@@ -268,15 +268,25 @@ const Scanner: React.FC<Props> = ({
     }
 
     if (mode === "fridge") {
-      try {
-        const payload = {
-          at: new Date().toISOString(),
-          items: reviewItems.map((x) => ({ name: x.name, confidence: x.confidence })),
-        };
-        localStorage.setItem("lastFridgeScan", JSON.stringify(payload));
-      } catch {
-        // ignore
-      }
+      // ✅ Fridge mode now also updates inventory (same as receipt)
+      const cleaned = reviewItems
+        .filter((x) => String(x.name || "").trim())
+        .map((x) => {
+          const qv = normalizeNumber((x as any).quantityValue, 1);
+          const qu = String((x as any).quantityUnit || "pcs");
+          return {
+            ...x,
+            name: String(x.name).trim(),
+            quantityValue: qv,
+            quantityUnit: qu,
+            quantity: `${qv} ${qu}`,
+            unitCost: 0, // Fridge scan typically doesn't have cost info
+            totalPrice: 0,
+            expiryDate: normalizeDDMMYYYY((x as any).expiryDate),
+          } as InventoryItem;
+        });
+
+      onItemsFound(cleaned);
       onClose();
       return;
     }
@@ -665,7 +675,7 @@ const Scanner: React.FC<Props> = ({
                   {mode === "receipt"
                     ? "Confirm & Add to Inventory"
                     : mode === "fridge"
-                      ? "Confirm (No Inventory Update)"
+                      ? "Confirm & Add to Inventory"
                       : "Confirm & Save Sales"}
                 </button>
               </div>
