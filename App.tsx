@@ -102,6 +102,7 @@ interface ErrorBoundaryState {
 }
 
 class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  declare props: ErrorBoundaryProps;
   state: ErrorBoundaryState = { hasError: false };
 
   static getDerivedStateFromError(error: unknown): ErrorBoundaryState {
@@ -698,7 +699,7 @@ export default function App() {
         .insert({
           business_id: business.id,
           user_id: user.id,
-          role: 'server', // 使用 server 或 staff
+          role: 'staff', // 修正：使用 'staff' 符合資料庫 check constraint
           status: 'active' // 重点：直接 Active，不再 Pending
         });
 
