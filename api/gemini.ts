@@ -16,15 +16,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const { prompt, imageBase64, mimeType, model, config } = req.body;
 
-    // 1. Get Secret Key from Server Env
-    const apiKey = process.env.GEMINI_API_KEY;
+    // 1. Get Secret Key from Server Env (with fallbacks for legacy/local VITE_ vars)
+    const apiKey =
+        process.env.GEMINI_API_KEY ||
+        process.env.VITE_GEMINI_API_KEY ||
+        process.env.VITE_GOOGLE_API_KEY ||
+        process.env.VITE_API_KEY;
+
     if (!apiKey) {
-        console.error('SERVER ERROR: Missing GEMINI_API_KEY in environment variables.');
-        return res.status(500).json({ error: 'Server configuration error: Integrity check failed.' });
+        console.error('SERVER ERROR: Missing GEMINI_API_KEY (or VITE_GEMINI_API_KEY) in environment variables.');
+        return res.status(500).json({ error: 'Server configuration error: Integrity check failed. Please check your .env.local file.' });
     }
 
     // 2. Select Model
-    const modelName = model || process.env.GEMINI_MODEL || 'gemini-1.5-flash';
+    const modelName = model || process.env.GEMINI_MODEL || process.env.VITE_GEMINI_MODEL || 'gemini-1.5-flash';
 
     try {
         // 3. Construct Google API Payload
