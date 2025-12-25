@@ -673,73 +673,79 @@ export default function App() {
     if (!code) return;
 
     try {
-      const { data: bizId, error: joinErr } = await supabase.rpc('join_business_with_code', {
-        p_join_code: code,
-      });
-
-      if (joinErr) {
-        alert(joinErr.message || 'Invalid or unauthorized store code.');
-        return;
-      }
-
-      const businessId = bizId as string;
-
-      const { data: biz, error: bizErr } = await supabase
+      // ✅ Fix: 不用 RPC，改前端直接查 + 插，确保 status = 'active'
+      // 1. 查店铺
+      const { data: business, error: findErr } = await supabase
         .from('businesses')
         .select('id, name, owner_id')
-        .eq('id', businessId)
+        .eq('join_code', code)
         .single();
 
-      if (bizErr || !biz) {
-        alert(bizErr?.message || 'Joined, but failed to load business.');
+      if (findErr || !business) {
+        console.error('Find business failed:', findErr);
+        alert('Invalid or unauthorized store code.');
         return;
       }
 
-      // 1) 让 dropdown 能看到店（但 joinCode 不存）
+      // 2. 直接插入 active member
+      const { error: joinErr } = await supabase
+        .from('business_members')
+        .insert({
+          business_id: business.id,
+          user_id: user.id,
+          role: 'server', // 使用 server 或 staff
+          status: 'active' // 重点：直接 Active，不再 Pending
+        });
+
+      if (joinErr) {
+        // 23505 = unique constraint violation (already joined)
+        if (joinErr.code === '23505') {
+          alert('You are already a member of this store.');
+        } else {
+          alert(joinErr.message || 'Join failed');
+        }
+        return;
+      }
+
+      // 3. 成功 -> 更新本地状态
+      const newMembership = {
+        id: `${user.id}_${business.id}`,
+        businessId: business.id,
+        name: user.name,
+        email: user.email,
+        role: 'Server',
+        hourlyRate: 0,
+        status: 'Active',
+      };
+
+      setStaff(prev => [...prev, newMembership as Staff]);
+
+      // 还要把 business 加到 businesses 列表里供 dropdown 显示
       setBusinesses(prev => {
-        if (prev.some(b => b.id === biz.id)) return prev;
-        return [
-          ...prev,
-          {
-            id: biz.id,
-            name: biz.name,
-            ownerId: biz.owner_id,
-            joinCode: '',
-            address: '',
-            hours: '',
-            customCategories: [],
-            customLocations: [],
-            pendingStaffIds: [],
-          },
-        ];
+        if (prev.some(b => b.id === business.id)) return prev;
+        return [...prev, {
+          id: business.id,
+          name: business.name,
+          ownerId: business.owner_id,
+          joinCode: '',
+          address: '', hours: '', contactInfo: '', notes: '',
+          customCategories: [], customLocations: [], pendingStaffIds: []
+        }];
       });
 
-      // 2) 本地写一条 Pending（配合 dropdown + 拦截切店）
-      setStaff(prev => {
-        const id = `${user.id}_${businessId}`;
-        const exists = prev.some(s => s.id === id);
-        if (exists) return prev;
-        return [
-          ...prev,
-          {
-            id,
-            businessId,
-            name: user.name,
-            email: user.email,
-            role: 'Server',
-            hourlyRate: 0,
-            status: 'Pending',
-          },
-        ];
-      });
-
-      alert('Request sent. Waiting for manager approval.');
-
-      setIsJoinStoreModalOpen(false);
       setJoinStoreCode('');
       setJoinStoreNameAlias('');
+      setIsJoinStoreModalOpen(false);
+
+      // 自动切过去
+      if (window.confirm(`Joined ${business.name} successfully! Switch to it now?`)) {
+        setCurrentBusinessId(business.id);
+        setView(ViewState.DASHBOARD);
+      }
+
     } catch (err: any) {
-      alert(err?.message || 'Join store failed');
+      console.error('Join store error:', err);
+      alert(err.message);
     }
   };
 
