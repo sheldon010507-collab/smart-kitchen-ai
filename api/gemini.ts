@@ -147,6 +147,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // Model Selection
         const modelName = model || process.env.GEMINI_MODEL || process.env.VITE_GEMINI_MODEL || 'gemini-1.5-flash';
 
+        // 🔍 Debug: Log which model is being used
+        console.log(`[Gemini API] Using model: ${modelName}`);
+
         const parts: any[] = [];
         if (imageBase64 && mimeType) {
             parts.push({
