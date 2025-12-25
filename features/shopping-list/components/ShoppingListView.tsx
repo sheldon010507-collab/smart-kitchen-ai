@@ -40,10 +40,6 @@ const ShoppingListView: React.FC<ShoppingListViewProps> = ({ businessId }) => {
         }
     });
 
-    // Effect to refetch when tab changes (to ensure fresh data)
-    React.useEffect(() => {
-        refetch();
-    }, [activeTab]);
 
     // Mutations
     const {

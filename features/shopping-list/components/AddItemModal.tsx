@@ -138,6 +138,7 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
                             type="text"
                             value={itemName}
                             onChange={(e) => setItemName(e.target.value)}
+                            maxLength={100}
                             className="w-full px-3 py-2 border border-[#E9E9E7] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             placeholder="e.g., Tomatoes"
                             autoFocus
@@ -209,12 +210,12 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
                                     type="button"
                                     onClick={() => setPriority(p)}
                                     className={`flex-1 py-2 px-3 rounded-lg border text-sm font-medium transition-colors ${priority === p
-                                            ? p === 'urgent'
-                                                ? 'bg-red-100 border-red-300 text-red-700'
-                                                : p === 'normal'
-                                                    ? 'bg-blue-100 border-blue-300 text-blue-700'
-                                                    : 'bg-gray-100 border-gray-300 text-gray-700'
-                                            : 'border-[#E9E9E7] text-[#787774] hover:bg-[#F7F6F3]'
+                                        ? p === 'urgent'
+                                            ? 'bg-red-100 border-red-300 text-red-700'
+                                            : p === 'normal'
+                                                ? 'bg-blue-100 border-blue-300 text-blue-700'
+                                                : 'bg-gray-100 border-gray-300 text-gray-700'
+                                        : 'border-[#E9E9E7] text-[#787774] hover:bg-[#F7F6F3]'
                                         }`}
                                 >
                                     {PRIORITY_LABELS[p]}

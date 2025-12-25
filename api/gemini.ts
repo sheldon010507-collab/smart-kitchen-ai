@@ -13,7 +13,7 @@ const getAllowedOrigin = (origin: string | undefined): string | null => {
         'https://www.guka.co.uk',
         'https://smart-kitchen-ai.vercel.app',
         // Allow localhost in development
-        ...(process.env.NODE_ENV === 'development' ? ['http://localhost:3000', 'http://localhost:5173'] : [])
+        ...(process.env.NODE_ENV === 'development' ? ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002', 'http://localhost:5173'] : [])
     ];
 
     if (origin && allowedOrigins.includes(origin)) {
