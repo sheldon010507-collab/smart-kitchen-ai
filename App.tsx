@@ -131,6 +131,31 @@ export default function App() {
   const [currentBusinessId, setCurrentBusinessId] = useState<string | null>(null);
   const [view, setView] = useState<ViewState>(ViewState.DASHBOARD);
 
+  // ✅ 3) 增加“兼容旧缓存”的清理，避免用户浏览器里旧的 biz_... 继续触发错误
+  const sanitizeStorage = () => {
+    if (typeof window === 'undefined') return;
+
+    // UUID v4 regex
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+    const keysToCheck = ['active_business_id', 'selectedBusinessId', 'currentBusinessId'];
+
+    keysToCheck.forEach(key => {
+      const val = localStorage.getItem(key);
+      if (val) {
+        // 如果是以 biz_ 开头，或者不是有效 UUID，就移除
+        if (val.startsWith('biz_') || !uuidRegex.test(val)) {
+          console.warn(`[Sanitize] Removing invalid ID from localStorage key "${key}":`, val);
+          localStorage.removeItem(key);
+        }
+      }
+    });
+  };
+
+  useEffect(() => {
+    sanitizeStorage();
+  }, []);
+
   // Data State（先保留本地 state，逐步接 Supabase）
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [sales, setSales] = useState<SalesReceipt[]>([]);
@@ -202,32 +227,32 @@ export default function App() {
   const activeBusiness = businesses.find(b => b.id === currentBusinessId);
   // ✅ Dropdown options = inventory-used + custom list
   const derivedCategories = useMemo(() => {
-  const bizItems =
-    currentBusinessId ? inventory.filter((i: any) => i.businessId === currentBusinessId) : inventory;
+    const bizItems =
+      currentBusinessId ? inventory.filter((i: any) => i.businessId === currentBusinessId) : inventory;
 
-  const fromItems = Array.from(
-    new Set((bizItems as any[]).map(i => i.category).filter(Boolean) as string[])
-  );
+    const fromItems = Array.from(
+      new Set((bizItems as any[]).map(i => i.category).filter(Boolean) as string[])
+    );
 
-  const fromBiz = activeBusiness?.customCategories ?? [];
-  return Array.from(new Set([...fromBiz, ...fromItems]))
-    .filter(Boolean)
-    .sort((a, b) => a.localeCompare(b));
-}, [inventory, currentBusinessId, activeBusiness]);
+    const fromBiz = activeBusiness?.customCategories ?? [];
+    return Array.from(new Set([...fromBiz, ...fromItems]))
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b));
+  }, [inventory, currentBusinessId, activeBusiness]);
 
   const derivedLocations = useMemo(() => {
-  const bizItems =
-    currentBusinessId ? inventory.filter((i: any) => i.businessId === currentBusinessId) : inventory;
+    const bizItems =
+      currentBusinessId ? inventory.filter((i: any) => i.businessId === currentBusinessId) : inventory;
 
-  const fromItems = Array.from(
-    new Set((bizItems as any[]).map(i => i.location).filter(Boolean) as string[])
-  );
+    const fromItems = Array.from(
+      new Set((bizItems as any[]).map(i => i.location).filter(Boolean) as string[])
+    );
 
-  const fromBiz = activeBusiness?.customLocations ?? [];
-  return Array.from(new Set([...fromBiz, ...fromItems]))
-    .filter(Boolean)
-    .sort((a, b) => a.localeCompare(b));
-}, [inventory, currentBusinessId, activeBusiness]);
+    const fromBiz = activeBusiness?.customLocations ?? [];
+    return Array.from(new Set([...fromBiz, ...fromItems]))
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b));
+  }, [inventory, currentBusinessId, activeBusiness]);
 
   const addMetaItem = (type: 'categories' | 'locations', value: string) => {
     if (!currentBusinessId) return;
@@ -547,14 +572,79 @@ export default function App() {
     setIsStoreModalOpen(true);
   };
 
-  const handleSaveStore = (business: Business) => {
-    if (editingBusiness) {
-      setBusinesses(prev => prev.map(b => (b.id === business.id ? business : b)));
-    } else {
-      setBusinesses(prev => [...prev, business]);
-      if (user) {
-        setUser({ ...user, ownedBusinessIds: [...(user.ownedBusinessIds || []), business.id] });
+  const handleSaveStore = async (businessData: Partial<Business>) => {
+    if (!user) return;
+
+    try {
+      if (businessData.id) {
+        // Edit Mode
+        const { error } = await supabase
+          .from('businesses')
+          .update({
+            name: businessData.name,
+            // 嘗試更新這些字段，如果數據庫沒有對應列可能會報錯，請根據實際 Schema 調整
+            // address: businessData.address,
+            // hours: businessData.hours,
+            // contact_info: businessData.contactInfo, 
+          })
+          .eq('id', businessData.id);
+
+        if (error) throw error;
+
+        setBusinesses(prev => prev.map(b => (b.id === businessData.id ? { ...b, ...businessData } as Business : b)));
+      } else {
+        // Create Mode - ✅ 修复：前端不传 ID，让 Supabase 生成 UUID
+        const { data: biz, error } = await supabase
+          .from('businesses')
+          .insert({
+            name: businessData.name?.trim(),
+            owner_id: user.id
+            // 如果您的 Schema 支持其他字段，请在此添加，例如：
+            // address: businessData.address,
+          })
+          .select('id, name, owner_id')
+          .single();
+
+        if (error) throw error;
+        if (!biz) throw new Error('Failed to create business');
+
+        const realUUID = biz.id;
+
+        // ✅ 必须插 business_members，不然 manager 自己都看不见
+        const { error: memErr } = await supabase.from('business_members').insert({
+          business_id: realUUID,
+          user_id: user.id,
+          role: 'owner',
+          status: 'active'
+        });
+
+        if (memErr) throw memErr;
+
+        // 构造本地对象（填充 UUID）
+        const newBusinessFull: Business = {
+          ...businessData,
+          id: realUUID,
+          ownerId: user.id,
+          // 默认值
+          joinCode: 'PENDING',
+          customCategories: ['Produce', 'Dairy', 'Meat', 'Pantry'],
+          customLocations: ['Fridge', 'Freezer', 'Pantry'],
+          pendingStaffIds: [],
+        } as Business;
+
+        setBusinesses(prev => [...prev, newBusinessFull]);
+
+        if (user) {
+          setUser({ ...user, ownedBusinessIds: [...(user.ownedBusinessIds || []), realUUID] });
+        }
+
+        // 切換到新店
+        localStorage.setItem('active_business_id', realUUID);
+        setCurrentBusinessId(realUUID);
       }
+    } catch (err: any) {
+      console.error('Save store failed:', err);
+      alert('Failed to save store: ' + (err.message || 'Unknown error'));
     }
   };
 
@@ -1008,11 +1098,10 @@ export default function App() {
 
             <button
               onClick={() => setView(ViewState.DASHBOARD)}
-              className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg text-sm transition-all ${
-                view === ViewState.DASHBOARD
-                  ? 'bg-white text-primary font-semibold shadow-sm border border-border'
-                  : 'text-secondary hover:text-primary hover:bg-white/50'
-              }`}
+              className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg text-sm transition-all ${view === ViewState.DASHBOARD
+                ? 'bg-white text-primary font-semibold shadow-sm border border-border'
+                : 'text-secondary hover:text-primary hover:bg-white/50'
+                }`}
             >
               <LayoutDashboard className="w-5 h-5" />
               <span>Overview</span>
@@ -1020,11 +1109,10 @@ export default function App() {
 
             <button
               onClick={() => setView(ViewState.INVENTORY)}
-              className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg text-sm transition-all ${
-                view === ViewState.INVENTORY
-                  ? 'bg-white text-primary font-semibold shadow-sm border border-border'
-                  : 'text-secondary hover:text-primary hover:bg-white/50'
-              }`}
+              className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg text-sm transition-all ${view === ViewState.INVENTORY
+                ? 'bg-white text-primary font-semibold shadow-sm border border-border'
+                : 'text-secondary hover:text-primary hover:bg-white/50'
+                }`}
             >
               <Refrigerator className="w-5 h-5" />
               <span>Inventory</span>
@@ -1032,11 +1120,10 @@ export default function App() {
 
             <button
               onClick={() => setView(ViewState.CHEF)}
-              className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg text-sm transition-all ${
-                view === ViewState.CHEF
-                  ? 'bg-white text-primary font-semibold shadow-sm border border-border'
-                  : 'text-secondary hover:text-primary hover:bg-white/50'
-              }`}
+              className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg text-sm transition-all ${view === ViewState.CHEF
+                ? 'bg-white text-primary font-semibold shadow-sm border border-border'
+                : 'text-secondary hover:text-primary hover:bg-white/50'
+                }`}
             >
               <ChefHat className="w-5 h-5" />
               <span>AI Chef</span>
@@ -1045,11 +1132,10 @@ export default function App() {
             {user.role === 'Manager' && (
               <button
                 onClick={() => setView(ViewState.RESTAURANT)}
-                className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg text-sm transition-all ${
-                  view === ViewState.RESTAURANT
-                    ? 'bg-white text-primary font-semibold shadow-sm border border-border'
-                    : 'text-secondary hover:text-primary hover:bg-white/50'
-                }`}
+                className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg text-sm transition-all ${view === ViewState.RESTAURANT
+                  ? 'bg-white text-primary font-semibold shadow-sm border border-border'
+                  : 'text-secondary hover:text-primary hover:bg-white/50'
+                  }`}
               >
                 <Store className="w-5 h-5" />
                 <span>Store Ops</span>
@@ -1149,8 +1235,8 @@ export default function App() {
               <header className="flex justify-between items-end border-b border-border pb-6">
                 <div>
                   <h2 className="text-4xl font-bold text-primary tracking-tight">
-                <EditableTitle defaultTitle="Master Dashboard" storageKey="overview_master_dashboard" />
-              </h2>
+                    <EditableTitle defaultTitle="Master Dashboard" storageKey="overview_master_dashboard" />
+                  </h2>
                   <p className="text-secondary mt-3 text-lg font-light">Overview of {accessibleBusinesses.length} locations</p>
                 </div>
                 <button
@@ -1393,8 +1479,8 @@ export default function App() {
                 <header className="flex justify-between items-end border-b border-border pb-6">
                   <div>
                     <h2 className="text-4xl font-bold text-primary tracking-tight">
-                <EditableTitle defaultTitle="Inventory" storageKey="module_inventory_title" />
-              </h2>
+                      <EditableTitle defaultTitle="Inventory" storageKey="module_inventory_title" />
+                    </h2>
                     <p className="text-secondary mt-3 text-lg font-light">Manage ingredients and stock for {activeBusiness?.name}</p>
                   </div>
                   <div className="flex space-x-3">
@@ -1405,16 +1491,16 @@ export default function App() {
                       <ScanLine className="w-5 h-5 mr-2" /> Scan
                     </button>
                     <button
-    onClick={() => {
-      setMetaTab('categories');
-      setMetaNewValue('');
-      setIsMetaManagerOpen(true);
-    }}
-    className="flex items-center px-6 py-3 bg-white text-primary border border-border rounded-lg shadow-sm text-sm font-semibold hover:bg-background transition-colors"
-  >
-    <Edit className="w-5 h-5 mr-2" />
-    Manage
-  </button>
+                      onClick={() => {
+                        setMetaTab('categories');
+                        setMetaNewValue('');
+                        setIsMetaManagerOpen(true);
+                      }}
+                      className="flex items-center px-6 py-3 bg-white text-primary border border-border rounded-lg shadow-sm text-sm font-semibold hover:bg-background transition-colors"
+                    >
+                      <Edit className="w-5 h-5 mr-2" />
+                      Manage
+                    </button>
                     <button
                       onClick={() => {
                         setEditingItem(null);
@@ -1519,14 +1605,14 @@ export default function App() {
       {isScannerOpen && (
         <div className="fixed inset-0 bg-white/90 z-50 flex items-center justify-center p-4 backdrop-blur-md">
           <ErrorBoundary>
-          <Scanner
-            initialMode={scannerMode}
-            inventoryNameOptions={filteredInventory.map((i) => i.name)}
-            onClose={() => setIsScannerOpen(false)}
-            onItemsFound={handleScanResult}
-            onSalesProcessed={handleSalesProcessed}
-          />
-        </ErrorBoundary>
+            <Scanner
+              initialMode={scannerMode}
+              inventoryNameOptions={filteredInventory.map((i) => i.name)}
+              onClose={() => setIsScannerOpen(false)}
+              onItemsFound={handleScanResult}
+              onSalesProcessed={handleSalesProcessed}
+            />
+          </ErrorBoundary>
         </div>
       )}
 
@@ -1598,92 +1684,90 @@ export default function App() {
           </div>
         </div>
       )}
-    {isMetaManagerOpen && (
-  <div className="fixed inset-0 bg-white/80 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-    <div className="bg-white rounded-xl w-full max-w-lg shadow-2xl border border-border p-6 relative">
-      <button
-        onClick={() => setIsMetaManagerOpen(false)}
-        className="absolute top-4 right-4 text-secondary hover:text-primary"
-      >
-        <X className="w-5 h-5" />
-      </button>
+      {isMetaManagerOpen && (
+        <div className="fixed inset-0 bg-white/80 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-xl w-full max-w-lg shadow-2xl border border-border p-6 relative">
+            <button
+              onClick={() => setIsMetaManagerOpen(false)}
+              className="absolute top-4 right-4 text-secondary hover:text-primary"
+            >
+              <X className="w-5 h-5" />
+            </button>
 
-      <h3 className="text-xl font-bold text-primary">Manage Categories & Locations</h3>
-      <p className="text-sm text-secondary mt-1">Rename / delete will update your inventory records too.</p>
+            <h3 className="text-xl font-bold text-primary">Manage Categories & Locations</h3>
+            <p className="text-sm text-secondary mt-1">Rename / delete will update your inventory records too.</p>
 
-      <div className="flex gap-2 mt-4">
-        <button
-          onClick={() => setMetaTab('categories')}
-          className={`px-4 py-2 rounded-lg text-sm font-bold border ${
-            metaTab === 'categories' ? 'bg-primary text-white border-primary' : 'bg-white text-primary border-border'
-          }`}
-        >
-          Categories
-        </button>
-        <button
-          onClick={() => setMetaTab('locations')}
-          className={`px-4 py-2 rounded-lg text-sm font-bold border ${
-            metaTab === 'locations' ? 'bg-primary text-white border-primary' : 'bg-white text-primary border-border'
-          }`}
-        >
-          Locations
-        </button>
-      </div>
-
-      <div className="mt-5 space-y-3 max-h-[360px] overflow-auto pr-1">
-        {(metaTab === 'categories' ? derivedCategories : derivedLocations).map(v => (
-          <div key={v} className="flex items-center justify-between p-3 rounded-lg border border-border bg-background">
-            <div className="font-semibold text-primary truncate">{v}</div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 mt-4">
               <button
-                onClick={async () => {
-                  const nv = window.prompt('Rename to:', v);
-                  if (!nv) return;
-                  await renameMetaItem(metaTab, v, nv);
-                }}
-                className="px-3 py-2 rounded-lg bg-white border border-border text-primary font-bold text-xs hover:bg-background"
+                onClick={() => setMetaTab('categories')}
+                className={`px-4 py-2 rounded-lg text-sm font-bold border ${metaTab === 'categories' ? 'bg-primary text-white border-primary' : 'bg-white text-primary border-border'
+                  }`}
               >
-                Rename
+                Categories
               </button>
               <button
-                onClick={async () => {
-                  await deleteMetaItem(metaTab, v);
-                }}
-                className="px-3 py-2 rounded-lg bg-white border border-border text-red-600 font-bold text-xs hover:bg-background"
+                onClick={() => setMetaTab('locations')}
+                className={`px-4 py-2 rounded-lg text-sm font-bold border ${metaTab === 'locations' ? 'bg-primary text-white border-primary' : 'bg-white text-primary border-border'
+                  }`}
               >
-                Delete
+                Locations
+              </button>
+            </div>
+
+            <div className="mt-5 space-y-3 max-h-[360px] overflow-auto pr-1">
+              {(metaTab === 'categories' ? derivedCategories : derivedLocations).map(v => (
+                <div key={v} className="flex items-center justify-between p-3 rounded-lg border border-border bg-background">
+                  <div className="font-semibold text-primary truncate">{v}</div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={async () => {
+                        const nv = window.prompt('Rename to:', v);
+                        if (!nv) return;
+                        await renameMetaItem(metaTab, v, nv);
+                      }}
+                      className="px-3 py-2 rounded-lg bg-white border border-border text-primary font-bold text-xs hover:bg-background"
+                    >
+                      Rename
+                    </button>
+                    <button
+                      onClick={async () => {
+                        await deleteMetaItem(metaTab, v);
+                      }}
+                      className="px-3 py-2 rounded-lg bg-white border border-border text-red-600 font-bold text-xs hover:bg-background"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+              {(metaTab === 'categories' ? derivedCategories : derivedLocations).length === 0 && (
+                <div className="p-6 text-center text-secondary text-sm border border-dashed border-border rounded-lg">
+                  No items yet.
+                </div>
+              )}
+            </div>
+
+            <div className="mt-5 flex gap-2">
+              <input
+                value={metaNewValue}
+                onChange={e => setMetaNewValue(e.target.value)}
+                placeholder={metaTab === 'categories' ? 'Add new category...' : 'Add new location...'}
+                className="flex-1 px-4 py-3 rounded-lg border border-border focus:outline-none focus:border-accent text-sm"
+              />
+              <button
+                onClick={() => {
+                  addMetaItem(metaTab, metaNewValue);
+                  setMetaNewValue('');
+                }}
+                className="px-5 py-3 rounded-lg bg-accent text-white font-bold text-sm hover:bg-accentHover"
+              >
+                Add
               </button>
             </div>
           </div>
-        ))}
-
-        {(metaTab === 'categories' ? derivedCategories : derivedLocations).length === 0 && (
-          <div className="p-6 text-center text-secondary text-sm border border-dashed border-border rounded-lg">
-            No items yet.
-          </div>
-        )}
-      </div>
-
-      <div className="mt-5 flex gap-2">
-        <input
-          value={metaNewValue}
-          onChange={e => setMetaNewValue(e.target.value)}
-          placeholder={metaTab === 'categories' ? 'Add new category...' : 'Add new location...'}
-          className="flex-1 px-4 py-3 rounded-lg border border-border focus:outline-none focus:border-accent text-sm"
-        />
-        <button
-          onClick={() => {
-            addMetaItem(metaTab, metaNewValue);
-            setMetaNewValue('');
-          }}
-          className="px-5 py-3 rounded-lg bg-accent text-white font-bold text-sm hover:bg-accentHover"
-        >
-          Add
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+        </div>
+      )}
 
     </div>
   );
