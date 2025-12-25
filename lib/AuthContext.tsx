@@ -16,15 +16,70 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // 確保 pending business 被創建（如果 localStorage 中有 pending_business_name）
+  async function ensurePendingBusiness(userId: string) {
+    try {
+      const pendingName = localStorage.getItem('pending_business_name');
+      if (!pendingName) {
+        return;
+      }
+
+      // 檢查是否已存在 business
+      const { data: existingBusiness, error: selectError } = await supabase
+        .from('businesses')
+        .select('id')
+        .eq('owner_id', userId)
+        .limit(1)
+        .single();
+
+      if (selectError && selectError.code !== 'PGRST116') {
+        // PGRST116 = no rows returned, 這是正常的
+        console.error('Error checking existing business:', selectError);
+        return;
+      }
+
+      if (existingBusiness) {
+        // 已存在 business，清掉 localStorage
+        localStorage.removeItem('pending_business_name');
+        return;
+      }
+
+      // 不存在，新增一條記錄
+      const { error: insertError } = await supabase
+        .from('businesses')
+        .insert({ name: pendingName, owner_id: userId });
+
+      if (insertError) {
+        console.error('Error inserting pending business:', insertError);
+        return;
+      }
+
+      // 成功後清掉 localStorage
+      localStorage.removeItem('pending_business_name');
+    } catch (error) {
+      console.error('Error in ensurePendingBusiness:', error);
+    }
+  }
+
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      setUser(user);
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
       setLoading(false);
+
+      // 如果有 user，嘗試創建 pending business
+      if (session?.user?.id) {
+        ensurePendingBusiness(session.user.id);
+      }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         setUser(session?.user ?? null);
+
+        // 如果有 user，嘗試創建 pending business
+        if (session?.user?.id) {
+          ensurePendingBusiness(session.user.id);
+        }
       }
     );
 

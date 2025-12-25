@@ -160,6 +160,11 @@ export default function SupabaseLogin({ onLoginSuccess }: Props) {
         return;
       }
 
+      // ✅ 在 signUp 之前，先把店名存到 localStorage（用於郵件確認後自動建立）
+      if (role === 'Manager' && storeName.trim()) {
+        localStorage.setItem('pending_business_name', storeName.trim());
+      }
+
       const { data, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -187,13 +192,14 @@ export default function SupabaseLogin({ onLoginSuccess }: Props) {
         return;
       }
 
-      // ✅ 开了邮箱验证：这里通常没有 session，必须先去邮箱点确认
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData.session) {
-        setError('Account created. Please verify your email, then sign in to continue.');
+      // ✅ 檢查是否有 session（開啟郵箱驗證時通常沒有）
+      if (!data.session) {
+        // 沒有 session，需要郵件確認
+        setError('已發送確認郵件，請確認後再登入，登入後會自動建立餐廳');
         return;
       }
 
+      // ✅ 有 session，可以直接創建 business
       // Manager：创建 business + membership active
       if (role === 'Manager') {
         const { data: newBusiness, error: bizError } = await supabase
@@ -206,9 +212,13 @@ export default function SupabaseLogin({ onLoginSuccess }: Props) {
           .single();
 
         if (bizError || !newBusiness) {
+          // 插入失敗，不清 localStorage，讓登入後自動補建機制處理
           setError(bizError?.message || 'Failed to create restaurant');
           return;
         }
+
+        // ✅ 插入成功，清掉 localStorage pending key
+        localStorage.removeItem('pending_business_name');
 
         const { error: memErr } = await supabase.from('business_members').insert({
           business_id: newBusiness.id,
@@ -383,15 +393,15 @@ export default function SupabaseLogin({ onLoginSuccess }: Props) {
 
                 {(error.toLowerCase().includes('verify your email') ||
                   error.toLowerCase().includes('email not confirmed')) && (
-                  <button
-                    type="button"
-                    onClick={resendConfirmEmail}
-                    disabled={resending}
-                    className="w-full py-2.5 bg-white border border-border rounded-lg text-sm font-semibold hover:bg-background disabled:opacity-50"
-                  >
-                    {resending ? 'Resending...' : 'Resend confirmation email'}
-                  </button>
-                )}
+                    <button
+                      type="button"
+                      onClick={resendConfirmEmail}
+                      disabled={resending}
+                      className="w-full py-2.5 bg-white border border-border rounded-lg text-sm font-semibold hover:bg-background disabled:opacity-50"
+                    >
+                      {resending ? 'Resending...' : 'Resend confirmation email'}
+                    </button>
+                  )}
               </div>
             )}
 
