@@ -15,6 +15,7 @@ import {
   Shield,
   X,
   ArrowRight,
+  ShoppingCart,
 } from 'lucide-react';
 
 import {
@@ -42,6 +43,7 @@ import MenuManager from './components/MenuManager';
 import StaffInventoryOverview from './components/StaffInventoryOverview';
 import SupabaseLogin from './components/SupabaseLogin';
 import { EditableTitle } from './components/EditableTitle';
+import { ShoppingListView, ShoppingListSummary, FEATURE_SHOPPING_LIST_ENABLED } from './features/shopping-list';
 // ✅ 注意：StaffCalendar 应该在 RestaurantDashboard 内部使用，不在这里导入
 import { supabase } from './lib/supabase';
 
@@ -1138,6 +1140,19 @@ export default function App() {
               <span>AI Chef</span>
             </button>
 
+            {FEATURE_SHOPPING_LIST_ENABLED && (
+              <button
+                onClick={() => setView(ViewState.SHOPPING)}
+                className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg text-sm transition-all ${view === ViewState.SHOPPING
+                  ? 'bg-white text-primary font-semibold shadow-sm border border-border'
+                  : 'text-secondary hover:text-primary hover:bg-white/50'
+                  }`}
+              >
+                <ShoppingCart className="w-5 h-5" />
+                <span>Shopping List</span>
+              </button>
+            )}
+
             {user.role === 'Manager' && (
               <button
                 onClick={() => setView(ViewState.RESTAURANT)}
@@ -1597,6 +1612,28 @@ export default function App() {
                   <p className="text-secondary text-lg">
                     {user.role !== 'Manager' ? 'Business Management is restricted to Managers.' : 'Select a store to view details.'}
                   </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* SHOPPING LIST VIEW */}
+          {view === ViewState.SHOPPING && (
+            <div className="animate-in fade-in duration-500 h-full">
+              {currentBusinessId ? (
+                // Single Store View (Staff or Manager selected store)
+                <ShoppingListView businessId={currentBusinessId} />
+              ) : user.role === 'Manager' ? (
+                // Master Dashboard Summary
+                <ShoppingListSummary onSelectBusiness={setCurrentBusinessId} />
+              ) : (
+                // Staff without business selected (shouldn't happen often)
+                <div className="flex flex-col items-center justify-center h-full text-secondary">
+                  <div className="bg-white p-8 rounded-xl border border-border shadow-sm text-center">
+                    <Store className="w-12 h-12 mx-auto mb-4 text-[#D3D1CB]" />
+                    <h3 className="text-lg font-medium text-primary mb-2">No Store Selected</h3>
+                    <p>Please select a store to view its shopping list.</p>
+                  </div>
                 </div>
               )}
             </div>
