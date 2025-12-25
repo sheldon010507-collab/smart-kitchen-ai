@@ -60,6 +60,18 @@ const callGeminiApi = async (payload: {
 };
 
 /**
+ * ✅ P2 Fix: Sanitize user input to prevent prompt injection
+ * Allows: letters (any script), numbers, spaces, hyphens, basic punctuation
+ */
+const sanitizeIngredientName = (name: string): string => {
+  if (!name || typeof name !== 'string') return '';
+  return name
+    .replace(/[<>{}[\]\\|`~!@#$%^&*()=+;:'"]/g, '') // Remove dangerous chars
+    .slice(0, 50) // Limit length
+    .trim();
+};
+
+/**
  * FEATURE: Analyze Images (Receipts for Inventory & Costing)
  * Supports RAG (dictionary) for better name matching
  */
@@ -71,7 +83,14 @@ export const analyzeInventoryImage = async (
 ): Promise<any[]> => {
 
   const today = new Date().toISOString().split('T')[0];
-  const dictStr = dictionary.slice(0, 400).join("、");
+
+  // ✅ Sanitize all dictionary entries before using in prompt
+  const sanitizedDict = dictionary
+    .map(sanitizeIngredientName)
+    .filter(name => name.length > 0)
+    .slice(0, 400);
+
+  const dictStr = sanitizedDict.join("、");
 
   const ragContext = dictStr
     ? `Context: Known ingredients dictionary: [${dictStr}]. If a name is similar, prefer the dictionary name. If unsure, provide alternatives in 'candidates'.`

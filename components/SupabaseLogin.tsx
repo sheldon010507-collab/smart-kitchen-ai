@@ -160,6 +160,24 @@ export default function SupabaseLogin({ onLoginSuccess }: Props) {
         return;
       }
 
+      // ✅ P3 Fix: Password strength validation
+      if (password.length < 8) {
+        setError('Password must be at least 8 characters');
+        return;
+      }
+      if (!/[A-Z]/.test(password)) {
+        setError('Password must contain at least one uppercase letter');
+        return;
+      }
+      if (!/[a-z]/.test(password)) {
+        setError('Password must contain at least one lowercase letter');
+        return;
+      }
+      if (!/[0-9]/.test(password)) {
+        setError('Password must contain at least one number');
+        return;
+      }
+
       // ✅ 在 signUp 之前，先把店名存到 localStorage（用於郵件確認後自動建立）
       if (role === 'Manager' && storeName.trim() && typeof window !== 'undefined' && window.localStorage) {
         localStorage.setItem('pending_business_name', storeName.trim());

@@ -89,21 +89,24 @@ const toISODate = (dateStr: string | undefined | null): string | null => {
   return null;
 };
 
-class ErrorBoundary extends React.Component<
-  { children: React.ReactNode },
-  { hasError: boolean; error?: unknown }
-> {
-  constructor(props: { children: React.ReactNode }) {
-    super(props);
-    this.state = { hasError: false };
-  }
+// ✅ Fix: Properly typed ErrorBoundary
+interface ErrorBoundaryProps {
+  children: React.ReactNode;
+}
 
-  static getDerivedStateFromError(error: unknown) {
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error?: unknown;
+}
+
+class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  state: ErrorBoundaryState = { hasError: false };
+
+  static getDerivedStateFromError(error: unknown): ErrorBoundaryState {
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: unknown, info: unknown) {
-    // Avoid white-screen: show a readable error box and keep console logs.
+  componentDidCatch(error: unknown, info: React.ErrorInfo) {
     console.error("[UI crashed]", error, info);
   }
 
