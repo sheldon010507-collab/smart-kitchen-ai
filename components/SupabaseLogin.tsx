@@ -161,7 +161,7 @@ export default function SupabaseLogin({ onLoginSuccess }: Props) {
       }
 
       // ✅ 在 signUp 之前，先把店名存到 localStorage（用於郵件確認後自動建立）
-      if (role === 'Manager' && storeName.trim()) {
+      if (role === 'Manager' && storeName.trim() && typeof window !== 'undefined' && window.localStorage) {
         localStorage.setItem('pending_business_name', storeName.trim());
       }
 
@@ -218,7 +218,9 @@ export default function SupabaseLogin({ onLoginSuccess }: Props) {
         }
 
         // ✅ 插入成功，清掉 localStorage pending key
-        localStorage.removeItem('pending_business_name');
+        if (typeof window !== 'undefined' && window.localStorage) {
+          localStorage.removeItem('pending_business_name');
+        }
 
         const { error: memErr } = await supabase.from('business_members').insert({
           business_id: newBusiness.id,

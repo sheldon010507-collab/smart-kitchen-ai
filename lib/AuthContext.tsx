@@ -19,6 +19,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // 確保 pending business 被創建（如果 localStorage 中有 pending_business_name）
   async function ensurePendingBusiness(userId: string) {
     try {
+      // 檢查 localStorage 是否可用（SSR/React Native 環境可能沒有）
+      if (typeof window === 'undefined' || !window.localStorage) {
+        return;
+      }
+
       const pendingName = localStorage.getItem('pending_business_name');
       if (!pendingName) {
         return;
