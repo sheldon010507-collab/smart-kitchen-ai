@@ -1,5 +1,6 @@
 
 import { InventoryItem, Recipe, SalesReceipt, MenuItem, Shift } from "../types";
+import { supabase } from "../lib/supabase";
 
 // Helper to encode file to base64
 export const fileToGenerativePart = async (file: File): Promise<string> => {
@@ -24,9 +25,19 @@ const callGeminiApi = async (payload: {
   config?: any;
 }): Promise<string> => {
   try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+
+    if (!token) {
+      throw new Error("Unauthorized: You must be logged in to use AI features.");
+    }
+
     const res = await fetch('/api/gemini', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
       body: JSON.stringify(payload)
     });
 
