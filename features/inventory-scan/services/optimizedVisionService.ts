@@ -151,25 +151,64 @@ export async function scanInventoryOptimized(options: ScanOptions): Promise<Scan
 }
 
 /**
- * Fetch known items from existing inventory
+ * Fetch known items from SKU master and existing inventory
+ * Combines data from both sources for comprehensive RAG dictionary
  */
 async function fetchKnownItems(businessId: string): Promise<KnownItem[]> {
+    const knownItems: KnownItem[] = [];
+
     try {
-        const { data, error } = await supabase
-            .from('inventory_items')
-            .select('id, name, quantity_unit')
+        // 1. First try to fetch from sku_master (enhanced metadata)
+        const { data: skuData, error: skuError } = await supabase
+            .from('sku_master')
+            .select('id, name, unit, category, typical_package_size, visual_description, aliases, par_level, typical_quantity')
             .eq('business_id', businessId)
             .order('name');
 
-        if (error) throw error;
+        if (!skuError && skuData?.length) {
+            skuData.forEach(item => {
+                knownItems.push({
+                    id: item.id,
+                    name: item.name,
+                    unit: item.unit || 'pcs',
+                    category: item.category,
+                    typical_package_size: item.typical_package_size,
+                    visual_description: item.visual_description,
+                    aliases: item.aliases,
+                    typical_quantity: item.typical_quantity
+                        ? `${item.typical_quantity} ${item.unit}`
+                        : (item.par_level ? `par: ${item.par_level} ${item.unit}` : undefined)
+                });
+            });
+        }
 
-        return (data || []).map(item => ({
-            id: item.id,
-            name: item.name,
-            unit: item.quantity_unit || 'pcs'
-        }));
+        // 2. Also fetch from inventory_items (for items not in sku_master)
+        const { data: invData, error: invError } = await supabase
+            .from('inventory_items')
+            .select('id, name, quantity_unit, category')
+            .eq('business_id', businessId)
+            .order('name');
+
+        if (!invError && invData?.length) {
+            const existingNames = new Set(knownItems.map(k => k.name.toLowerCase()));
+
+            invData.forEach(item => {
+                // Only add if not already in knownItems
+                if (!existingNames.has(item.name.toLowerCase())) {
+                    knownItems.push({
+                        id: item.id,
+                        name: item.name,
+                        unit: item.quantity_unit || 'pcs',
+                        category: item.category
+                    });
+                    existingNames.add(item.name.toLowerCase());
+                }
+            });
+        }
+
+        return knownItems;
     } catch (e) {
-        console.warn('Failed to fetch inventory:', e);
+        console.warn('Failed to fetch known items:', e);
         return [];
     }
 }
@@ -208,7 +247,9 @@ async function callGeminiVision(
             prompt,
             images: imageParts,
             config: {
-                temperature: 0.1,  // Low temperature for consistency
+                temperature: 0,  // Zero temperature for deterministic, accurate quantity estimation
+                topK: 1,         // Most likely token only
+                topP: 0.1,       // Very focused sampling
                 maxOutputTokens: 4096,
                 responseMimeType: 'application/json'
             }

@@ -107,10 +107,24 @@ export const analyzeInventoryImage = async (
        5. Expiry Date (dd/mm/yyyy) starting from ${today}.
        6. Confidence (0-1).
        Return a JSON array.`
-    : `Analyze this fridge/pantry photo. Identify items.
+    : `Analyze this fridge/pantry photo. Identify ALL food items with ACCURATE QUANTITIES.
        ${ragContext}
-       Estimate quantity.
-       Return a JSON array.`;
+       
+       QUANTITY ESTIMATION RULES:
+       - Direct count: Count visible items individually
+       - For packages: Read labels for weight (1kg, 500g, 1L, etc.)
+       - For stacked items: Count visible × estimated depth
+       - For containers: Estimate fill level (half full, 3/4 full)
+       - In "notes": ALWAYS show your calculation (e.g., "3 bags × 1kg = 3kg")
+       
+       Common container/package sizes:
+       - Eggs: 6/10/12/30 pcs
+       - Milk: 250ml/500ml/1L/2L
+       - Vegetables (bunch): ~200-300g
+       - Meat trays: 500g or 1kg
+       
+       Return a JSON array with name, quantityValue, quantityUnit, confidence (0-1), notes.
+       BE CONSERVATIVE - only report quantities you can verify from the image.`;
 
   const itemSchema = {
     type: "OBJECT",
@@ -125,7 +139,8 @@ export const analyzeInventoryImage = async (
       expiryDate: { type: "STRING" },
       confidence: { type: "NUMBER" },
       is_new_item: { type: "BOOLEAN" },
-      candidates: { type: "ARRAY", items: { type: "STRING" } }
+      candidates: { type: "ARRAY", items: { type: "STRING" } },
+      notes: { type: "STRING" }
     },
     required: ["name"]
   };
@@ -135,6 +150,9 @@ export const analyzeInventoryImage = async (
     imageBase64: base64Image,
     mimeType,
     config: {
+      temperature: 0,        // Zero temperature for accurate quantity estimation
+      topK: 1,               // Most likely token only
+      topP: 0.1,             // Very focused sampling
       responseMimeType: 'application/json',
       responseSchema: {
         type: "ARRAY",
