@@ -9,7 +9,7 @@ export interface Business {
   hours?: string;
   contactInfo?: string;
   notes?: string;
-  
+
   customCategories: string[];
   customLocations: string[];
   pendingStaffIds: string[]; // List of staff requesting to join
@@ -57,7 +57,8 @@ export enum ViewState {
   CHEF = 'CHEF',
   SHOPPING = 'SHOPPING',
   RESTAURANT = 'RESTAURANT',
-  PRIVACY = 'PRIVACY'
+  PRIVACY = 'PRIVACY',
+  INVENTORY_SCAN = 'INVENTORY_SCAN'
 }
 
 export interface ChartData {

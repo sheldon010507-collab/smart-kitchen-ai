@@ -16,6 +16,9 @@ import {
   X,
   ArrowRight,
   ShoppingCart,
+  Search,
+  AlertTriangle,
+  ChevronRight,
 } from 'lucide-react';
 
 import {
@@ -43,7 +46,7 @@ import MenuManager from './components/MenuManager';
 import StaffInventoryOverview from './components/StaffInventoryOverview';
 import SupabaseLogin from './components/SupabaseLogin';
 import { EditableTitle } from './components/EditableTitle';
-import { ShoppingListView, ShoppingListSummary, FEATURE_SHOPPING_LIST_ENABLED } from './features/shopping-list';
+import { ShoppingListView, ShoppingListSummary, FEATURE_SHOPPING_LIST_ENABLED, useShoppingListSummary } from './features/shopping-list';
 // ✅ 注意：StaffCalendar 应该在 RestaurantDashboard 内部使用，不在这里导入
 import { supabase } from './lib/supabase';
 
@@ -189,6 +192,9 @@ export default function App() {
   const [isJoinStoreModalOpen, setIsJoinStoreModalOpen] = useState(false);
   const [joinStoreCode, setJoinStoreCode] = useState('');
   const [joinStoreNameAlias, setJoinStoreNameAlias] = useState('');
+
+  // Inventory Search State
+  const [inventorySearchQuery, setInventorySearchQuery] = useState('');
 
   // ✅ 新增：浏览器返回按钮处理
   useEffect(() => {
@@ -407,6 +413,13 @@ export default function App() {
     () => (isMasterView ? prepTasks : prepTasks.filter(t => t.businessId === currentBusinessId)),
     [prepTasks, currentBusinessId, isMasterView]
   );
+
+  // Shopping List Summary for Master Dashboard
+  const { summaries: shoppingListSummaries, loading: shoppingListLoading } = useShoppingListSummary(
+    user?.role === 'Manager' && isMasterView ? user?.id : null
+  );
+  const totalPendingItems = shoppingListSummaries.reduce((sum, s) => sum + s.pending_count, 0);
+  const totalUrgentItems = shoppingListSummaries.reduce((sum, s) => sum + s.urgent_count, 0);
 
   // --- Logic: Recalculate Menu Costs ---
   const recalculateMenuCosts = (currentInventory: InventoryItem[]) => {
@@ -1327,6 +1340,84 @@ export default function App() {
                   })}
                 </div>
               </section>
+
+              {/* Shopping List Summary */}
+              {FEATURE_SHOPPING_LIST_ENABLED && (
+                <section>
+                  <h3 className="text-sm font-bold text-secondary uppercase tracking-widest mb-6">Shopping List Overview</h3>
+
+                  {/* Stats Cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div className="bg-white p-6 rounded-xl border border-border shadow-sm">
+                      <div className="text-sm font-medium text-secondary mb-2">Total Pending Items</div>
+                      <div className="text-3xl font-bold text-primary">
+                        {shoppingListLoading ? '...' : totalPendingItems}
+                      </div>
+                      <p className="text-xs text-secondary mt-1">across {shoppingListSummaries.length} stores</p>
+                    </div>
+                    <div className={`p-6 rounded-xl border shadow-sm ${totalUrgentItems > 0 ? 'bg-red-50 border-red-100' : 'bg-white border-border'}`}>
+                      <div className={`flex items-center space-x-2 mb-2 ${totalUrgentItems > 0 ? 'text-red-700' : 'text-secondary'}`}>
+                        <AlertTriangle className="w-4 h-4" />
+                        <span className="text-sm font-medium">Urgent Items</span>
+                      </div>
+                      <div className={`text-3xl font-bold ${totalUrgentItems > 0 ? 'text-red-600' : 'text-primary'}`}>
+                        {shoppingListLoading ? '...' : totalUrgentItems}
+                      </div>
+                      <p className="text-xs text-secondary mt-1">need immediate attention</p>
+                    </div>
+                  </div>
+
+                  {/* Store Breakdown */}
+                  <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
+                    <div className="px-6 py-4 border-b border-border bg-background/50">
+                      <h4 className="font-semibold text-primary">Store Breakdown</h4>
+                    </div>
+                    {shoppingListLoading ? (
+                      <div className="p-8 flex justify-center">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                      </div>
+                    ) : shoppingListSummaries.length === 0 ? (
+                      <div className="p-8 text-center text-secondary">No shopping list data available.</div>
+                    ) : (
+                      <div className="divide-y divide-border">
+                        {shoppingListSummaries.map((summary) => (
+                          <div
+                            key={summary.business_id}
+                            onClick={() => {
+                              setCurrentBusinessId(summary.business_id);
+                              setView(ViewState.SHOPPING);
+                            }}
+                            className="group flex items-center justify-between p-4 hover:bg-background cursor-pointer transition-colors"
+                          >
+                            <div className="flex items-center space-x-3">
+                              <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
+                                <ShoppingCart className="w-4 h-4" />
+                              </div>
+                              <div>
+                                <h5 className="font-medium text-primary">{summary.business_name}</h5>
+                                <p className="text-xs text-secondary">{summary.total_items} items total</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center space-x-4">
+                              <div className="text-right">
+                                <div className="text-lg font-bold text-primary">{summary.pending_count}</div>
+                                <div className="text-xs text-secondary uppercase tracking-wider">Pending</div>
+                              </div>
+                              {summary.urgent_count > 0 && (
+                                <div className="text-right px-2 py-1 bg-red-100 rounded-lg">
+                                  <div className="text-sm font-bold text-red-700">{summary.urgent_count}</div>
+                                  <div className="text-[10px] text-red-800 font-bold uppercase">Urgent</div>
+                                </div>
+                              )}
+                              <ChevronRight className="w-4 h-4 text-secondary group-hover:text-primary transition-colors" />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </section>
+              )}
             </div>
           )}
 
@@ -1538,22 +1629,53 @@ export default function App() {
                   </div>
                 </header>
 
+                {/* Search Input */}
+                <div className="relative">
+                  <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-secondary" />
+                  <input
+                    type="text"
+                    placeholder="Search inventory (name, category, location)..."
+                    value={inventorySearchQuery}
+                    onChange={e => setInventorySearchQuery(e.target.value)}
+                    className="w-full pl-12 pr-4 py-3 border border-border rounded-lg bg-white text-primary placeholder:text-secondary focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-colors"
+                  />
+                  {inventorySearchQuery && (
+                    <button
+                      onClick={() => setInventorySearchQuery('')}
+                      className="absolute right-4 top-1/2 transform -translate-y-1/2 text-secondary hover:text-primary"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-0 border-t border-l border-border bg-white shadow-sm rounded-lg overflow-hidden">
-                  {filteredInventory.map(item => (
-                    <div key={item.id} className="border-r border-b border-border p-6 hover:bg-background transition-colors">
-                      <InventoryCard
-                        item={item}
-                        onRemove={handleDeleteInventoryItem}
-                        onEdit={it => {
-                          setEditingItem(it);
-                          setIsEditModalOpen(true);
-                        }}
-                      />
-                    </div>
-                  ))}
+                  {filteredInventory
+                    .filter(item => {
+                      if (!inventorySearchQuery.trim()) return true;
+                      const query = inventorySearchQuery.toLowerCase().trim();
+                      return (
+                        item.name.toLowerCase().includes(query) ||
+                        item.category.toLowerCase().includes(query) ||
+                        item.location.toLowerCase().includes(query)
+                      );
+                    })
+                    .map(item => (
+                      <div key={item.id} className="border-r border-b border-border p-6 hover:bg-background transition-colors">
+                        <InventoryCard
+                          item={item}
+                          onRemove={handleDeleteInventoryItem}
+                          onEdit={it => {
+                            setEditingItem(it);
+                            setIsEditModalOpen(true);
+                          }}
+                        />
+                      </div>
+                    ))}
                 </div>
               </div>
             ))}
+
 
           {/* CHEF VIEW */}
           {view === ViewState.CHEF &&

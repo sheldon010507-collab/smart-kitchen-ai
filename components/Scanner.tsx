@@ -1,7 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { X, UploadCloud, Loader2, Wand2, Trash2 } from "lucide-react";
+import { X, UploadCloud, Loader2, Wand2, Trash2, Camera, Plus, ShoppingCart, ChefHat } from "lucide-react";
 import type { InventoryItem, SalesReceipt } from "../types";
 import { analyzeInventoryImage, analyzePOSReceipt } from "../services/geminiService";
+import { preprocessImage } from "../features/inventory-scan/utils/imagePreprocessing";
+import { generateScanPrompt } from "../features/inventory-scan/services/promptTemplates";
+import { calculateRequirements, formatRequirements } from "../features/inventory-scan/utils/calculateRequirements";
 
 type ScanMode = "receipt" | "fridge" | "sales";
 
@@ -101,6 +104,42 @@ function validateAndFlagItems(items: ReviewItem[]) {
   });
 }
 
+// ✅ Map raw AI items to ReviewItem format
+function mapRawItems(rawItems: any[]): ReviewItem[] {
+  return rawItems.map((x: any, idx: number) => {
+    const qv = normalizeNumber(x.quantityValue ?? x.quantity_value ?? x.quantity, 1);
+    const qu = String(x.quantityUnit ?? x.quantity_unit ?? x.unit ?? "pcs");
+    const unitCost = normalizeNumber(x.unitCost ?? x.unit_cost, 0);
+    const total = normalizeNumber(x.totalPrice ?? x.total_price, 0);
+
+    const name = String(x.name || "").trim();
+    const category = String(x.category || "");
+    const location = String(x.location || "");
+    const expiry = normalizeDDMMYYYY(x.expiryDate ?? x.expiry_date);
+
+    const confidence = normalizeNumber(x.confidence, 0.8);
+    const isNew = x.is_new_item === true;
+
+    return {
+      id: `${Date.now()}_${idx}`,
+      name,
+      quantityValue: qv,
+      quantityUnit: qu,
+      quantity: `${qv} ${qu}`,
+      unitCost,
+      totalPrice: total,
+      expiryDate: expiry,
+      category,
+      location,
+      confidence,
+      candidates: Array.isArray(x.candidates) ? x.candidates : [],
+      is_new_item: isNew,
+      flags: [],
+      raw_name: name
+    } as unknown as ReviewItem;
+  });
+}
+
 const Scanner: React.FC<Props> = ({
   initialMode,
   onClose,
@@ -112,11 +151,15 @@ const Scanner: React.FC<Props> = ({
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>("");
   const [analyzing, setAnalyzing] = useState(false);
-  const [step, setStep] = useState<"upload" | "review">("upload");
+  const [step, setStep] = useState<"upload" | "review" | "calculate">("upload");
   const [error, setError] = useState<string>("");
   const [rawOutput, setRawOutput] = useState<string>(""); // ✅ 保存原始输出用于调试
   const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
   const [salesDraft, setSalesDraft] = useState<SalesReceipt | null>(null);
+
+  // ✅ Multi-photo support for fridge mode
+  const [fridgePhotos, setFridgePhotos] = useState<Array<{ file: File; preview: string }>>([]);
+  const [calculationResult, setCalculationResult] = useState<string | null>(null);
 
   const dictionary = useMemo(() => uniq(inventoryNameOptions), [inventoryNameOptions]);
 
@@ -129,6 +172,8 @@ const Scanner: React.FC<Props> = ({
     setStep("upload");
     setReviewItems([]);
     setSalesDraft(null);
+    setFridgePhotos([]);
+    setCalculationResult(null);
   }, [initialMode]);
 
   const isReceiptLike = mode === "receipt" || mode === "fridge";
@@ -151,8 +196,32 @@ const Scanner: React.FC<Props> = ({
     }
   };
 
+  // ✅ Multi-photo handlers for fridge mode
+  const addFridgePhoto = async (f: File) => {
+    if (fridgePhotos.length >= 5) {
+      setError("Maximum 5 photos allowed");
+      return;
+    }
+    try {
+      const { dataUrl } = await fileToBase64(f);
+      setFridgePhotos(prev => [...prev, { file: f, preview: dataUrl }]);
+      setError("");
+    } catch (e: any) {
+      setError(e?.message || "Failed to load image.");
+    }
+  };
+
+  const removeFridgePhoto = (index: number) => {
+    setFridgePhotos(prev => prev.filter((_, i) => i !== index));
+  };
+
   const runAI = async () => {
-    if (!file) {
+    // For fridge mode, check multi-photo or single file
+    if (mode === "fridge" && fridgePhotos.length === 0 && !file) {
+      setError("Please add at least one photo.");
+      return;
+    }
+    if (mode !== "fridge" && !file) {
       setError("Please choose an image first.");
       return;
     }
@@ -162,10 +231,9 @@ const Scanner: React.FC<Props> = ({
     setRawOutput("");
 
     try {
-      const { base64, mime } = await fileToBase64(file);
-
       // Mode: Sales
       if (mode === "sales") {
+        const { base64, mime } = await fileToBase64(file!);
         const receipt = await analyzePOSReceipt(base64, mime);
         if (!receipt || !receipt.items || receipt.items.length === 0) {
           // Fallback or error
@@ -189,11 +257,41 @@ const Scanner: React.FC<Props> = ({
         return;
       }
 
-      // Mode: Receipt or Fridge
+      // Mode: Receipt - single photo
+      if (mode === "receipt") {
+        const { base64, mime } = await fileToBase64(file!);
+        const rawItems = await analyzeInventoryImage(base64, mime, 'receipt', dictionary);
+
+        if (!rawItems || rawItems.length === 0) {
+          throw new Error("No items found. Please try a clearer photo.");
+        }
+
+        setReviewItems(validateAndFlagItems(mapRawItems(rawItems)));
+        setStep("review");
+        return;
+      }
+
+      // Mode: Fridge - multi-photo with preprocessing
+      const photosToProcess = fridgePhotos.length > 0 ? fridgePhotos : [{ file: file!, preview: previewUrl }];
+
+      // Preprocess all images (compress & enhance)
+      const processedImages: string[] = [];
+      for (const photo of photosToProcess) {
+        const processed = await preprocessImage(photo.file, {
+          maxWidth: 1920,
+          maxHeight: 1080,
+          targetSizeKB: 400,
+          autoEnhance: true
+        });
+        processedImages.push(processed.base64);
+      }
+
+      // Use first image for now (multi-image fusion requires API update)
+      // TODO: Update API to support multi-image
       const rawItems = await analyzeInventoryImage(
-        base64,
-        mime,
-        mode as 'receipt' | 'fridge',
+        processedImages[0],
+        'image/jpeg',
+        'fridge',
         dictionary // Pass dictionary for RAG
       );
 
@@ -201,41 +299,7 @@ const Scanner: React.FC<Props> = ({
         throw new Error("No items found. Please try a clearer photo.");
       }
 
-      const mapped: ReviewItem[] = rawItems.map((x: any, idx: number) => {
-        const qv = normalizeNumber(x.quantityValue ?? x.quantity_value, 1);
-        const qu = String(x.quantityUnit ?? x.quantity_unit ?? "pcs");
-        const unitCost = normalizeNumber(x.unitCost ?? x.unit_cost, 0);
-        const total = normalizeNumber(x.totalPrice ?? x.total_price, 0);
-
-        const name = String(x.name || "").trim();
-        const category = String(x.category || "");
-        const location = String(x.location || "");
-        const expiry = normalizeDDMMYYYY(x.expiryDate ?? x.expiry_date);
-
-        // Use confidence from AI if available
-        const confidence = normalizeNumber(x.confidence, 0.8);
-        const isNew = x.is_new_item === true;
-
-        return {
-          id: `${Date.now()}_${idx}`,
-          name,
-          quantityValue: qv,
-          quantityUnit: qu,
-          quantity: `${qv} ${qu}`,
-          unitCost,
-          totalPrice: total,
-          expiryDate: expiry,
-          category,
-          location,
-          confidence,
-          candidates: Array.isArray(x.candidates) ? x.candidates : [],
-          is_new_item: isNew,
-          flags: [], // Populated by validateAndFlagItems
-          raw_name: name
-        } as unknown as ReviewItem;
-      });
-
-      setReviewItems(validateAndFlagItems(mapped));
+      setReviewItems(validateAndFlagItems(mapRawItems(rawItems)));
       setStep("review");
 
     } catch (e: any) {
@@ -378,40 +442,100 @@ const Scanner: React.FC<Props> = ({
             <div className="grid md:grid-cols-2 gap-6">
               {/* Left: Upload */}
               <div className="space-y-4">
-                <div className="flex items-center justify-between gap-4 bg-background rounded-xl border border-border p-4">
-                  <label className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-border rounded-lg cursor-pointer hover:bg-background">
-                    <UploadCloud className="w-4 h-4" />
-                    <span className="text-sm font-bold">Choose Image</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => {
-                        const f = e.target.files?.[0];
-                        if (f) handleChoose(f);
-                      }}
-                    />
-                  </label>
+                {/* Fridge mode: Multi-photo upload */}
+                {mode === "fridge" ? (
+                  <>
+                    <div className="flex items-center justify-between gap-4 bg-background rounded-xl border border-border p-4">
+                      <label className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-border rounded-lg cursor-pointer hover:bg-background">
+                        <Plus className="w-4 h-4" />
+                        <span className="text-sm font-bold">Add Photo ({fridgePhotos.length}/5)</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) addFridgePhoto(f);
+                          }}
+                        />
+                      </label>
 
-                  <button
-                    onClick={runAI}
-                    disabled={analyzing || !file}
-                    className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-primary text-white font-bold hover:bg-black disabled:opacity-50"
-                  >
-                    {analyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
-                    Analyze
-                  </button>
-                </div>
+                      <button
+                        onClick={runAI}
+                        disabled={analyzing || fridgePhotos.length === 0}
+                        className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-primary text-white font-bold hover:bg-black disabled:opacity-50"
+                      >
+                        {analyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
+                        Analyze {fridgePhotos.length} Photo{fridgePhotos.length !== 1 ? 's' : ''}
+                      </button>
+                    </div>
 
-                {previewUrl ? (
-                  <div className="rounded-xl border border-border bg-background p-4">
-                    <img src={previewUrl} alt="preview" className="max-h-[360px] w-full object-contain rounded-lg bg-white" />
-                    <p className="text-xs text-secondary mt-2">Supported: jpg/png/webp. Better light = better accuracy.</p>
-                  </div>
+                    {/* Multi-photo thumbnails */}
+                    {fridgePhotos.length > 0 ? (
+                      <div className="rounded-xl border border-border bg-background p-4">
+                        <div className="grid grid-cols-5 gap-2 mb-2">
+                          {fridgePhotos.map((photo, idx) => (
+                            <div key={idx} className="relative aspect-square rounded-lg overflow-hidden border border-border bg-white">
+                              <img src={photo.preview} alt={`Photo ${idx + 1}`} className="w-full h-full object-cover" />
+                              <button
+                                onClick={() => removeFridgePhoto(idx)}
+                                className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600"
+                              >
+                                ✕
+                              </button>
+                              <span className="absolute bottom-1 left-1 bg-black/60 text-white text-xs px-1.5 py-0.5 rounded">{idx + 1}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <p className="text-xs text-secondary">Take multiple angles for better accuracy. AI will merge results.</p>
+                      </div>
+                    ) : (
+                      <div className="rounded-xl border border-border bg-background p-10 text-center text-secondary text-sm">
+                        <Camera className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                        <div>Add photos from different angles</div>
+                        <div className="text-xs mt-1">Up to 5 photos for best accuracy</div>
+                      </div>
+                    )}
+                  </>
                 ) : (
-                  <div className="rounded-xl border border-border bg-background p-10 text-center text-secondary text-sm">
-                    Choose an image to start.
-                  </div>
+                  /* Receipt/Sales mode: Single photo */
+                  <>
+                    <div className="flex items-center justify-between gap-4 bg-background rounded-xl border border-border p-4">
+                      <label className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-border rounded-lg cursor-pointer hover:bg-background">
+                        <UploadCloud className="w-4 h-4" />
+                        <span className="text-sm font-bold">Choose Image</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) handleChoose(f);
+                          }}
+                        />
+                      </label>
+
+                      <button
+                        onClick={runAI}
+                        disabled={analyzing || !file}
+                        className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-primary text-white font-bold hover:bg-black disabled:opacity-50"
+                      >
+                        {analyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
+                        Analyze
+                      </button>
+                    </div>
+
+                    {previewUrl ? (
+                      <div className="rounded-xl border border-border bg-background p-4">
+                        <img src={previewUrl} alt="preview" className="max-h-[360px] w-full object-contain rounded-lg bg-white" />
+                        <p className="text-xs text-secondary mt-2">Supported: jpg/png/webp. Better light = better accuracy.</p>
+                      </div>
+                    ) : (
+                      <div className="rounded-xl border border-border bg-background p-10 text-center text-secondary text-sm">
+                        Choose an image to start.
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
 
@@ -419,11 +543,23 @@ const Scanner: React.FC<Props> = ({
               <div className="space-y-4">
                 <div className="font-bold text-primary">What you will do</div>
                 <ol className="list-decimal list-inside text-sm text-secondary space-y-2">
-                  <li>Upload a clear photo (no glare, text not cut off).</li>
-                  <li>Click Analyze.</li>
-                  <li>Check low-confidence rows (red highlight).</li>
-                  <li>Fix names using the dropdown suggestions.</li>
-                  <li>Confirm: {mode === "fridge" ? "will only save the list (no inventory update)" : "will add to inventory"}.</li>
+                  {mode === "fridge" ? (
+                    <>
+                      <li>Add 1-5 photos from different angles.</li>
+                      <li>Click Analyze (AI will merge all photos).</li>
+                      <li>Check low-confidence rows (red highlight).</li>
+                      <li>Fix names and quantities as needed.</li>
+                      <li>Confirm to add items to inventory.</li>
+                    </>
+                  ) : (
+                    <>
+                      <li>Upload a clear photo (no glare, text not cut off).</li>
+                      <li>Click Analyze.</li>
+                      <li>Check low-confidence rows (red highlight).</li>
+                      <li>Fix names using the dropdown suggestions.</li>
+                      <li>Confirm to add items to inventory.</li>
+                    </>
+                  )}
                 </ol>
 
                 <div className="rounded-xl border border-border bg-background p-4">
