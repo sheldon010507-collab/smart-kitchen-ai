@@ -1155,43 +1155,72 @@ export default function App() {
           </button>
         </div>
       </aside>
-
       {/* Main Content */}
-      <main className="flex-1 md:ml-72 pb-24 md:pb-12 bg-white min-h-screen md:rounded-tl-2xl md:border-l md:border-border overflow-hidden relative">
-        {/* Mobile Header */}
-        <div className="md:hidden bg-white border-b border-border p-4 flex justify-between items-center sticky top-0 z-20">
-          <h1 className="font-bold text-primary">SmartKitchen</h1>
-          <div className="flex items-center space-x-4">
+      <main className="flex-1 md:ml-72 pb-20 md:pb-12 bg-gray-50 md:bg-white min-h-screen md:rounded-tl-2xl md:border-l md:border-border overflow-hidden relative">
+        {/* Mobile Header - Redesigned */}
+        <div className="md:hidden bg-white border-b border-gray-100 px-4 py-3 flex justify-between items-center sticky top-0 z-20 shadow-sm">
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 bg-slate-800 rounded-lg flex items-center justify-center">
+              <ChefHat className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h1 className="font-bold text-slate-800 text-sm leading-none">SmartKitchen</h1>
+              <p className="text-xs text-gray-400 mt-0.5">AI Workspace</p>
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            {/* Store Switcher */}
             <div className="relative">
-              <button onClick={() => setIsBusinessDropdownOpen(!isBusinessDropdownOpen)} className="flex items-center text-secondary">
-                <span className="mr-2 text-sm font-bold truncate max-w-[100px]">
+              <button
+                onClick={() => setIsBusinessDropdownOpen(!isBusinessDropdownOpen)}
+                className="flex items-center bg-gray-100 rounded-lg px-3 py-2 active:bg-gray-200 transition-colors"
+              >
+                <Building2 className="w-4 h-4 text-slate-600 mr-2" />
+                <span className="text-xs font-semibold text-slate-700 truncate max-w-[80px]">
                   {activeBusiness?.name || (user.role === 'Manager' ? 'Master' : 'Stores')}
                 </span>
-                <Building2 className="w-6 h-6" />
+                <ChevronDown className={`w-4 h-4 text-gray-400 ml-1 transition-transform ${isBusinessDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
 
               {isBusinessDropdownOpen && (
-                <div className="absolute top-full right-0 mt-2 w-56 bg-white rounded-lg shadow-xl border border-border z-30 py-2">
+                <div className="absolute top-full right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-100 z-30 py-2 max-h-[60vh] overflow-auto">
+                  <div className="px-3 py-2 text-xs text-gray-400 uppercase tracking-wider font-semibold">Select Store</div>
+
                   {user.role === 'Manager' && (
                     <button
                       onClick={() => handleSwitchBusiness(null)}
-                      className="w-full text-left px-4 py-2 text-sm text-primary hover:bg-background font-bold"
+                      className={`w-full text-left px-4 py-3 text-sm flex items-center space-x-3 ${!currentBusinessId ? 'bg-slate-50 text-slate-800 font-semibold' : 'text-gray-600 hover:bg-gray-50'}`}
                     >
-                      Master View
+                      <div className="w-8 h-8 bg-slate-200 rounded-lg flex items-center justify-center">
+                        <LayoutDashboard className="w-4 h-4 text-slate-600" />
+                      </div>
+                      <div>
+                        <div className="font-medium">Master View</div>
+                        <div className="text-xs text-gray-400">All locations</div>
+                      </div>
+                      {!currentBusinessId && <Check className="w-4 h-4 text-slate-800 ml-auto" />}
                     </button>
                   )}
 
                   {accessibleBusinesses.map(b => {
                     const mem = user.role === 'Staff' ? staffMemberships.find(m => m.businessId === b.id) : null;
                     const isPending = mem?.status === 'Pending';
+                    const isActive = b.id === currentBusinessId;
                     return (
                       <button
                         key={b.id}
                         onClick={() => handleSwitchBusiness(b.id)}
-                        className="w-full text-left px-4 py-2 text-sm text-secondary hover:bg-background"
+                        className={`w-full text-left px-4 py-3 text-sm flex items-center space-x-3 ${isActive ? 'bg-slate-50 text-slate-800' : 'text-gray-600 hover:bg-gray-50'}`}
                       >
-                        {b.name}
-                        {user.role === 'Staff' && isPending ? ' (Pending)' : ''}
+                        <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                          <Store className="w-4 h-4 text-blue-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className={`font-medium truncate ${isActive ? 'text-slate-800' : ''}`}>{b.name}</div>
+                          {isPending && <div className="text-xs text-amber-600">Pending approval</div>}
+                        </div>
+                        {isActive && <Check className="w-4 h-4 text-slate-800" />}
                       </button>
                     );
                   })}
@@ -1202,20 +1231,24 @@ export default function App() {
                         setIsBusinessDropdownOpen(false);
                         setIsJoinStoreModalOpen(true);
                       }}
-                      className="w-full text-left px-4 py-2 text-sm text-accent font-bold hover:bg-background border-t border-border mt-1"
+                      className="w-full text-left px-4 py-3 text-sm text-blue-600 font-semibold hover:bg-blue-50 border-t border-gray-100 mt-2 flex items-center space-x-3"
                     >
-                      + Add Store
+                      <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                        <Plus className="w-4 h-4 text-blue-600" />
+                      </div>
+                      <span>Join New Store</span>
                     </button>
                   )}
                 </div>
               )}
             </div>
 
-            <button onClick={() => setView(ViewState.PRIVACY)} className="text-secondary">
-              <Shield className="w-6 h-6" />
-            </button>
-            <button onClick={handleLogout} className="text-secondary">
-              <LogOut className="w-6 h-6" />
+            {/* Action Buttons */}
+            <button
+              onClick={handleLogout}
+              className="w-9 h-9 flex items-center justify-center rounded-lg bg-gray-100 active:bg-gray-200 transition-colors"
+            >
+              <LogOut className="w-4 h-4 text-gray-500" />
             </button>
           </div>
         </div>
