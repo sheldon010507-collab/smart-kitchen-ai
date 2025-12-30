@@ -102,16 +102,16 @@ const ShoppingListView: React.FC<ShoppingListViewProps> = ({ businessId }) => {
     return (
         <div className="h-full flex flex-col bg-white">
             {/* Header Controls */}
-            <div className="p-6 border-b border-[#E9E9E7] space-y-4">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="p-4 md:p-6 border-b border-[#E9E9E7] space-y-3 md:space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 md:gap-4">
 
                     {/* Tabs */}
-                    <div className="flex bg-[#F7F6F3] p-1 rounded-lg self-start">
+                    <div className="flex bg-[#F7F6F3] p-1 rounded-lg self-start overflow-x-auto">
                         {(['pending', 'purchased', 'cancelled'] as const).map((tab) => (
                             <button
                                 key={tab}
                                 onClick={() => setActiveTab(tab)}
-                                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all capitalize ${activeTab === tab
+                                className={`px-3 md:px-4 py-1.5 rounded-md text-xs md:text-sm font-medium transition-all capitalize whitespace-nowrap ${activeTab === tab
                                     ? 'bg-white text-[#37352F] shadow-sm'
                                     : 'text-[#787774] hover:text-[#37352F]'
                                     }`}
@@ -122,7 +122,7 @@ const ShoppingListView: React.FC<ShoppingListViewProps> = ({ businessId }) => {
                     </div>
 
                     {/* Action Buttons */}
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-2 overflow-x-auto">
                         <ExportButton items={items} />
 
                         {activeTab === 'pending' && (
@@ -134,10 +134,11 @@ const ShoppingListView: React.FC<ShoppingListViewProps> = ({ businessId }) => {
                                 />
                                 <button
                                     onClick={openAddModal}
-                                    className="flex items-center space-x-2 px-4 py-2 bg-[#37352F] text-white rounded-lg hover:bg-[#2f2e2b] transition-colors text-sm font-medium"
+                                    className="flex items-center space-x-1 md:space-x-2 px-3 md:px-4 py-2 bg-[#37352F] text-white rounded-lg hover:bg-[#2f2e2b] transition-colors text-xs md:text-sm font-medium whitespace-nowrap"
                                 >
                                     <Plus className="w-4 h-4" />
-                                    <span>Add Item</span>
+                                    <span className="hidden sm:inline">Add Item</span>
+                                    <span className="sm:hidden">Add</span>
                                 </button>
                             </>
                         )}

@@ -99,22 +99,23 @@ const AutoGenerateButton: React.FC<AutoGenerateButtonProps> = ({
             <button
                 onClick={handleGenerate}
                 disabled={loading}
-                className="flex items-center space-x-2 px-4 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center space-x-1 md:space-x-2 px-3 md:px-4 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors text-xs md:text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
             >
                 <Zap className={`w-4 h-4 ${loading ? 'animate-pulse' : ''}`} />
-                <span>{loading ? 'Scanning...' : 'Auto Generate'}</span>
+                <span className="hidden sm:inline">{loading ? 'Scanning...' : 'Auto Generate'}</span>
+                <span className="sm:hidden">{loading ? '...' : 'Auto'}</span>
             </button>
 
             {/* Preview Modal */}
             {showPreview && result && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col overflow-hidden">
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 md:p-4">
+                    <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] md:max-h-[80vh] flex flex-col overflow-hidden">
                         {/* Header */}
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-[#E9E9E7]">
+                        <div className="flex items-center justify-between px-4 md:px-6 py-3 md:py-4 border-b border-[#E9E9E7]">
                             <div>
-                                <h2 className="text-lg font-semibold text-[#37352F]">Generated Items</h2>
-                                <p className="text-sm text-[#787774]">
-                                    {result.items.length} items found • {result.skipped} skipped (already exists)
+                                <h2 className="text-base md:text-lg font-semibold text-[#37352F]">Generated Items</h2>
+                                <p className="text-xs md:text-sm text-[#787774]">
+                                    {result.items.length} items found • {result.skipped} skipped
                                 </p>
                             </div>
                             <button onClick={handleClose} className="text-[#787774] hover:text-[#37352F]">
@@ -154,14 +155,14 @@ const AutoGenerateButton: React.FC<AutoGenerateButtonProps> = ({
                                             key={index}
                                             onClick={() => toggleItem(index)}
                                             className={`flex items-center space-x-3 p-3 rounded-lg border cursor-pointer transition-colors ${selectedItems.has(String(index))
-                                                    ? 'border-blue-300 bg-blue-50'
-                                                    : 'border-[#E9E9E7] hover:bg-[#F7F6F3]'
+                                                ? 'border-blue-300 bg-blue-50'
+                                                : 'border-[#E9E9E7] hover:bg-[#F7F6F3]'
                                                 }`}
                                         >
                                             <div
                                                 className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${selectedItems.has(String(index))
-                                                        ? 'bg-blue-500 border-blue-500'
-                                                        : 'border-[#D3D1CB]'
+                                                    ? 'bg-blue-500 border-blue-500'
+                                                    : 'border-[#D3D1CB]'
                                                     }`}
                                             >
                                                 {selectedItems.has(String(index)) && (
@@ -186,10 +187,10 @@ const AutoGenerateButton: React.FC<AutoGenerateButtonProps> = ({
                                             </div>
                                             <span
                                                 className={`text-xs px-2 py-1 rounded-full ${item.priority === 'urgent'
-                                                        ? 'bg-red-100 text-red-700'
-                                                        : item.priority === 'normal'
-                                                            ? 'bg-blue-100 text-blue-700'
-                                                            : 'bg-gray-100 text-gray-600'
+                                                    ? 'bg-red-100 text-red-700'
+                                                    : item.priority === 'normal'
+                                                        ? 'bg-blue-100 text-blue-700'
+                                                        : 'bg-gray-100 text-gray-600'
                                                     }`}
                                             >
                                                 {PRIORITY_LABELS[item.priority]}

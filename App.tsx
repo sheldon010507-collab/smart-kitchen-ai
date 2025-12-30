@@ -1220,20 +1220,20 @@ export default function App() {
           </div>
         </div>
 
-        <div className="p-6 md:p-16 max-w-6xl mx-auto min-h-screen">
+        <div className="p-4 md:p-16 max-w-6xl mx-auto min-h-screen">
           {/* MASTER DASHBOARD VIEW (Managers Only) */}
           {isMasterView && view === ViewState.DASHBOARD && (
             <div className="space-y-16 animate-in fade-in duration-500">
-              <header className="flex justify-between items-end border-b border-border pb-6">
+              <header className="flex flex-col md:flex-row md:justify-between md:items-end gap-4 border-b border-border pb-6">
                 <div>
-                  <h2 className="text-4xl font-bold text-primary tracking-tight">
+                  <h2 className="text-2xl md:text-4xl font-bold text-primary tracking-tight">
                     <EditableTitle defaultTitle="Master Dashboard" storageKey="overview_master_dashboard" />
                   </h2>
-                  <p className="text-secondary mt-3 text-lg font-light">Overview of {accessibleBusinesses.length} locations</p>
+                  <p className="text-secondary mt-2 md:mt-3 text-base md:text-lg font-light">Overview of {accessibleBusinesses.length} locations</p>
                 </div>
                 <button
                   onClick={handleOpenCreateStore}
-                  className="flex items-center px-6 py-3 bg-accent text-white rounded-lg shadow-sm text-sm font-semibold hover:bg-accentHover transition-colors"
+                  className="flex items-center justify-center px-4 md:px-6 py-2.5 md:py-3 bg-accent text-white rounded-lg shadow-sm text-sm font-semibold hover:bg-accentHover transition-colors w-full md:w-auto"
                 >
                   <Plus className="w-5 h-5 mr-2" />
                   Add Location
@@ -1378,17 +1378,17 @@ export default function App() {
           {/* SINGLE STORE DASHBOARD VIEW */}
           {!isMasterView && view === ViewState.DASHBOARD && (
             <div className="space-y-16 animate-in fade-in duration-500">
-              <header className="flex flex-col md:flex-row md:items-end justify-between gap-8 border-b border-border pb-8">
+              <header className="flex flex-col md:flex-row md:items-end justify-between gap-4 md:gap-8 border-b border-border pb-6 md:pb-8">
                 <div>
-                  <h2 className="text-4xl font-bold text-primary tracking-tight">{user.name}</h2>
-                  <p className="text-secondary mt-3 text-lg flex items-center">
+                  <h2 className="text-2xl md:text-4xl font-bold text-primary tracking-tight">{user.name}</h2>
+                  <p className="text-secondary mt-2 md:mt-3 text-base md:text-lg flex flex-wrap items-center gap-2">
                     {activeBusiness?.name || (user.role === 'Staff' ? 'No Store Selected' : 'Loading...')}
                     {activeBusiness && user.role === 'Manager' ? (
-                      <span className="ml-4 text-xs bg-background text-secondary px-2 py-1 rounded border border-border font-mono">
+                      <span className="text-xs bg-background text-secondary px-2 py-1 rounded border border-border font-mono">
                         {activeBusiness?.joinCode}
                       </span>
                     ) : activeBusiness ? (
-                      <span className="ml-4 text-xs bg-accent text-white px-2 py-1 rounded border border-border font-bold">
+                      <span className="text-xs bg-accent text-white px-2 py-1 rounded border border-border font-bold">
                         STAFF
                       </span>
                     ) : null}
@@ -1396,20 +1396,20 @@ export default function App() {
                 </div>
 
                 {user.role === 'Manager' && (
-                  <div className="flex space-x-4">
+                  <div className="grid grid-cols-2 md:flex md:space-x-4 gap-2 md:gap-0 w-full md:w-auto">
                     <button
                       onClick={() => openScanner('receipt')}
-                      className="flex items-center px-6 py-3 bg-white text-primary border border-border rounded-lg shadow-sm hover:bg-background text-sm font-semibold transition-colors"
+                      className="flex items-center justify-center px-3 md:px-6 py-2.5 md:py-3 bg-white text-primary border border-border rounded-lg shadow-sm hover:bg-background text-sm font-semibold transition-colors"
                     >
-                      <ScanLine className="w-5 h-5 mr-2" />
-                      Scan Invoice
+                      <ScanLine className="w-4 md:w-5 h-4 md:h-5 mr-1.5 md:mr-2" />
+                      <span className="hidden sm:inline">Scan </span>Invoice
                     </button>
                     <button
                       onClick={() => openScanner('fridge')}
-                      className="flex items-center px-6 py-3 bg-accent text-white rounded-lg shadow-sm hover:bg-accentHover text-sm font-semibold transition-colors"
+                      className="flex items-center justify-center px-3 md:px-6 py-2.5 md:py-3 bg-accent text-white rounded-lg shadow-sm hover:bg-accentHover text-sm font-semibold transition-colors"
                     >
-                      <ScanLine className="w-5 h-5 mr-2" />
-                      Scan Fridge
+                      <ScanLine className="w-4 md:w-5 h-4 md:h-5 mr-1.5 md:mr-2" />
+                      <span className="hidden sm:inline">Scan </span>Fridge
                     </button>
                   </div>
                 )}
@@ -1545,20 +1545,21 @@ export default function App() {
                 <p className="text-secondary text-lg">Select a store to view its inventory.</p>
               </div>
             ) : (
-              <div className="space-y-12 animate-in fade-in duration-500">
-                <header className="flex justify-between items-end border-b border-border pb-6">
+              <div className="space-y-6 md:space-y-12 animate-in fade-in duration-500">
+                <header className="flex flex-col md:flex-row md:justify-between md:items-end gap-4 border-b border-border pb-4 md:pb-6">
                   <div>
-                    <h2 className="text-4xl font-bold text-primary tracking-tight">
+                    <h2 className="text-2xl md:text-4xl font-bold text-primary tracking-tight">
                       <EditableTitle defaultTitle="Inventory" storageKey="module_inventory_title" />
                     </h2>
-                    <p className="text-secondary mt-3 text-lg font-light">Manage ingredients and stock for {activeBusiness?.name}</p>
+                    <p className="text-secondary mt-2 md:mt-3 text-sm md:text-lg font-light">Manage stock for {activeBusiness?.name}</p>
                   </div>
-                  <div className="flex space-x-3">
+                  <div className="grid grid-cols-3 md:flex md:space-x-3 gap-2 md:gap-0">
                     <button
                       onClick={() => openScanner('receipt')}
-                      className="flex items-center px-6 py-3 bg-white text-primary border border-border rounded-lg shadow-sm text-sm font-semibold hover:bg-background transition-colors"
+                      className="flex items-center justify-center px-3 md:px-6 py-2 md:py-3 bg-white text-primary border border-border rounded-lg shadow-sm text-xs md:text-sm font-semibold hover:bg-background transition-colors"
                     >
-                      <ScanLine className="w-5 h-5 mr-2" /> Scan
+                      <ScanLine className="w-4 md:w-5 h-4 md:h-5 md:mr-2" />
+                      <span className="hidden md:inline">Scan</span>
                     </button>
                     <button
                       onClick={() => {
@@ -1566,19 +1567,20 @@ export default function App() {
                         setMetaNewValue('');
                         setIsMetaManagerOpen(true);
                       }}
-                      className="flex items-center px-6 py-3 bg-white text-primary border border-border rounded-lg shadow-sm text-sm font-semibold hover:bg-background transition-colors"
+                      className="flex items-center justify-center px-3 md:px-6 py-2 md:py-3 bg-white text-primary border border-border rounded-lg shadow-sm text-xs md:text-sm font-semibold hover:bg-background transition-colors"
                     >
-                      <Edit className="w-5 h-5 mr-2" />
-                      Manage
+                      <Edit className="w-4 md:w-5 h-4 md:h-5 md:mr-2" />
+                      <span className="hidden md:inline">Manage</span>
                     </button>
                     <button
                       onClick={() => {
                         setEditingItem(null);
                         setIsEditModalOpen(true);
                       }}
-                      className="flex items-center px-6 py-3 bg-accent text-white rounded-lg shadow-sm text-sm font-semibold hover:bg-accentHover"
+                      className="flex items-center justify-center px-3 md:px-6 py-2 md:py-3 bg-accent text-white rounded-lg shadow-sm text-xs md:text-sm font-semibold hover:bg-accentHover"
                     >
-                      <Plus className="w-5 h-5 mr-2" /> Add Item
+                      <Plus className="w-4 md:w-5 h-4 md:h-5 md:mr-2" />
+                      <span className="hidden md:inline">Add</span>
                     </button>
                   </div>
                 </header>

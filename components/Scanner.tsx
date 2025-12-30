@@ -408,15 +408,15 @@ const Scanner: React.FC<Props> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
-      <div className="w-full max-w-4xl max-h-[90vh] bg-white rounded-2xl border border-border shadow-xl overflow-hidden flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-2 md:p-4">
+      <div className="w-full max-w-4xl max-h-[95vh] md:max-h-[90vh] bg-white rounded-xl md:rounded-2xl border border-border shadow-xl overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="flex items-start justify-between p-6 border-b border-border shrink-0">
+        <div className="flex items-start justify-between p-4 md:p-6 border-b border-border shrink-0">
           <div>
-            <h2 className="text-xl font-bold text-primary">
+            <h2 className="text-lg md:text-xl font-bold text-primary">
               {mode === "receipt" ? "Scan Receipt" : mode === "fridge" ? "Scan Fridge" : "Scan Sales"}
             </h2>
-            <p className="text-sm text-secondary mt-1">Upload a photo, run AI, then confirm the results.</p>
+            <p className="text-xs md:text-sm text-secondary mt-1 hidden sm:block">Upload a photo, run AI, then confirm the results.</p>
           </div>
           <button onClick={onClose} className="p-2 rounded-lg hover:bg-background text-secondary" aria-label="Close">
             <X className="w-5 h-5" />
@@ -424,7 +424,7 @@ const Scanner: React.FC<Props> = ({
         </div>
 
         {/* Tabs */}
-        <div className="px-6 pt-4 shrink-0">
+        <div className="px-4 md:px-6 pt-3 md:pt-4 shrink-0 overflow-x-auto">
           <div className="inline-flex rounded-xl border border-border bg-white overflow-hidden">
             {(["receipt", "fridge", "sales"] as ScanMode[]).map((m) => (
               <button
@@ -437,7 +437,7 @@ const Scanner: React.FC<Props> = ({
                   setSalesDraft(null);
                   setStep("upload");
                 }}
-                className={`px-4 py-2 text-sm font-bold ${mode === m ? "bg-primary text-white" : "text-primary hover:bg-background"
+                className={`px-3 md:px-4 py-2 text-xs md:text-sm font-bold whitespace-nowrap ${mode === m ? "bg-primary text-white" : "text-primary hover:bg-background"
                   }`}
               >
                 {m === "receipt" ? "Receipt" : m === "fridge" ? "Fridge" : "Sales"}
@@ -447,7 +447,7 @@ const Scanner: React.FC<Props> = ({
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-auto flex-1">
+        <div className="p-4 md:p-6 overflow-auto flex-1">
           {/* Error Display */}
           {error && (
             <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700 text-sm">
@@ -465,7 +465,7 @@ const Scanner: React.FC<Props> = ({
           )}
 
           {step === "upload" && (
-            <div className="grid md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
               {/* Left: Upload */}
               <div className="space-y-4">
                 {/* Fridge mode: Multi-photo upload */}
@@ -567,8 +567,8 @@ const Scanner: React.FC<Props> = ({
 
               {/* Right: Instructions */}
               <div className="space-y-4">
-                <div className="font-bold text-primary">What you will do</div>
-                <ol className="list-decimal list-inside text-sm text-secondary space-y-2">
+                <div className="font-bold text-primary text-sm md:text-base">Instructions</div>
+                <ol className="list-decimal list-inside text-xs md:text-sm text-secondary space-y-1 md:space-y-2">
                   {mode === "fridge" ? (
                     <>
                       <li>Add 1-5 photos from different angles.</li>
@@ -710,7 +710,7 @@ const Scanner: React.FC<Props> = ({
                                   )}
                                 </div>
 
-                                <div className="mt-3 grid grid-cols-1 md:grid-cols-6 gap-3">
+                                <div className="mt-3 grid grid-cols-2 md:grid-cols-6 gap-2 md:gap-3">
                                   {/* Name */}
                                   <div className="md:col-span-2">
                                     <div className="text-xs font-bold text-secondary uppercase tracking-widest mb-1">

@@ -56,10 +56,10 @@ const ExportButton: React.FC<ExportButtonProps> = ({ items, businessName, disabl
         <div className="relative" ref={dropdownRef}>
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="flex items-center space-x-2 px-3 py-2 text-sm text-[#37352F] border border-[#E9E9E7] rounded-lg hover:bg-[#F7F6F3] transition-colors"
+                className="flex items-center space-x-1 md:space-x-2 px-2 md:px-3 py-2 text-sm text-[#37352F] border border-[#E9E9E7] rounded-lg hover:bg-[#F7F6F3] transition-colors"
             >
                 <Download className="w-4 h-4" />
-                <span>Export</span>
+                <span className="hidden sm:inline">Export</span>
                 <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
             </button>
 
