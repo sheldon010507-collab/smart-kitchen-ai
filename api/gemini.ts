@@ -19,8 +19,8 @@ const getAllowedOrigin = (origin: string | undefined): string | null => {
     if (origin && allowedOrigins.includes(origin)) {
         return origin;
     }
-    // Fallback for Vercel preview deployments
-    if (origin && origin.endsWith('.vercel.app')) {
+    // ✅ Security Fix: Only allow vercel.app from specific project prefixes
+    if (origin && (origin.includes('smart-kitchen') || origin.includes('guka')) && origin.endsWith('.vercel.app')) {
         return origin;
     }
     return null;
@@ -127,11 +127,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(429).json({ error: 'Too many requests. Please wait a moment.' });
         }
 
-        // 3. Load Gemini API Key
-        const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+        // 3. Load Gemini API Key (server-side only, no VITE_ fallback)
+        const apiKey = process.env.GEMINI_API_KEY;
 
         if (!apiKey) {
-            console.error('SERVER ERROR: GEMINI_API_KEY missing');
+            console.error('SERVER ERROR: GEMINI_API_KEY environment variable is required');
             return res.status(500).json({ error: 'AI service not configured' });
         }
 

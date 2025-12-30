@@ -26,19 +26,13 @@ interface Props {
 
 
 
-async function fileToBase64(file: File): Promise<{ base64: string; mime: string; dataUrl: string }> {
-  const dataUrl: string = await new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(new Error("Failed to read file"));
-    reader.readAsDataURL(file);
-  });
+// ✅ Issue 15 Fix: Removed local fileToBase64 to prevent memory issues.
+// We now use URL.createObjectURL for preview and preprocessImage for API calls.
 
-  const comma = dataUrl.indexOf(",");
-  const base64 = comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl;
-  const mimeMatch = dataUrl.match(/^data:(.*?);base64,/);
-  const mime = mimeMatch?.[1] || file.type || "image/jpeg";
-  return { base64, mime, dataUrl };
+function cleanupUrl(url: string) {
+  if (url && url.startsWith('blob:')) {
+    URL.revokeObjectURL(url);
+  }
 }
 
 // ✅ 更健壮的 JSON 提取函数
@@ -87,7 +81,12 @@ function topMatches(query: string, options: string[], limit = 6) {
   return uniq(scored);
 }
 
-
+// Validation limits - extracted as constants for maintainability
+const VALIDATION_LIMITS = {
+  MAX_QUANTITY: 200,
+  MAX_UNIT_COST: 1000,
+  MAX_TOTAL_PRICE: 5000,
+} as const;
 
 function validateAndFlagItems(items: ReviewItem[]) {
   return items.map((it) => {
@@ -96,9 +95,9 @@ function validateAndFlagItems(items: ReviewItem[]) {
     const unitCost = normalizeNumber((it as any).unitCost, 0);
     const total = normalizeNumber((it as any).totalPrice ?? (it as any).total_price, 0);
 
-    if (qty > 200) flags.push("Quantity too large");
-    if (unitCost > 1000) flags.push("Unit cost too high");
-    if (total > 5000) flags.push("Total price too high");
+    if (qty > VALIDATION_LIMITS.MAX_QUANTITY) flags.push("Quantity too large");
+    if (unitCost > VALIDATION_LIMITS.MAX_UNIT_COST) flags.push("Unit cost too high");
+    if (total > VALIDATION_LIMITS.MAX_TOTAL_PRICE) flags.push("Total price too high");
 
     return { ...it, flags };
   });
@@ -164,6 +163,9 @@ const Scanner: React.FC<Props> = ({
   const dictionary = useMemo(() => uniq(inventoryNameOptions), [inventoryNameOptions]);
 
   useEffect(() => {
+    // Cleanup old preview
+    if (previewUrl) cleanupUrl(previewUrl);
+
     setMode(initialMode);
     setFile(null);
     setPreviewUrl("");
@@ -172,9 +174,22 @@ const Scanner: React.FC<Props> = ({
     setStep("upload");
     setReviewItems([]);
     setSalesDraft(null);
-    setFridgePhotos([]);
+    setFridgePhotos(prev => {
+      // Cleanup photos
+      prev.forEach(p => cleanupUrl(p.preview));
+      return [];
+    });
     setCalculationResult(null);
   }, [initialMode]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (previewUrl) cleanupUrl(previewUrl);
+      fridgePhotos.forEach(p => cleanupUrl(p.preview));
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const isReceiptLike = mode === "receipt" || mode === "fridge";
 
@@ -184,16 +199,16 @@ const Scanner: React.FC<Props> = ({
     return uniq([...a, ...b]).slice(0, 10);
   };
 
-  const handleChoose = async (f: File) => {
+  const handleChoose = (f: File) => {
     setError("");
     setRawOutput("");
+
+    // Cleanup previous
+    if (previewUrl) cleanupUrl(previewUrl);
+
     setFile(f);
-    try {
-      const { dataUrl } = await fileToBase64(f);
-      setPreviewUrl(dataUrl);
-    } catch (e: any) {
-      setError(e?.message || "Failed to load image.");
-    }
+    const url = URL.createObjectURL(f);
+    setPreviewUrl(url);
   };
 
   // ✅ Multi-photo handlers for fridge mode
@@ -202,17 +217,17 @@ const Scanner: React.FC<Props> = ({
       setError("Maximum 5 photos allowed");
       return;
     }
-    try {
-      const { dataUrl } = await fileToBase64(f);
-      setFridgePhotos(prev => [...prev, { file: f, preview: dataUrl }]);
-      setError("");
-    } catch (e: any) {
-      setError(e?.message || "Failed to load image.");
-    }
+    const url = URL.createObjectURL(f);
+    setFridgePhotos(prev => [...prev, { file: f, preview: url }]);
+    setError("");
   };
 
   const removeFridgePhoto = (index: number) => {
-    setFridgePhotos(prev => prev.filter((_, i) => i !== index));
+    setFridgePhotos(prev => {
+      const target = prev[index];
+      if (target) cleanupUrl(target.preview);
+      return prev.filter((_, i) => i !== index);
+    });
   };
 
   const runAI = async () => {
@@ -232,9 +247,15 @@ const Scanner: React.FC<Props> = ({
 
     try {
       // Mode: Sales
+      // Mode: Sales
       if (mode === "sales") {
-        const { base64, mime } = await fileToBase64(file!);
-        const receipt = await analyzePOSReceipt(base64, mime);
+        const processed = await preprocessImage(file!, {
+          targetSizeKB: 500,
+          maxWidth: 1500, // Receipt needs good details
+          autoEnhance: true
+        });
+
+        const receipt = await analyzePOSReceipt(processed.base64, 'image/jpeg');
         if (!receipt || !receipt.items || receipt.items.length === 0) {
           // Fallback or error
           if (!receipt) throw new Error("No sales data found.");
@@ -259,8 +280,13 @@ const Scanner: React.FC<Props> = ({
 
       // Mode: Receipt - single photo
       if (mode === "receipt") {
-        const { base64, mime } = await fileToBase64(file!);
-        const rawItems = await analyzeInventoryImage(base64, mime, 'receipt', dictionary);
+        const processed = await preprocessImage(file!, {
+          targetSizeKB: 500,
+          maxWidth: 1500,
+          autoEnhance: true
+        });
+
+        const rawItems = await analyzeInventoryImage(processed.base64, 'image/jpeg', 'receipt', dictionary);
 
         if (!rawItems || rawItems.length === 0) {
           throw new Error("No items found. Please try a clearer photo.");

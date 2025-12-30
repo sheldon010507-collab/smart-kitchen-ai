@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import {
   LayoutDashboard,
   Refrigerator,
@@ -49,6 +49,8 @@ import { EditableTitle } from './components/EditableTitle';
 import { ShoppingListView, ShoppingListSummary, FEATURE_SHOPPING_LIST_ENABLED, useShoppingListSummary } from './features/shopping-list';
 // ✅ 注意：StaffCalendar 应该在 RestaurantDashboard 内部使用，不在这里导入
 import { supabase } from './lib/supabase';
+import { useInventoryContext } from './lib/InventoryContext';
+import { useBusiness, BusinessProvider } from './lib/BusinessContext';
 
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 
@@ -135,10 +137,14 @@ export default function App() {
   // --- Global State ---
   const [user, setUser] = useState<User | null>(null);
 
-  // ✅ 用 Supabase 后，别用 mock 了（避免 Manager/Staff 看到假店）
-  const [businesses, setBusinesses] = useState<Business[]>([]);
-  const [currentBusinessId, setCurrentBusinessId] = useState<string | null>(null);
+  // ✅ 業務狀態 - 保持本地管理（為未來 Context 遷移準備別名）
+  const [businesses, setBusinessesDirect] = useState<Business[]>([]);
+  const [currentBusinessId, setCurrentBusinessIdDirect] = useState<string | null>(null);
   const [view, setView] = useState<ViewState>(ViewState.DASHBOARD);
+
+  // ✅ 創建兼容層：保持現有代碼不變
+  const setBusinesses = setBusinessesDirect;
+  const setCurrentBusinessId = setCurrentBusinessIdDirect;
 
   // ✅ 3) 增加“兼容旧缓存”的清理，避免用户浏览器里旧的 biz_... 继续触发错误
   const sanitizeStorage = () => {
@@ -150,12 +156,19 @@ export default function App() {
     const keysToCheck = ['active_business_id', 'selectedBusinessId', 'currentBusinessId'];
 
     keysToCheck.forEach(key => {
-      const val = localStorage.getItem(key);
-      if (val) {
-        // 如果是以 biz_ 开头，或者不是有效 UUID，就移除
-        if (val.startsWith('biz_') || !uuidRegex.test(val)) {
-          console.warn(`[Sanitize] Removing invalid ID from localStorage key "${key}":`, val);
-          localStorage.removeItem(key);
+      // Check both storages
+      const valLocal = localStorage.getItem(key);
+      if (valLocal) {
+        localStorage.removeItem(key); // Migrate/Clean from local
+        if (uuidRegex.test(valLocal) && !valLocal.startsWith('biz_')) {
+          sessionStorage.setItem(key, valLocal); // Move to session if valid
+        }
+      }
+
+      const valSession = sessionStorage.getItem(key);
+      if (valSession) {
+        if (valSession.startsWith('biz_') || !uuidRegex.test(valSession)) {
+          sessionStorage.removeItem(key);
         }
       }
     });
@@ -165,8 +178,16 @@ export default function App() {
     sanitizeStorage();
   }, []);
 
-  // Data State（先保留本地 state，逐步接 Supabase）
-  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  // ✅ 使用 InventoryContext 管理庫存狀態
+  const inventoryCtx = useInventoryContext();
+  const inventory = inventoryCtx.inventory;
+  const setInventory = (updater: InventoryItem[] | ((prev: InventoryItem[]) => InventoryItem[])) => {
+    // 注意：Context 不支持直接 setState，這是一個兼容層
+    // 對於 filter 操作，我們需要在業務層處理
+    console.warn('[App] Direct setInventory is deprecated, use inventoryCtx methods instead');
+  };
+
+  // Data State（其他狀態保持本地管理）
   const [sales, setSales] = useState<SalesReceipt[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
   const [shifts, setShifts] = useState<Shift[]>([]);
@@ -196,37 +217,42 @@ export default function App() {
   // Inventory Search State
   const [inventorySearchQuery, setInventorySearchQuery] = useState('');
 
-  // ✅ 新增：浏览器返回按钮处理
+  // ✅ P1 優化：使用 useRef 避免 popstate 監聽器頻繁重新註冊
+  const modalStatesRef = useRef({
+    isScannerOpen,
+    isEditModalOpen,
+    isStoreModalOpen,
+    isJoinStoreModalOpen,
+    isMetaManagerOpen,
+    isBusinessDropdownOpen
+  });
+
+  // 更新 ref（不觸發重新渲染）
+  useEffect(() => {
+    modalStatesRef.current = {
+      isScannerOpen,
+      isEditModalOpen,
+      isStoreModalOpen,
+      isJoinStoreModalOpen,
+      isMetaManagerOpen,
+      isBusinessDropdownOpen
+    };
+  });
+
+  // 監聽器只註冊一次
   useEffect(() => {
     const handlePopState = () => {
-      if (isScannerOpen) {
-        setIsScannerOpen(false);
-        return;
-      }
-      if (isEditModalOpen) {
-        setIsEditModalOpen(false);
-        return;
-      }
-      if (isStoreModalOpen) {
-        setIsStoreModalOpen(false);
-        return;
-      }
-      if (isJoinStoreModalOpen) {
-        setIsJoinStoreModalOpen(false);
-        return;
-      }
-      if (isMetaManagerOpen) {
-        setIsMetaManagerOpen(false);
-        return;
-      }
-      if (isBusinessDropdownOpen) {
-        setIsBusinessDropdownOpen(false);
-        return;
-      }
+      const states = modalStatesRef.current;
+      if (states.isScannerOpen) { setIsScannerOpen(false); return; }
+      if (states.isEditModalOpen) { setIsEditModalOpen(false); return; }
+      if (states.isStoreModalOpen) { setIsStoreModalOpen(false); return; }
+      if (states.isJoinStoreModalOpen) { setIsJoinStoreModalOpen(false); return; }
+      if (states.isMetaManagerOpen) { setIsMetaManagerOpen(false); return; }
+      if (states.isBusinessDropdownOpen) { setIsBusinessDropdownOpen(false); return; }
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [isScannerOpen, isEditModalOpen, isStoreModalOpen, isJoinStoreModalOpen, isMetaManagerOpen, isBusinessDropdownOpen]);
+  }, []); // 空依賴 - 只註冊一次
 
   // ✅ 新增：打开 Scanner 的辅助函数
   const openScanner = (mode: 'receipt' | 'fridge' | 'sales') => {
@@ -239,12 +265,12 @@ export default function App() {
   const activeBusiness = businesses.find(b => b.id === currentBusinessId);
   // ✅ Dropdown options = inventory-used + custom list
   const derivedCategories = useMemo(() => {
-    const bizItems =
-      currentBusinessId ? inventory.filter((i: any) => i.businessId === currentBusinessId) : inventory;
+    const bizItems: InventoryItem[] =
+      currentBusinessId ? inventory.filter((i) => i.businessId === currentBusinessId) : inventory;
 
     const fromItems = Array.from(
-      new Set((bizItems as any[]).map(i => i.category).filter(Boolean) as string[])
-    );
+      new Set(bizItems.map(i => i.category).filter(Boolean))
+    ) as string[];
 
     const fromBiz = activeBusiness?.customCategories ?? [];
     return Array.from(new Set([...fromBiz, ...fromItems]))
@@ -253,12 +279,12 @@ export default function App() {
   }, [inventory, currentBusinessId, activeBusiness]);
 
   const derivedLocations = useMemo(() => {
-    const bizItems =
-      currentBusinessId ? inventory.filter((i: any) => i.businessId === currentBusinessId) : inventory;
+    const bizItems: InventoryItem[] =
+      currentBusinessId ? inventory.filter((i) => i.businessId === currentBusinessId) : inventory;
 
     const fromItems = Array.from(
-      new Set((bizItems as any[]).map(i => i.location).filter(Boolean) as string[])
-    );
+      new Set(bizItems.map(i => i.location).filter(Boolean))
+    ) as string[];
 
     const fromBiz = activeBusiness?.customLocations ?? [];
     return Array.from(new Set([...fromBiz, ...fromItems]))
@@ -307,23 +333,18 @@ export default function App() {
       })
     );
 
-    // 2) update local inventory state
-    setInventory(prev =>
-      prev.map(i => {
-        if (i.businessId !== currentBusinessId) return i;
-        if (type === 'categories' && (i.category || '').trim() === oldV) return { ...i, category: newV };
-        if (type === 'locations' && (i.location || '').trim() === oldV) return { ...i, location: newV };
-        return i;
-      })
-    );
+    // 2) update inventory in DB and reload (instead of local state mutation)
+    // Note: The setInventory call is now a no-op, the actual update happens in DB
 
     // 3) persist to DB (inventory_items)
-    const patch = type === 'categories' ? { category: newV } : { location: newV };
+    const patch: Record<string, string | null> = type === 'categories'
+      ? { category: newV }
+      : { location: newV };
     const column = type === 'categories' ? 'category' : 'location';
 
     const { error } = await supabase
       .from('inventory_items')
-      .update(patch as any)
+      .update(patch)
       .eq('business_id', currentBusinessId)
       .eq(column, oldV);
 
@@ -332,6 +353,9 @@ export default function App() {
       alert(error.message || 'Rename failed');
       return;
     }
+
+    // ✅ 刷新庫存以反映 DB 變更
+    await loadInventory(currentBusinessId);
   };
 
   const deleteMetaItem = async (type: 'categories' | 'locations', name: string) => {
@@ -353,23 +377,18 @@ export default function App() {
       })
     );
 
-    // 2) clear from local inventory state
-    setInventory(prev =>
-      prev.map(i => {
-        if (i.businessId !== currentBusinessId) return i;
-        if (type === 'categories' && (i.category || '').trim() === v) return { ...i, category: '' };
-        if (type === 'locations' && (i.location || '').trim() === v) return { ...i, location: '' };
-        return i;
-      })
-    );
+    // 2) update inventory in DB and reload (instead of local state mutation)
+    // Note: The setInventory call is now a no-op, the actual update happens in DB
 
     // 3) clear from DB
-    const patch = type === 'categories' ? { category: null } : { location: null };
+    const patch: Record<string, string | null> = type === 'categories'
+      ? { category: null }
+      : { location: null };
     const column = type === 'categories' ? 'category' : 'location';
 
     const { error } = await supabase
       .from('inventory_items')
-      .update(patch as any)
+      .update(patch)
       .eq('business_id', currentBusinessId)
       .eq(column, v);
 
@@ -378,6 +397,9 @@ export default function App() {
       alert(error.message || 'Delete failed');
       return;
     }
+
+    // ✅ 刷新庫存以反映 DB 變更
+    await loadInventory(currentBusinessId);
   };
 
   // ✅ Staff：Active + Pending 都放进列表（让 dropdown 能看到店）
@@ -464,20 +486,9 @@ export default function App() {
     };
   };
 
+  // ✅ 使用 Context 加載庫存
   const loadInventory = async (bizId: string) => {
-    const { data, error } = await supabase
-      .from('inventory_items')
-      .select('*')
-      .eq('business_id', bizId)
-      .order('updated_at', { ascending: false });
-
-    if (error) {
-      console.error('loadInventory error:', error);
-      alert(error.message || 'Failed to load inventory');
-      return;
-    }
-
-    setInventory((data || []).map(mapDbRowToInventoryItem));
+    await inventoryCtx.loadInventory(bizId);
   };
 
   // 当前店铺变化 -> 自动拉库存
@@ -555,7 +566,7 @@ export default function App() {
     setView(ViewState.DASHBOARD);
 
     // 清空本地数据（避免换号后看到上个账号的数据）
-    setInventory([]);
+    // Note: inventory is now managed by context, it will be empty when no businessId is selected
     setSales([]);
     setStaff([]);
     setShifts([]);
@@ -658,7 +669,7 @@ export default function App() {
         }
 
         // 切換到新店
-        localStorage.setItem('active_business_id', realUUID);
+        sessionStorage.setItem('active_business_id', realUUID);
         setCurrentBusinessId(realUUID);
       }
     } catch (err: any) {
@@ -672,7 +683,8 @@ export default function App() {
     if (user) {
       setUser({ ...user, ownedBusinessIds: user.ownedBusinessIds?.filter(id => id !== businessId) });
     }
-    setInventory(prev => prev.filter(i => i.businessId !== businessId));
+    // ✅ 使用 Context 清除庫存
+    inventoryCtx.clearInventoryForBusiness(businessId);
     setSales(prev => prev.filter(s => s.businessId !== businessId));
     setStaff(prev => prev.filter(s => s.businessId !== businessId));
     setShifts(prev => prev.filter(s => s.businessId !== businessId));
@@ -769,63 +781,12 @@ export default function App() {
   };
 
   // --- Data Handlers ---
+  // ✅ 使用 InventoryContext 處理掃描結果
   const handleScanResult = async (items: InventoryItem[]) => {
     if (!currentBusinessId) return;
 
-    const itemsWithBiz = items.map(i => ({ ...i, businessId: currentBusinessId }));
-
     try {
-      // 先用当前 inventory（已从 DB load）做匹配：同名则累加数量
-      for (const newItem of itemsWithBiz) {
-        const matched = inventory.find(
-          i =>
-            i.businessId === currentBusinessId &&
-            i.name.trim().toLowerCase() === (newItem.name || '').trim().toLowerCase()
-        );
-
-        if (matched) {
-          const newQtyValue = Number(matched.quantityValue || 0) + Number(newItem.quantityValue || 0);
-
-          const payload: any = {
-            name: matched.name,
-            canonical_name: matched.name,
-            category: newItem.category || matched.category || null,
-            location: newItem.location || matched.location || null,
-            quantity_value: newQtyValue,
-            quantity_unit: matched.quantityUnit || newItem.quantityUnit || 'pcs',
-            unit_cost: Number(newItem.unitCost ?? matched.unitCost ?? 0),
-            // ✅ 修复：转换日期格式
-            expiry_date: toISODate(newItem.expiryDate) || toISODate(matched.expiryDate),
-          };
-
-          const { error } = await supabase
-            .from('inventory_items')
-            .update(payload)
-            .eq('id', matched.id)
-            .eq('business_id', currentBusinessId);
-
-          if (error) throw error;
-        } else {
-          const payload: any = {
-            business_id: currentBusinessId,
-            name: newItem.name,
-            canonical_name: newItem.name,
-            category: newItem.category || null,
-            location: newItem.location || null,
-            quantity_value: Number(newItem.quantityValue || 0),
-            quantity_unit: newItem.quantityUnit || 'pcs',
-            unit_cost: Number(newItem.unitCost || 0),
-            // ✅ 修复：转换日期格式 + 默认使用今天日期
-            expiry_date: toISODate(newItem.expiryDate),
-            added_date: new Date().toISOString().split('T')[0],
-          };
-
-          const { error } = await supabase.from('inventory_items').insert(payload);
-          if (error) throw error;
-        }
-      }
-
-      await loadInventory(currentBusinessId);
+      await inventoryCtx.addItems(items, currentBusinessId);
       setIsScannerOpen(false);
     } catch (err: any) {
       console.error('handleScanResult error:', err);
@@ -898,20 +859,13 @@ export default function App() {
     }
   };
 
+  // ✅ 使用 InventoryContext 刪除庫存項目
   const handleDeleteInventoryItem = async (id: string) => {
     if (!currentBusinessId) return;
-    const { error } = await supabase
-      .from('inventory_items')
-      .delete()
-      .eq('id', id)
-      .eq('business_id', currentBusinessId);
-
-    if (error) {
-      alert(error.message || 'Delete failed');
-      return;
+    const success = await inventoryCtx.deleteItem(id, currentBusinessId);
+    if (!success) {
+      alert('Delete failed');
     }
-
-    setInventory(prev => prev.filter(i => i.id !== id));
   };
 
   const handleAddMenuItem = (item: MenuItem) => {
