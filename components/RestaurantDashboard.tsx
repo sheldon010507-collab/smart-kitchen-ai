@@ -2,7 +2,7 @@
 import React, { useMemo, useState } from 'react';
 import { SalesReceipt, Staff, Shift, MenuItem, InventoryItem } from '../types';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
-import { Plus, Loader2, Lightbulb, CheckCircle2, XCircle, RefreshCcw } from 'lucide-react';
+import { Plus, Loader2, Lightbulb, CheckCircle2, XCircle, RefreshCcw, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import AddShiftModal from './AddShiftModal';
 import StaffScheduleTable from './StaffScheduleTable';
@@ -109,9 +109,12 @@ const RestaurantDashboard: React.FC<Props> = ({
     setIsShiftModalOpen(true);
   };
 
-  const approveMember = async (userId: string) => {
+  const approveMember = async (memberId: string) => {
     try {
-      setActingId(userId);
+      setActingId(memberId);
+
+      // ✅ m.id 格式可能是 "userId_businessId" 或純 "userId"
+      const userId = memberId.includes('_') ? memberId.split('_')[0] : memberId;
 
       const { error } = await supabase
         .from('business_members')
@@ -130,9 +133,12 @@ const RestaurantDashboard: React.FC<Props> = ({
     }
   };
 
-  const rejectMember = async (userId: string) => {
+  const rejectMember = async (memberId: string) => {
     try {
-      setActingId(userId);
+      setActingId(memberId);
+
+      // ✅ m.id 格式可能是 "userId_businessId" 或純 "userId"
+      const userId = memberId.includes('_') ? memberId.split('_')[0] : memberId;
 
       const { error } = await supabase
         .from('business_members')
@@ -141,7 +147,7 @@ const RestaurantDashboard: React.FC<Props> = ({
         .eq('user_id', userId);
 
       if (error) {
-        alert(error.message || 'Reject failed');
+        alert(error.message || 'Remove failed');
         return;
       }
 
@@ -161,9 +167,8 @@ const RestaurantDashboard: React.FC<Props> = ({
             <button
               key={tab}
               onClick={() => setActiveTab(tab as any)}
-              className={`pb-4 text-sm font-bold uppercase tracking-wider transition-colors border-b-2 ${
-                activeTab === tab ? 'border-primary text-primary' : 'border-transparent text-secondary hover:text-primary'
-              }`}
+              className={`pb-4 text-sm font-bold uppercase tracking-wider transition-colors border-b-2 ${activeTab === tab ? 'border-primary text-primary' : 'border-transparent text-secondary hover:text-primary'
+                }`}
             >
               {tab}
             </button>
@@ -318,6 +323,44 @@ const RestaurantDashboard: React.FC<Props> = ({
           ) : (
             <div className="bg-white p-8 rounded-xl border border-border">
               <p className="text-secondary text-sm">No pending join requests.</p>
+            </div>
+          )}
+
+          {/* Active Staff Members */}
+          {activeStaff.length > 0 && (
+            <div className="bg-white p-8 rounded-xl border border-border">
+              <h3 className="text-sm font-bold text-secondary uppercase tracking-widest mb-6">
+                Active Staff ({activeStaff.length})
+              </h3>
+
+              <div className="space-y-3">
+                {activeStaff.map(m => (
+                  <div key={m.id} className="flex items-center justify-between p-4 rounded-lg border border-border hover:bg-background transition-colors">
+                    <div className="flex items-center space-x-4 min-w-0">
+                      <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-sm">
+                        {(m.name || 'S').charAt(0).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="font-bold text-primary truncate">{m.name || 'Staff'}</div>
+                        <div className="text-xs text-secondary truncate">{m.email || m.role || 'No email'}</div>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        if (window.confirm(`Are you sure you want to remove ${m.name || 'this staff member'} from this store?`)) {
+                          rejectMember(m.id);
+                        }
+                      }}
+                      disabled={actingId === m.id}
+                      className="px-4 py-2 rounded-lg bg-white border border-red-200 text-red-600 font-bold text-sm hover:bg-red-50 flex items-center disabled:opacity-50"
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 

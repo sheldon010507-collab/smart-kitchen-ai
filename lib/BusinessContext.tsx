@@ -19,7 +19,7 @@ interface BusinessContextType {
     loadBusinessesForStaff: (userId: string, userEmail: string, userName: string) => Promise<void>;
     createBusiness: (name: string, userId: string) => Promise<Business | null>;
     updateBusiness: (business: Partial<Business>) => Promise<boolean>;
-    deleteBusiness: (businessId: string) => void;
+    deleteBusiness: (businessId: string) => Promise<boolean>;
     joinBusinessByCode: (code: string, user: User) => Promise<{ success: boolean; businessId?: string; error?: string }>;
     refreshBusinesses: () => Promise<void>;
 }
@@ -211,10 +211,32 @@ export function BusinessProvider({ children, user, staff, setStaff }: BusinessPr
         }
     }, []);
 
-    const deleteBusiness = useCallback((businessId: string) => {
-        setBusinesses(prev => prev.filter(b => b.id !== businessId));
-        if (currentBusinessId === businessId) {
-            setCurrentBusinessId(null);
+    const deleteBusiness = useCallback(async (businessId: string): Promise<boolean> => {
+        try {
+            // Delete from database - this will cascade delete:
+            // - shopping_list items (ON DELETE CASCADE)
+            // - inventory_items (ON DELETE CASCADE)  
+            // - business_members (ON DELETE CASCADE)
+            const { error } = await supabase
+                .from('businesses')
+                .delete()
+                .eq('id', businessId);
+
+            if (error) {
+                console.error('Delete business failed:', error);
+                return false;
+            }
+
+            // Update local state
+            setBusinesses(prev => prev.filter(b => b.id !== businessId));
+            if (currentBusinessId === businessId) {
+                setCurrentBusinessId(null);
+            }
+
+            return true;
+        } catch (e: any) {
+            console.error('Delete business failed:', e);
+            return false;
         }
     }, [currentBusinessId]);
 

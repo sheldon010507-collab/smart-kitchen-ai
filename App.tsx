@@ -33,7 +33,7 @@ import {
   Business,
 } from './types';
 
-import InventoryCard from './components/InventoryCard';
+// import InventoryCard from './components/InventoryCard'; // Moved to InventoryView.tsx
 import Scanner from './components/Scanner';
 import ChefView from './components/ChefView';
 import EditItemModal from './components/EditItemModal';
@@ -54,84 +54,25 @@ import { useBusiness, BusinessProvider } from './lib/BusinessContext';
 
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 
+// ✅ 從模組導入工具函數
+import { toISODate } from './utils/dateUtils';
+import { calculateIngredientCost } from './utils/costCalculations';
+import { normMemberStatus, mapDbRowToInventoryItem } from './utils/transforms';
+import { sanitizeStorage } from './utils/storageUtils';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
+import { JoinStoreModal } from './components/modals/JoinStoreModal';
+import { MetaManagerModal } from './components/modals/MetaManagerModal';
+import { MasterDashboard } from './features/dashboard/MasterDashboard';
+import { StoreDashboard } from './features/dashboard/StoreDashboard';
+import { StaffDashboard } from './features/dashboard/StaffDashboard';
+import { InventoryView } from './features/inventory/InventoryView';
+import { DesktopSidebar } from './components/layout/DesktopSidebar';
+import { MobileHeader } from './components/layout/MobileHeader';
+
 const COLORS = ['#475569', '#64748B', '#94A3B8', '#CBD5E1', '#E2E8F0', '#F1F5F9'];
 
-// Helper to convert units for cost calculation
-const calculateIngredientCost = (invItem: InventoryItem, usageQty: number, usageUnit: string): number => {
-  const invUnit = (invItem.quantityUnit || 'pcs').toLowerCase();
-  const uUnit = usageUnit.toLowerCase();
-  const costPerInvUnit = invItem.unitCost || 0;
+// ✅ 函數已移至模組文件
 
-  let ratio = 0;
-  if (uUnit === invUnit) ratio = usageQty;
-  else if (invUnit === 'kg' && uUnit === 'g') ratio = usageQty / 1000;
-  else if (invUnit === 'g' && uUnit === 'kg') ratio = usageQty * 1000;
-  else if (invUnit === 'l' && uUnit === 'ml') ratio = usageQty / 1000;
-  else if (invUnit === 'ml' && uUnit === 'l') ratio = usageQty * 1000;
-  else if (invUnit === 'lb' && uUnit === 'oz') ratio = usageQty / 16;
-  else if (invUnit === 'oz' && uUnit === 'lb') ratio = usageQty * 16;
-  else ratio = usageQty; // fallback
-
-  return ratio * costPerInvUnit;
-};
-
-const normMemberStatus = (s: any): 'Active' | 'Pending' => {
-  const v = String(s || '').toLowerCase();
-  return v === 'active' ? 'Active' : 'Pending';
-};
-
-// ✅ 新增：日期格式转换函数 (dd/mm/yyyy -> YYYY-MM-DD)
-const toISODate = (dateStr: string | undefined | null): string | null => {
-  if (!dateStr) return null;
-  const v = dateStr.trim();
-  if (!v) return null;
-  // 已经是 YYYY-MM-DD 格式
-  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
-  // dd/mm/yyyy 格式
-  const match = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (match) {
-    const [, day, month, year] = match;
-    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-  }
-  return null;
-};
-
-// ✅ Fix: Properly typed ErrorBoundary
-interface ErrorBoundaryProps {
-  children: React.ReactNode;
-}
-
-interface ErrorBoundaryState {
-  hasError: boolean;
-  error?: unknown;
-}
-
-class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  declare props: ErrorBoundaryProps;
-  state: ErrorBoundaryState = { hasError: false };
-
-  static getDerivedStateFromError(error: unknown): ErrorBoundaryState {
-    return { hasError: true, error };
-  }
-
-  componentDidCatch(error: unknown, info: React.ErrorInfo) {
-    console.error("[UI crashed]", error, info);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="p-6 rounded-xl border border-red-200 bg-red-50 text-red-800">
-          <div className="font-bold mb-2">This page crashed.</div>
-          <div className="text-sm opacity-90">
-            Open DevTools Console to see the error details. Fix the error and refresh.
-          </div>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
 
 export default function App() {
   // --- Global State ---
@@ -146,33 +87,7 @@ export default function App() {
   const setBusinesses = setBusinessesDirect;
   const setCurrentBusinessId = setCurrentBusinessIdDirect;
 
-  // ✅ 3) 增加“兼容旧缓存”的清理，避免用户浏览器里旧的 biz_... 继续触发错误
-  const sanitizeStorage = () => {
-    if (typeof window === 'undefined') return;
-
-    // UUID v4 regex
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-    const keysToCheck = ['active_business_id', 'selectedBusinessId', 'currentBusinessId'];
-
-    keysToCheck.forEach(key => {
-      // Check both storages
-      const valLocal = localStorage.getItem(key);
-      if (valLocal) {
-        localStorage.removeItem(key); // Migrate/Clean from local
-        if (uuidRegex.test(valLocal) && !valLocal.startsWith('biz_')) {
-          sessionStorage.setItem(key, valLocal); // Move to session if valid
-        }
-      }
-
-      const valSession = sessionStorage.getItem(key);
-      if (valSession) {
-        if (valSession.startsWith('biz_') || !uuidRegex.test(valSession)) {
-          sessionStorage.removeItem(key);
-        }
-      }
-    });
-  };
+  // ✅ 使用導入的 sanitizeStorage 函數清理舊緩存
 
   useEffect(() => {
     sanitizeStorage();
@@ -718,14 +633,14 @@ export default function App() {
         return;
       }
 
-      // 2. 直接插入 active member
+      // 2. 插入 pending member，等待 Manager 審批
       const { error: joinErr } = await supabase
         .from('business_members')
         .insert({
           business_id: business.id,
           user_id: user.id,
           role: 'staff', // 修正：使用 'staff' 符合資料庫 check constraint
-          status: 'active' // 重点：直接 Active，不再 Pending
+          status: 'pending' // ✅ 修復：需要 Manager 審批
         });
 
       if (joinErr) {
@@ -746,7 +661,7 @@ export default function App() {
         email: user.email,
         role: 'Server',
         hourlyRate: 0,
-        status: 'Active',
+        status: 'Pending', // ✅ 本地狀態也設為 Pending
       };
 
       setStaff(prev => [...prev, newMembership as Staff]);
@@ -768,11 +683,10 @@ export default function App() {
       setJoinStoreNameAlias('');
       setIsJoinStoreModalOpen(false);
 
-      // 自动切过去
-      if (window.confirm(`Joined ${business.name} successfully! Switch to it now?`)) {
-        setCurrentBusinessId(business.id);
-        setView(ViewState.DASHBOARD);
-      }
+      // ✅ 告知用戶需要等待 Manager 審批
+      alert(`Your request to join ${business.name} has been submitted! Please wait for manager approval.`);
+
+      // 不自動切換，因為 Pending 狀態無法進入店鋪
 
     } catch (err: any) {
       console.error('Join store error:', err);
@@ -992,678 +906,150 @@ export default function App() {
   return (
     <div className="min-h-screen bg-background text-primary font-sans flex flex-col md:flex-row">
       {/* Sidebar (Desktop) */}
-      <aside className="hidden md:flex flex-col w-72 bg-background fixed h-full z-10 print:hidden pr-6 border-r border-border">
-        <div className="p-8 flex items-center space-x-3 mb-6">
-          <div className="bg-white p-2 rounded-lg border border-border shadow-sm">
-            <ChefHat className="w-6 h-6 text-primary" />
-          </div>
-          <div>
-            <h1 className="font-bold text-primary text-lg leading-none tracking-tight">SmartKitchen</h1>
-            <p className="text-xs text-secondary font-medium mt-1">AI Workspace</p>
-          </div>
-        </div>
-
-        <div className="px-6 space-y-2 flex-1 overflow-y-auto">
-          {/* Business Switcher */}
-          {(user.role === 'Manager' || user.role === 'Staff') && (
-            <div className="relative mb-10">
-              <button
-                onClick={() => setIsBusinessDropdownOpen(!isBusinessDropdownOpen)}
-                className="w-full flex items-center justify-between px-4 py-3 bg-white border border-border rounded-lg text-sm text-primary hover:border-accent transition-colors shadow-sm"
-              >
-                <div className="flex items-center space-x-3 truncate">
-                  <Building2 className="w-4 h-4 text-secondary" />
-                  <span className="font-semibold truncate">
-                    {activeBusiness ? activeBusiness.name : user.role === 'Manager' ? 'Master Dashboard' : 'Select Store'}
-                  </span>
-                </div>
-                <ChevronDown className="w-4 h-4 text-secondary" />
-              </button>
-
-              {isBusinessDropdownOpen && (
-                <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-lg shadow-xl border border-border z-20 py-2">
-                  {user.role === 'Manager' && (
-                    <button
-                      onClick={() => handleSwitchBusiness(null)}
-                      className="w-full flex items-center justify-between px-4 py-2.5 text-sm text-left hover:bg-background font-medium"
-                    >
-                      <span className="text-primary">Master View</span>
-                      {!currentBusinessId && <Check className="w-4 h-4 text-accent" />}
-                    </button>
-                  )}
-
-                  {accessibleBusinesses.length > 0 ? (
-                    accessibleBusinesses.map(b => {
-                      const mem = user.role === 'Staff' ? staffMemberships.find(m => m.businessId === b.id) : null;
-                      const isPending = mem?.status === 'Pending';
-                      return (
-                        <button
-                          key={b.id}
-                          onClick={() => handleSwitchBusiness(b.id)}
-                          className="w-full flex items-center justify-between px-4 py-2.5 text-sm text-left hover:bg-background"
-                        >
-                          <span className="truncate text-secondary">
-                            {b.name}
-                            {user.role === 'Staff' && isPending ? ' (Pending)' : ''}
-                          </span>
-                          {b.id === currentBusinessId && <Check className="w-4 h-4 text-accent" />}
-                        </button>
-                      );
-                    })
-                  ) : (
-                    <div className="px-4 py-2 text-xs text-secondary italic">No stores found.</div>
-                  )}
-
-                  {user.role === 'Staff' && (
-                    <button
-                      onClick={() => {
-                        setIsBusinessDropdownOpen(false);
-                        setIsJoinStoreModalOpen(true);
-                      }}
-                      className="w-full flex items-center justify-between px-4 py-2.5 text-sm text-left hover:bg-background border-t border-border mt-1 text-accent font-bold"
-                    >
-                      <span className="flex items-center">
-                        <Plus className="w-3 h-3 mr-2" /> Add Store
-                      </span>
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          <div className="space-y-1">
-            <div className="px-4 py-2 text-xs font-bold text-secondary uppercase tracking-widest opacity-70 mb-2">Modules</div>
-
-            <button
-              onClick={() => setView(ViewState.DASHBOARD)}
-              className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg text-sm transition-all ${view === ViewState.DASHBOARD
-                ? 'bg-white text-primary font-semibold shadow-sm border border-border'
-                : 'text-secondary hover:text-primary hover:bg-white/50'
-                }`}
-            >
-              <LayoutDashboard className="w-5 h-5" />
-              <span>Overview</span>
-            </button>
-
-            <button
-              onClick={() => setView(ViewState.INVENTORY)}
-              className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg text-sm transition-all ${view === ViewState.INVENTORY
-                ? 'bg-white text-primary font-semibold shadow-sm border border-border'
-                : 'text-secondary hover:text-primary hover:bg-white/50'
-                }`}
-            >
-              <Refrigerator className="w-5 h-5" />
-              <span>Inventory</span>
-            </button>
-
-            <button
-              onClick={() => setView(ViewState.CHEF)}
-              className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg text-sm transition-all ${view === ViewState.CHEF
-                ? 'bg-white text-primary font-semibold shadow-sm border border-border'
-                : 'text-secondary hover:text-primary hover:bg-white/50'
-                }`}
-            >
-              <ChefHat className="w-5 h-5" />
-              <span>AI Chef</span>
-            </button>
-
-            {FEATURE_SHOPPING_LIST_ENABLED && (
-              <button
-                onClick={() => setView(ViewState.SHOPPING)}
-                className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg text-sm transition-all ${view === ViewState.SHOPPING
-                  ? 'bg-white text-primary font-semibold shadow-sm border border-border'
-                  : 'text-secondary hover:text-primary hover:bg-white/50'
-                  }`}
-              >
-                <ShoppingCart className="w-5 h-5" />
-                <span>Shopping List</span>
-              </button>
-            )}
-
-            {user.role === 'Manager' && (
-              <button
-                onClick={() => setView(ViewState.RESTAURANT)}
-                className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg text-sm transition-all ${view === ViewState.RESTAURANT
-                  ? 'bg-white text-primary font-semibold shadow-sm border border-border'
-                  : 'text-secondary hover:text-primary hover:bg-white/50'
-                  }`}
-              >
-                <Store className="w-5 h-5" />
-                <span>Store Ops</span>
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Sidebar Footer */}
-        <div className="p-6 mt-auto border-t border-border bg-background/50">
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center space-x-3 px-4 py-2.5 text-secondary hover:text-primary rounded-lg transition-colors text-sm font-medium hover:bg-white mb-2"
-          >
-            <LogOut className="w-5 h-5" />
-            <span>Log Out</span>
-          </button>
-
-          <button
-            onClick={() => setView(ViewState.PRIVACY)}
-            className="w-full flex items-center space-x-3 px-4 py-2 text-secondary hover:text-primary rounded-lg transition-colors text-xs font-medium"
-          >
-            <Shield className="w-4 h-4" />
-            <span>Cookies & Privacy</span>
-          </button>
-        </div>
-      </aside>
+      <DesktopSidebar
+        user={user}
+        view={view}
+        setView={setView}
+        activeBusiness={activeBusiness}
+        accessibleBusinesses={accessibleBusinesses}
+        currentBusinessId={currentBusinessId}
+        isBusinessDropdownOpen={isBusinessDropdownOpen}
+        setIsBusinessDropdownOpen={setIsBusinessDropdownOpen}
+        staffMemberships={staff.filter(s => s.businessId && businesses.some(b => b.id === s.businessId))}
+        onSwitchBusiness={handleSwitchBusiness}
+        onOpenJoinStore={() => setIsJoinStoreModalOpen(true)}
+        onLogout={handleLogout}
+      />
       {/* Main Content */}
       <main className="flex-1 md:ml-72 pb-20 md:pb-12 bg-gray-50 md:bg-white min-h-screen md:rounded-tl-2xl md:border-l md:border-border overflow-hidden relative">
         {/* Mobile Header - Redesigned */}
-        <div className="md:hidden bg-white border-b border-gray-100 px-4 py-3 flex justify-between items-center sticky top-0 z-20 shadow-sm">
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-slate-800 rounded-lg flex items-center justify-center">
-              <ChefHat className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h1 className="font-bold text-slate-800 text-sm leading-none">SmartKitchen</h1>
-              <p className="text-xs text-gray-400 mt-0.5">AI Workspace</p>
-            </div>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            {/* Store Switcher */}
-            <div className="relative">
-              <button
-                onClick={() => setIsBusinessDropdownOpen(!isBusinessDropdownOpen)}
-                className="flex items-center bg-gray-100 rounded-lg px-3 py-2 active:bg-gray-200 transition-colors"
-              >
-                <Building2 className="w-4 h-4 text-slate-600 mr-2" />
-                <span className="text-xs font-semibold text-slate-700 truncate max-w-[80px]">
-                  {activeBusiness?.name || (user.role === 'Manager' ? 'Master' : 'Stores')}
-                </span>
-                <ChevronDown className={`w-4 h-4 text-gray-400 ml-1 transition-transform ${isBusinessDropdownOpen ? 'rotate-180' : ''}`} />
-              </button>
-
-              {isBusinessDropdownOpen && (
-                <div className="absolute top-full right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-100 z-30 py-2 max-h-[60vh] overflow-auto">
-                  <div className="px-3 py-2 text-xs text-gray-400 uppercase tracking-wider font-semibold">Select Store</div>
-
-                  {user.role === 'Manager' && (
-                    <button
-                      onClick={() => handleSwitchBusiness(null)}
-                      className={`w-full text-left px-4 py-3 text-sm flex items-center space-x-3 ${!currentBusinessId ? 'bg-slate-50 text-slate-800 font-semibold' : 'text-gray-600 hover:bg-gray-50'}`}
-                    >
-                      <div className="w-8 h-8 bg-slate-200 rounded-lg flex items-center justify-center">
-                        <LayoutDashboard className="w-4 h-4 text-slate-600" />
-                      </div>
-                      <div>
-                        <div className="font-medium">Master View</div>
-                        <div className="text-xs text-gray-400">All locations</div>
-                      </div>
-                      {!currentBusinessId && <Check className="w-4 h-4 text-slate-800 ml-auto" />}
-                    </button>
-                  )}
-
-                  {accessibleBusinesses.map(b => {
-                    const mem = user.role === 'Staff' ? staffMemberships.find(m => m.businessId === b.id) : null;
-                    const isPending = mem?.status === 'Pending';
-                    const isActive = b.id === currentBusinessId;
-                    return (
-                      <button
-                        key={b.id}
-                        onClick={() => handleSwitchBusiness(b.id)}
-                        className={`w-full text-left px-4 py-3 text-sm flex items-center space-x-3 ${isActive ? 'bg-slate-50 text-slate-800' : 'text-gray-600 hover:bg-gray-50'}`}
-                      >
-                        <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                          <Store className="w-4 h-4 text-blue-600" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className={`font-medium truncate ${isActive ? 'text-slate-800' : ''}`}>{b.name}</div>
-                          {isPending && <div className="text-xs text-amber-600">Pending approval</div>}
-                        </div>
-                        {isActive && <Check className="w-4 h-4 text-slate-800" />}
-                      </button>
-                    );
-                  })}
-
-                  {user.role === 'Staff' && (
-                    <button
-                      onClick={() => {
-                        setIsBusinessDropdownOpen(false);
-                        setIsJoinStoreModalOpen(true);
-                      }}
-                      className="w-full text-left px-4 py-3 text-sm text-blue-600 font-semibold hover:bg-blue-50 border-t border-gray-100 mt-2 flex items-center space-x-3"
-                    >
-                      <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                        <Plus className="w-4 h-4 text-blue-600" />
-                      </div>
-                      <span>Join New Store</span>
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Action Buttons */}
-            <button
-              onClick={handleLogout}
-              className="w-9 h-9 flex items-center justify-center rounded-lg bg-gray-100 active:bg-gray-200 transition-colors"
-            >
-              <LogOut className="w-4 h-4 text-gray-500" />
-            </button>
-          </div>
-        </div>
+        <MobileHeader
+          user={user}
+          activeBusiness={activeBusiness}
+          accessibleBusinesses={accessibleBusinesses}
+          currentBusinessId={currentBusinessId}
+          isBusinessDropdownOpen={isBusinessDropdownOpen}
+          setIsBusinessDropdownOpen={setIsBusinessDropdownOpen}
+          staffMemberships={staff.filter(s => s.businessId && businesses.some(b => b.id === s.businessId))}
+          onSwitchBusiness={handleSwitchBusiness}
+          onOpenJoinStore={() => setIsJoinStoreModalOpen(true)}
+          onLogout={handleLogout}
+        />
 
         <div className="p-4 md:p-16 max-w-6xl mx-auto min-h-screen">
           {/* MASTER DASHBOARD VIEW (Managers Only) */}
           {isMasterView && view === ViewState.DASHBOARD && (
-            <div className="space-y-16 animate-in fade-in duration-500">
-              <header className="flex flex-col md:flex-row md:justify-between md:items-end gap-4 border-b border-border pb-6">
-                <div>
-                  <h2 className="text-2xl md:text-4xl font-bold text-primary tracking-tight">
-                    <EditableTitle defaultTitle="Master Dashboard" storageKey="overview_master_dashboard" />
-                  </h2>
-                  <p className="text-secondary mt-2 md:mt-3 text-base md:text-lg font-light">Overview of {accessibleBusinesses.length} locations</p>
-                </div>
-                <button
-                  onClick={handleOpenCreateStore}
-                  className="flex items-center justify-center px-4 md:px-6 py-2.5 md:py-3 bg-accent text-white rounded-lg shadow-sm text-sm font-semibold hover:bg-accentHover transition-colors w-full md:w-auto"
-                >
-                  <Plus className="w-5 h-5 mr-2" />
-                  Add Location
-                </button>
-              </header>
-
-              <section>
-                <h3 className="text-sm font-bold text-secondary uppercase tracking-widest mb-6">Locations</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                  {accessibleBusinesses.map(biz => {
-                    const bizInv = inventory.filter(i => i.businessId === biz.id);
-                    const bizSales = sales.filter(s => s.businessId === biz.id);
-                    const totalRev = bizSales.reduce((acc, s) => acc + s.totalAmount, 0);
-                    const alerts = bizInv.filter(i => i.expiryDate && new Date(i.expiryDate) < new Date(Date.now() + 86400000 * 3)).length;
-
-                    return (
-                      <div
-                        key={biz.id}
-                        onClick={() => setCurrentBusinessId(biz.id)}
-                        className="bg-white p-8 rounded-xl border border-border hover:border-accent hover:shadow-md transition-all cursor-pointer group relative"
-                      >
-                        <div className="flex justify-between items-start mb-8">
-                          <div className="pr-10">
-                            <h3 className="font-bold text-xl text-primary mb-2 group-hover:text-accent transition-colors">{biz.name}</h3>
-                            {biz.address && (
-                              <div className="flex items-center text-sm text-secondary">
-                                <MapPin className="w-4 h-4 mr-1.5" />
-                                <span className="truncate">{biz.address}</span>
-                              </div>
-                            )}
-                          </div>
-                          <span className="text-xs bg-background px-2 py-1 rounded text-secondary font-mono border border-border">
-                            {biz.joinCode}
-                          </span>
-                        </div>
-
-                        <button
-                          onClick={e => handleOpenEditStore(biz, e)}
-                          className="absolute top-6 right-12 p-2 text-secondary hover:text-primary rounded-lg hover:bg-background transition-colors z-10"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-
-                        <div className="space-y-4 pt-4 border-t border-border">
-                          <div className="flex justify-between text-base items-center">
-                            <span className="text-secondary font-medium">Revenue</span>
-                            <span className="font-bold text-primary">${totalRev.toFixed(0)}</span>
-                          </div>
-                          <div className="flex justify-between text-base items-center">
-                            <span className="text-secondary font-medium">Alerts</span>
-                            <span className={`font-semibold ${alerts > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                              {alerts} items
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </section>
-
-              {/* Shopping List Summary */}
-              {FEATURE_SHOPPING_LIST_ENABLED && (
-                <section>
-                  <h3 className="text-sm font-bold text-secondary uppercase tracking-widest mb-6">Shopping List Overview</h3>
-
-                  {/* Stats Cards */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                    <div className="bg-white p-6 rounded-xl border border-border shadow-sm">
-                      <div className="text-sm font-medium text-secondary mb-2">Total Pending Items</div>
-                      <div className="text-3xl font-bold text-primary">
-                        {shoppingListLoading ? '...' : totalPendingItems}
-                      </div>
-                      <p className="text-xs text-secondary mt-1">across {shoppingListSummaries.length} stores</p>
-                    </div>
-                    <div className={`p-6 rounded-xl border shadow-sm ${totalUrgentItems > 0 ? 'bg-red-50 border-red-100' : 'bg-white border-border'}`}>
-                      <div className={`flex items-center space-x-2 mb-2 ${totalUrgentItems > 0 ? 'text-red-700' : 'text-secondary'}`}>
-                        <AlertTriangle className="w-4 h-4" />
-                        <span className="text-sm font-medium">Urgent Items</span>
-                      </div>
-                      <div className={`text-3xl font-bold ${totalUrgentItems > 0 ? 'text-red-600' : 'text-primary'}`}>
-                        {shoppingListLoading ? '...' : totalUrgentItems}
-                      </div>
-                      <p className="text-xs text-secondary mt-1">need immediate attention</p>
-                    </div>
-                  </div>
-
-                  {/* Store Breakdown */}
-                  <div className="bg-white rounded-xl border border-border shadow-sm overflow-hidden">
-                    <div className="px-6 py-4 border-b border-border bg-background/50">
-                      <h4 className="font-semibold text-primary">Store Breakdown</h4>
-                    </div>
-                    {shoppingListLoading ? (
-                      <div className="p-8 flex justify-center">
-                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-                      </div>
-                    ) : shoppingListSummaries.length === 0 ? (
-                      <div className="p-8 text-center text-secondary">No shopping list data available.</div>
-                    ) : (
-                      <div className="divide-y divide-border">
-                        {shoppingListSummaries.map((summary) => (
-                          <div
-                            key={summary.business_id}
-                            onClick={() => {
-                              setCurrentBusinessId(summary.business_id);
-                              setView(ViewState.SHOPPING);
-                            }}
-                            className="group flex items-center justify-between p-4 hover:bg-background cursor-pointer transition-colors"
-                          >
-                            <div className="flex items-center space-x-3">
-                              <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
-                                <ShoppingCart className="w-4 h-4" />
-                              </div>
-                              <div>
-                                <h5 className="font-medium text-primary">{summary.business_name}</h5>
-                                <p className="text-xs text-secondary">{summary.total_items} items total</p>
-                              </div>
-                            </div>
-                            <div className="flex items-center space-x-4">
-                              <div className="text-right">
-                                <div className="text-lg font-bold text-primary">{summary.pending_count}</div>
-                                <div className="text-xs text-secondary uppercase tracking-wider">Pending</div>
-                              </div>
-                              {summary.urgent_count > 0 && (
-                                <div className="text-right px-2 py-1 bg-red-100 rounded-lg">
-                                  <div className="text-sm font-bold text-red-700">{summary.urgent_count}</div>
-                                  <div className="text-[10px] text-red-800 font-bold uppercase">Urgent</div>
-                                </div>
-                              )}
-                              <ChevronRight className="w-4 h-4 text-secondary group-hover:text-primary transition-colors" />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </section>
-              )}
-            </div>
+            <MasterDashboard
+              businesses={accessibleBusinesses}
+              inventory={inventory}
+              sales={sales}
+              shoppingListSummaries={shoppingListSummaries}
+              shoppingListLoading={shoppingListLoading}
+              onSelectBusiness={setCurrentBusinessId}
+              onCreateStore={handleOpenCreateStore}
+              onEditStore={handleOpenEditStore}
+              setView={setView}
+            />
           )}
 
           {/* SINGLE STORE DASHBOARD VIEW */}
-          {!isMasterView && view === ViewState.DASHBOARD && (
-            <div className="space-y-16 animate-in fade-in duration-500">
-              <header className="flex flex-col md:flex-row md:items-end justify-between gap-4 md:gap-8 border-b border-border pb-6 md:pb-8">
-                <div>
-                  <h2 className="text-2xl md:text-4xl font-bold text-primary tracking-tight">{user.name}</h2>
-                  <p className="text-secondary mt-2 md:mt-3 text-base md:text-lg flex flex-wrap items-center gap-2">
-                    {activeBusiness?.name || (user.role === 'Staff' ? 'No Store Selected' : 'Loading...')}
-                    {activeBusiness && user.role === 'Manager' ? (
-                      <span className="text-xs bg-background text-secondary px-2 py-1 rounded border border-border font-mono">
-                        {activeBusiness?.joinCode}
-                      </span>
-                    ) : activeBusiness ? (
-                      <span className="text-xs bg-accent text-white px-2 py-1 rounded border border-border font-bold">
-                        STAFF
-                      </span>
-                    ) : null}
-                  </p>
-                </div>
-
-                {user.role === 'Manager' && (
-                  <div className="grid grid-cols-2 md:flex md:space-x-4 gap-2 md:gap-0 w-full md:w-auto">
-                    <button
-                      onClick={() => openScanner('receipt')}
-                      className="flex items-center justify-center px-3 md:px-6 py-2.5 md:py-3 bg-white text-primary border border-border rounded-lg shadow-sm hover:bg-background text-sm font-semibold transition-colors"
-                    >
-                      <ScanLine className="w-4 md:w-5 h-4 md:h-5 mr-1.5 md:mr-2" />
-                      <span className="hidden sm:inline">Scan </span>Invoice
-                    </button>
-                    <button
-                      onClick={() => openScanner('fridge')}
-                      className="flex items-center justify-center px-3 md:px-6 py-2.5 md:py-3 bg-accent text-white rounded-lg shadow-sm hover:bg-accentHover text-sm font-semibold transition-colors"
-                    >
-                      <ScanLine className="w-4 md:w-5 h-4 md:h-5 mr-1.5 md:mr-2" />
-                      <span className="hidden sm:inline">Scan </span>Fridge
-                    </button>
-                  </div>
-                )}
-              </header>
-
-              {user.role === 'Staff' ? (
-                <div className="space-y-8">
-                  {activeBusiness ? (
-                    <>
-                      <StaffInventoryOverview inventory={filteredInventory} />
-
-                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                        <div className="lg:col-span-2">
-                          <MenuManager
-                            menu={filteredMenu}
-                            inventory={filteredInventory}
-                            onAddMenuItem={handleAddMenuItem}
-                            onDeleteMenuItem={handleDeleteMenuItem}
-                            onUpdateMenuItem={handleUpdateMenuItem}
-                            isStaff={true}
-                          />
-                        </div>
-
-                        <div className="h-[600px]">
-                          <PrepList
-                            tasks={filteredTasks}
-                            currentUser={user}
-                            onAddTask={text => {
-                              if (!currentBusinessId) return;
-                              setPrepTasks(prev => [
-                                ...prev,
-                                {
-                                  id: Date.now().toString(),
-                                  businessId: currentBusinessId,
-                                  text,
-                                  completed: false,
-                                  addedBy: user.name,
-                                  date: new Date().toISOString(),
-                                },
-                              ]);
-                            }}
-                            onToggleTask={id => setPrepTasks(prev => prev.map(t => (t.id === id ? { ...t, completed: !t.completed } : t)))}
-                            onDeleteTask={id => setPrepTasks(prev => prev.filter(t => t.id !== id))}
-                          />
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center py-20 border-2 border-dashed border-border rounded-xl">
-                      <Store className="w-16 h-16 text-border mb-4" />
-                      <h3 className="text-lg font-bold text-primary mb-2">No Store Selected</h3>
-                      <p className="text-secondary mb-6 text-center max-w-md">
-                        If you just joined, you may be waiting for approval. Or add a store using your invite code.
-                      </p>
-                      <button
-                        onClick={() => setIsJoinStoreModalOpen(true)}
-                        className="px-6 py-3 bg-accent text-white rounded-lg font-bold shadow-sm hover:bg-accentHover"
-                      >
-                        Add Store Code
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
-                  <div className="lg:col-span-2 space-y-12">
-                    <section>
-                      <h3 className="text-sm font-bold text-secondary uppercase tracking-widest mb-6">Inventory Breakdown</h3>
-                      <div className="bg-white p-8 rounded-xl border border-border h-96 flex flex-col items-center justify-center">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
-                            <Pie
-                              data={(() => {
-                                const data: any = {};
-                                filteredInventory.forEach(i => (data[i.category] = (data[i.category] || 0) + 1));
-                                return Object.keys(data).map(k => ({ name: k, value: data[k] }));
-                              })()}
-                              cx="50%"
-                              cy="50%"
-                              innerRadius={70}
-                              outerRadius={100}
-                              paddingAngle={4}
-                              dataKey="value"
-                              stroke="none"
-                            >
-                              {COLORS.map((c, i) => (
-                                <Cell key={i} fill={c} />
-                              ))}
-                            </Pie>
-                            <Tooltip
-                              contentStyle={{ borderRadius: '8px', border: '1px solid #E5E7EB', boxShadow: 'none', padding: '8px 12px' }}
-                              itemStyle={{ fontWeight: 600, color: '#111827' }}
-                            />
-                            <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px' }} />
-                          </PieChart>
-                        </ResponsiveContainer>
-                      </div>
-                    </section>
-                  </div>
-
-                  <div className="h-[400px]">
-                    <PrepList
-                      tasks={filteredTasks}
-                      currentUser={user}
-                      onAddTask={text => {
-                        if (!currentBusinessId) return;
-                        setPrepTasks(prev => [
-                          ...prev,
-                          {
-                            id: Date.now().toString(),
-                            businessId: currentBusinessId,
-                            text,
-                            completed: false,
-                            addedBy: user.name,
-                            date: new Date().toISOString(),
-                          },
-                        ]);
-                      }}
-                      onToggleTask={id => setPrepTasks(prev => prev.map(t => (t.id === id ? { ...t, completed: !t.completed } : t)))}
-                      onDeleteTask={id => setPrepTasks(prev => prev.filter(t => t.id !== id))}
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
+          {!isMasterView && view === ViewState.DASHBOARD && activeBusiness && (
+            user.role === 'Manager' ? (
+              <StoreDashboard
+                user={user}
+                activeBusiness={activeBusiness}
+                inventory={filteredInventory}
+                tasks={filteredTasks}
+                onAddTask={text => {
+                  if (!currentBusinessId) return;
+                  setPrepTasks(prev => [
+                    ...prev,
+                    {
+                      id: Date.now().toString(),
+                      businessId: currentBusinessId,
+                      text,
+                      completed: false,
+                      addedBy: user.name,
+                      date: new Date().toISOString(),
+                    },
+                  ]);
+                }}
+                onToggleTask={id => setPrepTasks(prev => prev.map(t => (t.id === id ? { ...t, completed: !t.completed } : t)))}
+                onDeleteTask={id => setPrepTasks(prev => prev.filter(t => t.id !== id))}
+                onOpenScanner={openScanner}
+              />
+            ) : (
+              <StaffDashboard
+                user={user}
+                activeBusiness={activeBusiness}
+                inventory={filteredInventory}
+                menu={filteredMenu}
+                tasks={filteredTasks}
+                onAddMenuItem={handleAddMenuItem}
+                onDeleteMenuItem={handleDeleteMenuItem}
+                onUpdateMenuItem={handleUpdateMenuItem}
+                onAddTask={text => {
+                  if (!currentBusinessId) return;
+                  setPrepTasks(prev => [
+                    ...prev,
+                    {
+                      id: Date.now().toString(),
+                      businessId: currentBusinessId,
+                      text,
+                      completed: false,
+                      addedBy: user.name,
+                      date: new Date().toISOString(),
+                    },
+                  ]);
+                }}
+                onToggleTask={id => setPrepTasks(prev => prev.map(t => (t.id === id ? { ...t, completed: !t.completed } : t)))}
+                onDeleteTask={id => setPrepTasks(prev => prev.filter(t => t.id !== id))}
+                onOpenJoinStore={() => setIsJoinStoreModalOpen(true)}
+              />
+            )
+          )}
+          {!isMasterView && view === ViewState.DASHBOARD && !activeBusiness && user.role === 'Staff' && (
+            <StaffDashboard
+              user={user}
+              activeBusiness={null}
+              inventory={[]}
+              menu={[]}
+              tasks={[]}
+              onAddMenuItem={() => { }}
+              onDeleteMenuItem={() => { }}
+              onUpdateMenuItem={() => { }}
+              onAddTask={() => { }}
+              onToggleTask={() => { }}
+              onDeleteTask={() => { }}
+              onOpenJoinStore={() => setIsJoinStoreModalOpen(true)}
+            />
           )}
 
           {/* INVENTORY VIEW */}
-          {view === ViewState.INVENTORY &&
-            (isMasterView ? (
-              <div className="flex flex-col items-center justify-center h-96 animate-in fade-in duration-500">
-                <Store className="w-16 h-16 text-border mb-6" />
-                <p className="text-secondary text-lg">Select a store to view its inventory.</p>
-              </div>
-            ) : (
-              <div className="space-y-6 md:space-y-12 animate-in fade-in duration-500">
-                <header className="flex flex-col md:flex-row md:justify-between md:items-end gap-4 border-b border-border pb-4 md:pb-6">
-                  <div>
-                    <h2 className="text-2xl md:text-4xl font-bold text-primary tracking-tight">
-                      <EditableTitle defaultTitle="Inventory" storageKey="module_inventory_title" />
-                    </h2>
-                    <p className="text-secondary mt-2 md:mt-3 text-sm md:text-lg font-light">Manage stock for {activeBusiness?.name}</p>
-                  </div>
-                  <div className="grid grid-cols-3 md:flex md:space-x-3 gap-2 md:gap-0">
-                    <button
-                      onClick={() => openScanner('receipt')}
-                      className="flex items-center justify-center px-3 md:px-6 py-2 md:py-3 bg-white text-primary border border-border rounded-lg shadow-sm text-xs md:text-sm font-semibold hover:bg-background transition-colors"
-                    >
-                      <ScanLine className="w-4 md:w-5 h-4 md:h-5 md:mr-2" />
-                      <span className="hidden md:inline">Scan</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        setMetaTab('categories');
-                        setMetaNewValue('');
-                        setIsMetaManagerOpen(true);
-                      }}
-                      className="flex items-center justify-center px-3 md:px-6 py-2 md:py-3 bg-white text-primary border border-border rounded-lg shadow-sm text-xs md:text-sm font-semibold hover:bg-background transition-colors"
-                    >
-                      <Edit className="w-4 md:w-5 h-4 md:h-5 md:mr-2" />
-                      <span className="hidden md:inline">Manage</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        setEditingItem(null);
-                        setIsEditModalOpen(true);
-                      }}
-                      className="flex items-center justify-center px-3 md:px-6 py-2 md:py-3 bg-accent text-white rounded-lg shadow-sm text-xs md:text-sm font-semibold hover:bg-accentHover"
-                    >
-                      <Plus className="w-4 md:w-5 h-4 md:h-5 md:mr-2" />
-                      <span className="hidden md:inline">Add</span>
-                    </button>
-                  </div>
-                </header>
-
-                {/* Search Input */}
-                <div className="relative">
-                  <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-secondary" />
-                  <input
-                    type="text"
-                    placeholder="Search inventory (name, category, location)..."
-                    value={inventorySearchQuery}
-                    onChange={e => setInventorySearchQuery(e.target.value)}
-                    className="w-full pl-12 pr-4 py-3 border border-border rounded-lg bg-white text-primary placeholder:text-secondary focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-colors"
-                  />
-                  {inventorySearchQuery && (
-                    <button
-                      onClick={() => setInventorySearchQuery('')}
-                      className="absolute right-4 top-1/2 transform -translate-y-1/2 text-secondary hover:text-primary"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-0 border-t border-l border-border bg-white shadow-sm rounded-lg overflow-hidden">
-                  {filteredInventory
-                    .filter(item => {
-                      if (!inventorySearchQuery.trim()) return true;
-                      const query = inventorySearchQuery.toLowerCase().trim();
-                      return (
-                        item.name.toLowerCase().includes(query) ||
-                        item.category.toLowerCase().includes(query) ||
-                        item.location.toLowerCase().includes(query)
-                      );
-                    })
-                    .map(item => (
-                      <div key={item.id} className="border-r border-b border-border p-6 hover:bg-background transition-colors">
-                        <InventoryCard
-                          item={item}
-                          onRemove={handleDeleteInventoryItem}
-                          onEdit={it => {
-                            setEditingItem(it);
-                            setIsEditModalOpen(true);
-                          }}
-                        />
-                      </div>
-                    ))}
-                </div>
-              </div>
-            ))}
+          {view === ViewState.INVENTORY && (
+            <InventoryView
+              isMasterView={isMasterView}
+              activeBusiness={activeBusiness}
+              inventorySearchQuery={inventorySearchQuery}
+              setInventorySearchQuery={setInventorySearchQuery}
+              filteredInventory={filteredInventory}
+              onDeleteInventoryItem={handleDeleteInventoryItem}
+              onEditInventoryItem={it => {
+                setEditingItem(it);
+                setIsEditModalOpen(true);
+              }}
+              onOpenScanner={openScanner}
+              onOpenMetaManager={() => {
+                setMetaTab('categories');
+                setMetaNewValue('');
+                setIsMetaManagerOpen(true);
+              }}
+              onAddItem={() => {
+                setEditingItem(null);
+                setIsEditModalOpen(true);
+              }}
+            />
+          )}
 
 
           {/* CHEF VIEW */}
@@ -1793,139 +1179,30 @@ export default function App() {
       />
 
       {/* JOIN STORE MODAL (Staff) */}
-      {isJoinStoreModalOpen && (
-        <div className="fixed inset-0 bg-white/80 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-xl w-full max-w-sm shadow-2xl border border-border p-6 relative">
-            <button onClick={() => setIsJoinStoreModalOpen(false)} className="absolute top-4 right-4 text-secondary hover:text-primary">
-              <X className="w-5 h-5" />
-            </button>
+      <JoinStoreModal
+        isOpen={isJoinStoreModalOpen}
+        onClose={() => setIsJoinStoreModalOpen(false)}
+        joinStoreCode={joinStoreCode}
+        setJoinStoreCode={setJoinStoreCode}
+        joinStoreNameAlias={joinStoreNameAlias}
+        setJoinStoreNameAlias={setJoinStoreNameAlias}
+        onSubmit={handleJoinStoreSubmit}
+      />
 
-            <div className="text-center mb-6">
-              <div className="inline-flex items-center justify-center p-3 rounded-xl mb-4 bg-background border border-border">
-                <Building2 className="w-8 h-8 text-primary" />
-              </div>
-              <h3 className="text-xl font-bold text-primary">Join a Store</h3>
-              <p className="text-secondary text-sm mt-1">Enter the code provided by your manager.</p>
-            </div>
-
-            <form onSubmit={handleJoinStoreSubmit} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-secondary uppercase tracking-wider mb-2">Store Code</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. DK2025"
-                  value={joinStoreCode}
-                  onChange={e => setJoinStoreCode(e.target.value.toUpperCase())}
-                  className="w-full px-4 py-3 rounded-lg border border-border focus:outline-none focus:border-accent text-center font-mono text-lg uppercase tracking-widest"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-secondary uppercase tracking-wider mb-2">Alias (Optional)</label>
-                <input
-                  type="text"
-                  placeholder="e.g. My Workplace"
-                  value={joinStoreNameAlias}
-                  onChange={e => setJoinStoreNameAlias(e.target.value)}
-                  className="w-full px-4 py-3 rounded-lg border border-border focus:outline-none focus:border-accent text-sm"
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="w-full py-3 bg-primary text-white rounded-lg font-bold shadow-sm hover:bg-black transition-colors flex items-center justify-center"
-              >
-                Join Store <ArrowRight className="w-4 h-4 ml-2" />
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
-      {isMetaManagerOpen && (
-        <div className="fixed inset-0 bg-white/80 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-xl w-full max-w-lg shadow-2xl border border-border p-6 relative">
-            <button
-              onClick={() => setIsMetaManagerOpen(false)}
-              className="absolute top-4 right-4 text-secondary hover:text-primary"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <h3 className="text-xl font-bold text-primary">Manage Categories & Locations</h3>
-            <p className="text-sm text-secondary mt-1">Rename / delete will update your inventory records too.</p>
-
-            <div className="flex gap-2 mt-4">
-              <button
-                onClick={() => setMetaTab('categories')}
-                className={`px-4 py-2 rounded-lg text-sm font-bold border ${metaTab === 'categories' ? 'bg-primary text-white border-primary' : 'bg-white text-primary border-border'
-                  }`}
-              >
-                Categories
-              </button>
-              <button
-                onClick={() => setMetaTab('locations')}
-                className={`px-4 py-2 rounded-lg text-sm font-bold border ${metaTab === 'locations' ? 'bg-primary text-white border-primary' : 'bg-white text-primary border-border'
-                  }`}
-              >
-                Locations
-              </button>
-            </div>
-
-            <div className="mt-5 space-y-3 max-h-[360px] overflow-auto pr-1">
-              {(metaTab === 'categories' ? derivedCategories : derivedLocations).map(v => (
-                <div key={v} className="flex items-center justify-between p-3 rounded-lg border border-border bg-background">
-                  <div className="font-semibold text-primary truncate">{v}</div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={async () => {
-                        const nv = window.prompt('Rename to:', v);
-                        if (!nv) return;
-                        await renameMetaItem(metaTab, v, nv);
-                      }}
-                      className="px-3 py-2 rounded-lg bg-white border border-border text-primary font-bold text-xs hover:bg-background"
-                    >
-                      Rename
-                    </button>
-                    <button
-                      onClick={async () => {
-                        await deleteMetaItem(metaTab, v);
-                      }}
-                      className="px-3 py-2 rounded-lg bg-white border border-border text-red-600 font-bold text-xs hover:bg-background"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              ))}
-
-              {(metaTab === 'categories' ? derivedCategories : derivedLocations).length === 0 && (
-                <div className="p-6 text-center text-secondary text-sm border border-dashed border-border rounded-lg">
-                  No items yet.
-                </div>
-              )}
-            </div>
-
-            <div className="mt-5 flex gap-2">
-              <input
-                value={metaNewValue}
-                onChange={e => setMetaNewValue(e.target.value)}
-                placeholder={metaTab === 'categories' ? 'Add new category...' : 'Add new location...'}
-                className="flex-1 px-4 py-3 rounded-lg border border-border focus:outline-none focus:border-accent text-sm"
-              />
-              <button
-                onClick={() => {
-                  addMetaItem(metaTab, metaNewValue);
-                  setMetaNewValue('');
-                }}
-                className="px-5 py-3 rounded-lg bg-accent text-white font-bold text-sm hover:bg-accentHover"
-              >
-                Add
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* META MANAGER MODAL */}
+      <MetaManagerModal
+        isOpen={isMetaManagerOpen}
+        onClose={() => setIsMetaManagerOpen(false)}
+        metaTab={metaTab}
+        setMetaTab={setMetaTab}
+        metaNewValue={metaNewValue}
+        setMetaNewValue={setMetaNewValue}
+        categories={derivedCategories}
+        locations={derivedLocations}
+        onRename={renameMetaItem}
+        onDelete={deleteMetaItem}
+        onAdd={addMetaItem}
+      />
 
     </div>
   );

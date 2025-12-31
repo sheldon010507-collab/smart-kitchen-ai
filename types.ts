@@ -1,18 +1,26 @@
+/**
+ * SmartKitchen - TypeScript Type Definitions
+ * 
+ * These types match the Supabase database schema.
+ * Updated: 2025-01-01
+ */
+
+// ============================================================
+// CORE ENTITIES
+// ============================================================
 
 export interface Business {
   id: string;
   name: string;
   ownerId: string;
   joinCode: string;
-  // New fields
   address?: string;
   hours?: string;
   contactInfo?: string;
   notes?: string;
-
   customCategories: string[];
   customLocations: string[];
-  pendingStaffIds: string[]; // List of staff requesting to join
+  pendingStaffIds: string[];
 }
 
 export interface User {
@@ -24,18 +32,247 @@ export interface User {
   workingBusinessId?: string;
 }
 
+export interface BusinessMember {
+  id: string;
+  businessId: string;
+  userId: string;
+  role: 'owner' | 'staff';
+  status: 'active' | 'pending';
+  createdAt: string;
+}
+
+// ============================================================
+// INVENTORY MODULE
+// ============================================================
+
 export interface InventoryItem {
   id: string;
   businessId: string;
   name: string;
-  quantity: string; // Display string, e.g. "5 kg"
-  quantityValue?: number; // Numeric value, e.g. 5
-  quantityUnit?: string; // Unit, e.g. 'kg', 'g', 'L', 'ml', 'pcs'
-  unitCost?: number; // Cost per 1 unit of quantityUnit (e.g. cost per 1 kg)
+  quantity: string;
+  quantityValue?: number;
+  quantityUnit?: string;
+  unitCost?: number;
   category: string;
   location: string;
   expiryDate: string;
   addedDate: string;
+}
+
+/** SKU Master - for AI recognition */
+export interface SkuMaster {
+  id: string;
+  businessId: string;
+  skuCode: string;
+  name: string;
+  type: 'raw' | 'prep';
+  category?: string;
+  unit: string;
+  imageUrl?: string;
+  safetyStock?: number;
+  parLevel?: number;
+  parentSkuId?: string;
+  usagePerUnit?: number;
+  typicalPackageSize?: string;
+  visualDescription?: string;
+  aliases?: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Inventory State - real-time stock from scanning */
+export interface InventoryState {
+  id: string;
+  businessId: string;
+  skuId: string;
+  currentQty: number;
+  lastScannedAt?: string;
+  scannedBy?: string;
+  scanImageUrl?: string;
+  confidenceScore?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ============================================================
+// MENU MODULE (NEW - matches database)
+// ============================================================
+
+export interface MenuItem {
+  id: string;
+  businessId: string;
+  name: string;
+  description?: string;
+  sellingPrice: number;
+  estimatedCost?: number;
+  category?: string;
+  imageUrl?: string;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Menu Ingredient - BOM (Bill of Materials) */
+export interface MenuIngredient {
+  id: string;
+  menuItemId: string;
+  inventoryId?: string;  // References 'inventory' table, NOT 'inventory_items'
+  ingredientName: string;
+  quantityUsed: number;
+  unitUsed: string;
+  costPerUnit?: number;
+  createdAt: string;
+}
+
+// Legacy type for backwards compatibility
+export interface IngredientUsage {
+  inventoryItemId: string;
+  quantityUsed: number;
+  unitUsed: string;
+  costSnapshot: number;
+}
+
+// ============================================================
+// OPERATIONS MODULE (NEW - matches database)
+// ============================================================
+
+/** Prep Task - daily preparation tasks */
+export interface PrepTask {
+  id: string;
+  businessId: string;
+  taskText: string;
+  assignedTo?: string;
+  completed: boolean;
+  completedAt?: string;
+  completedBy?: string;
+  taskDate: string;
+  priority: number;
+  createdBy?: string;
+  createdAt: string;
+}
+
+// Legacy alias
+export interface PrepTaskLegacy {
+  id: string;
+  businessId: string;
+  text: string;
+  completed: boolean;
+  addedBy: string;
+  date: string;
+}
+
+/** Shift - staff scheduling and clock-in/out */
+export interface Shift {
+  id: string;
+  businessId: string;
+  userId: string;
+  shiftDate: string;
+  scheduledStart?: string;
+  scheduledEnd?: string;
+  actualStart?: string;
+  actualEnd?: string;
+  hourlyRate?: number;
+  totalHours?: number;
+  totalCost?: number;
+  notes?: string;
+  status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
+  createdAt: string;
+}
+
+// ============================================================
+// SALES MODULE (NEW - matches database)
+// ============================================================
+
+/** Sales Receipt - transaction record */
+export interface SalesReceipt {
+  id: string;
+  businessId: string;
+  receiptNumber?: string;
+  tableNumber?: string;
+  totalAmount: number;
+  taxAmount?: number;
+  discountAmount?: number;
+  paymentMethod?: 'cash' | 'card' | 'online' | 'mixed';
+  status: 'pending' | 'completed' | 'refunded' | 'cancelled';
+  servedBy?: string;
+  notes?: string;
+  createdAt: string;
+}
+
+/** Sales Item - line item in a receipt */
+export interface SalesItem {
+  id: string;
+  receiptId: string;
+  menuItemId?: string;
+  itemName: string;
+  quantity: number;
+  unitPrice: number;
+  subtotal: number;
+  notes?: string;
+}
+
+// Legacy type for backwards compatibility
+export interface SalesItemLegacy {
+  name: string;
+  quantity: number;
+  price: number;
+}
+
+// ============================================================
+// STAFF MODULE
+// ============================================================
+
+export interface Staff {
+  id: string;
+  businessId: string;
+  name: string;
+  email: string;
+  role: 'Chef' | 'Server' | 'Manager' | 'Barista';
+  hourlyRate: number;
+  status: 'Active' | 'Pending';
+}
+
+// ============================================================
+// SHOPPING LIST MODULE
+// ============================================================
+
+export type ShoppingListReason = 'low_stock' | 'expiring' | 'prep_required' | 'manual';
+export type ShoppingListPriority = 'urgent' | 'normal' | 'low';
+export type ShoppingListStatus = 'pending' | 'purchased' | 'cancelled';
+
+export interface ShoppingListItem {
+  id: string;
+  businessId: string;
+  inventoryItemId?: string;
+  itemName: string;
+  category?: string;
+  quantityNeeded: number;
+  unit: string;
+  estimatedCost?: number;
+  reason: ShoppingListReason;
+  priority: ShoppingListPriority;
+  status: ShoppingListStatus;
+  createdBy: string;
+  updatedBy?: string;
+  createdAt: string;
+  updatedAt: string;
+  purchasedAt?: string;
+  notes?: string;
+}
+
+// ============================================================
+// AI & SCANNING
+// ============================================================
+
+export interface ScanHistory {
+  id: string;
+  businessId: string;
+  scanType: 'front' | 'back' | 'storage';
+  imageUrl?: string;
+  recognizedItems: any;
+  createdAt: string;
+  scannedBy?: string;
 }
 
 export interface Recipe {
@@ -49,6 +286,10 @@ export interface Recipe {
   missingIngredients: string[];
   calories?: number;
 }
+
+// ============================================================
+// UI STATE
+// ============================================================
 
 export enum ViewState {
   DASHBOARD = 'DASHBOARD',
@@ -67,69 +308,80 @@ export interface ChartData {
   [key: string]: any;
 }
 
-export interface PrepTask {
-  id: string;
-  businessId: string;
-  text: string;
-  completed: boolean;
-  addedBy: string;
-  date: string;
-}
+// ============================================================
+// DATABASE ROW TYPES (snake_case - direct from Supabase)
+// ============================================================
 
-export interface SalesItem {
-  name: string;
-  quantity: number;
-  price: number;
-}
+export namespace Database {
+  export interface MenuItemRow {
+    id: string;
+    business_id: string;
+    name: string;
+    description: string | null;
+    selling_price: number;
+    estimated_cost: number | null;
+    category: string | null;
+    image_url: string | null;
+    is_active: boolean;
+    sort_order: number;
+    created_at: string;
+    updated_at: string;
+  }
 
-export interface SalesReceipt {
-  id: string;
-  businessId: string;
-  date: string;
-  time: string;
-  totalAmount: number;
-  items: SalesItem[];
-  paymentMethod?: string;
-}
+  export interface PrepTaskRow {
+    id: string;
+    business_id: string;
+    task_text: string;
+    assigned_to: string | null;
+    completed: boolean;
+    completed_at: string | null;
+    completed_by: string | null;
+    task_date: string;
+    priority: number;
+    created_by: string | null;
+    created_at: string;
+  }
 
-export interface Staff {
-  id: string;
-  businessId: string;
-  name: string;
-  email: string;
-  role: 'Chef' | 'Server' | 'Manager' | 'Barista';
-  hourlyRate: number;
-  status: 'Active' | 'Pending'; // For approval workflow
-}
+  export interface ShiftRow {
+    id: string;
+    business_id: string;
+    user_id: string;
+    shift_date: string;
+    scheduled_start: string | null;
+    scheduled_end: string | null;
+    actual_start: string | null;
+    actual_end: string | null;
+    hourly_rate: number | null;
+    total_hours: number | null;
+    total_cost: number | null;
+    notes: string | null;
+    status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
+    created_at: string;
+  }
 
-export interface Shift {
-  id: string;
-  businessId: string;
-  staffId: string;
-  date: string;
-  startTime: string;
-  endTime: string;
-  totalHours: number;
-  hourlyRate: number; // Rate used for this specific shift, allows override
-  totalCost: number;
-}
+  export interface SalesReceiptRow {
+    id: string;
+    business_id: string;
+    receipt_number: string | null;
+    table_number: string | null;
+    total_amount: number;
+    tax_amount: number | null;
+    discount_amount: number | null;
+    payment_method: 'cash' | 'card' | 'online' | 'mixed' | null;
+    status: 'pending' | 'completed' | 'refunded' | 'cancelled';
+    served_by: string | null;
+    notes: string | null;
+    created_at: string;
+  }
 
-// Ingredient usage for Menu Engineering
-export interface IngredientUsage {
-  inventoryItemId: string;
-  quantityUsed: number; // In the BOM unit
-  unitUsed: string; // e.g. 'g', 'ml'
-  costSnapshot: number; // Calculated cost for this usage
-}
-
-export interface MenuItem {
-  id: string;
-  businessId: string;
-  name: string;
-  description?: string; // Added description
-  category: string;
-  sellingPrice: number;
-  estimatedCost: number; // COGS
-  imageUrl?: string;
-  ingredients?: IngredientUsage[]; // BOM
+  export interface SalesItemRow {
+    id: string;
+    receipt_id: string;
+    menu_item_id: string | null;
+    item_name: string;
+    quantity: number;
+    unit_price: number;
+    subtotal: number;
+    notes: string | null;
+  }
 }
