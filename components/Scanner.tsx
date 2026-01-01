@@ -67,6 +67,23 @@ function validateAndFlagItems(items: ReviewItem[]) {
   });
 }
 
+// Default shelf life by category (days)
+const CATEGORY_SHELF_LIFE: Record<string, number> = {
+  dairy: 7, produce: 5, meat: 3, seafood: 2, fresh: 5,
+  frozen: 90, 'dry goods': 180, beverages: 30, condiments: 90, bakery: 3
+};
+
+function getDefaultExpiry(category: string): string {
+  const lowerCat = category.toLowerCase();
+  let days = 7; // default
+  for (const [key, d] of Object.entries(CATEGORY_SHELF_LIFE)) {
+    if (lowerCat.includes(key)) { days = d; break; }
+  }
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return date.toISOString().split('T')[0];
+}
+
 // ✅ Map raw AI items to ReviewItem format
 function mapRawItems(rawItems: any[]): ReviewItem[] {
   return rawItems.map((x: any, idx: number) => {
@@ -78,7 +95,12 @@ function mapRawItems(rawItems: any[]): ReviewItem[] {
     const name = String(x.name || "").trim();
     const category = String(x.category || "");
     const location = String(x.location || "");
-    const expiry = normalizeDDMMYYYY(x.expiryDate ?? x.expiry_date);
+
+    // ✅ Smart expiry: use AI result or calculate from category
+    let expiry = normalizeDDMMYYYY(x.expiryDate ?? x.expiry_date);
+    if (!expiry || expiry.length < 8) {
+      expiry = getDefaultExpiry(category);
+    }
 
     const confidence = normalizeNumber(x.confidence, 0.8);
     const isNew = x.is_new_item === true;
@@ -102,6 +124,7 @@ function mapRawItems(rawItems: any[]): ReviewItem[] {
     } as unknown as ReviewItem;
   });
 }
+
 
 const Scanner: React.FC<Props> = ({
   initialMode,
