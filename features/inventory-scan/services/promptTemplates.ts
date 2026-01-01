@@ -1,25 +1,24 @@
 /**
- * Optimized Prompt Templates for Inventory Scanning
+ * Optimized Prompt Templates for Inventory Scanning v2.0
  * 
- * Key optimizations:
- * 1. Clear output format (JSON Schema)
- * 2. Enhanced RAG dictionary with package sizes, visual descriptions, aliases
- * 3. Few-shot examples (10 comprehensive examples)
- * 4. Multi-angle fusion instructions with CRITICAL warnings
- * 5. Quantity estimation guidance
- * 6. DON'T list to prevent common errors
- * 7. Result validation function
+ * Optimizations:
+ * 1. Reduced from ~4500 chars to ~1800 chars
+ * 2. 4 examples instead of 10
+ * 3. Removed verbose package size reference
+ * 4. Streamlined rules
+ * 5. Added timeout-friendly quick version
+ * 6. Smart prompt selector based on context
  */
 
 export interface KnownItem {
   id?: string;
   name: string;
   unit: string;
-  category?: string;                 // 分類，如 '蔬菜', '肉類'
-  typical_quantity?: string;         // 典型庫存量
-  typical_package_size?: string;     // 典型包裝規格，如 '5kg袋'
-  visual_description?: string;       // 視覺描述，如 '紅色包裝'
-  aliases?: string[];                // 別名列表
+  category?: string;
+  typical_quantity?: string;
+  typical_package_size?: string;
+  visual_description?: string;
+  aliases?: string[];
 }
 
 export type ScanAreaType = 'storage' | 'prep' | 'fridge';
@@ -32,213 +31,149 @@ export interface PromptOptions {
   language?: LanguageType;
 }
 
-// Area descriptions
-const AREA_DESCRIPTIONS: Record<ScanAreaType, Record<LanguageType, string>> = {
-  storage: {
-    en: 'dry storage room with shelves, containing packaged ingredients and supplies',
-    zh: '乾貨倉庫，有貨架，存放包裝食材和用品'
-  },
-  prep: {
-    en: 'prep station with containers of prepared ingredients (sliced, diced, portioned)',
-    zh: '備料區，有容器盛放已處理的食材（切片、切丁、分裝）'
-  },
-  fridge: {
-    en: 'refrigerator/cold storage with fresh produce, proteins, and dairy',
-    zh: '冷藏/冷凍區，存放生鮮、肉類、乳製品'
-  }
+// Area descriptions (simplified)
+const AREA_DESCRIPTIONS: Record<ScanAreaType, string> = {
+  storage: 'dry storage with shelves',
+  prep: 'prep station with containers',
+  fridge: 'refrigerator/cold storage'
 };
 
-// Allowed units for standardized output
-const ALLOWED_UNITS = ['kg', 'g', 'L', 'ml', 'pcs', 'box', 'bag', 'bottle', 'pack', 'bunch', 'slice', 'portion'];
+const ALLOWED_UNITS = ['kg', 'g', 'L', 'ml', 'pcs', 'box', 'bag', 'bottle', 'pack', 'bunch'];
 
-// Common package sizes for reference (helps AI estimate quantities)
-const COMMON_PACKAGE_SIZES = `
-## Common Package References:
-- Rice/Flour bags: usually 1kg, 2kg, 5kg, 10kg, 25kg
-- Oil bottles: 500ml, 1L, 2L, 5L
-- Canned goods: 400g, 800g, 2.5kg
-- Eggs: 6pcs, 10pcs, 12pcs (dozen), 30pcs (tray)
-- Vegetables (bunch): ~200-300g per bunch
-- Meat trays: typically 500g or 1kg
-- Milk/Cream: 250ml, 500ml, 1L, 2L
-- Sauce bottles: 150ml, 300ml, 500ml, 1L
-`;
-
-// Few-shot examples (10 comprehensive examples covering all quantity estimation scenarios)
+// Reduced to 4 key examples
 const FEW_SHOT_EXAMPLES = `
-[Example 1 - Direct count, clearly visible individual items]
-Input: 3 boxes of tofu on shelf, labels facing camera
-{"items":[{"name":"Tofu","quantity":3,"unit":"box","confidence":0.95,"estimation_method":"direct_count","notes":"3 boxes clearly visible"}],"scan_quality":"good"}
+[Direct count]
+{"items":[{"name":"Tofu","quantity":3,"unit":"box","confidence":0.95,"notes":"3 boxes visible"}],"scan_quality":"good"}
 
-[Example 2 - Package size estimation from label]
-Input: 2 rice bags with "5kg" printed on them
-{"items":[{"name":"Rice","quantity":10,"unit":"kg","confidence":0.9,"estimation_method":"weight_estimate","notes":"2 bags × 5kg = 10kg"}],"scan_quality":"good"}
+[Package calculation]
+{"items":[{"name":"Rice","quantity":10,"unit":"kg","confidence":0.9,"notes":"2 bags × 5kg"}],"scan_quality":"good"}
 
-[Example 3 - Partial visibility, conservative estimate]
-Input: Stack of egg trays, only front row visible, 3 high
-{"items":[{"name":"Eggs","quantity":90,"unit":"pcs","confidence":0.6,"estimation_method":"partial_visible","notes":"3 trays × 30pcs = 90 minimum"}],"scan_quality":"medium","suggestions":["Check depth of stack"]}
+[Partial visibility]
+{"items":[{"name":"Eggs","quantity":30,"unit":"pcs","confidence":0.6,"notes":"1 tray visible, depth unknown"}],"scan_quality":"medium"}
 
-[Example 4 - Visual volume estimation for loose items]
-Input: Container half full with diced onions, ~2L container
-{"items":[{"name":"Diced Onion","quantity":500,"unit":"g","confidence":0.65,"estimation_method":"visual_estimate","notes":"~1L volume ≈ 500g for diced veg"}],"scan_quality":"medium"}
-
-[Example 5 - Multiple item types]
-Input: Shelf with 5 oil bottles (1L each), 2 sauce bottles, 6 visible cans
-{"items":[
-  {"name":"Cooking Oil","quantity":5,"unit":"L","confidence":0.9,"estimation_method":"direct_count","notes":"5 × 1L"},
-  {"name":"Soy Sauce","quantity":2,"unit":"bottle","confidence":0.7,"estimation_method":"direct_count","notes":"2 bottles"},
-  {"name":"Canned Tomatoes","quantity":6,"unit":"pcs","confidence":0.5,"estimation_method":"partial_visible","notes":"6 front row"}
-],"scan_quality":"medium"}
-
-[Example 6 - Bottles with visible labels]
-Input: Sauce rack with 8 bottles, labels show 500ml
-{"items":[{"name":"Teriyaki Sauce","quantity":4,"unit":"L","confidence":0.85,"estimation_method":"weight_estimate","notes":"8 bottles × 500ml = 4L"}],"scan_quality":"good"}
-
-[Example 7 - Fresh produce in crate]
-Input: Wooden crate 3/4 full of tomatoes, crate size ~40×30×20cm
-{"items":[{"name":"Tomatoes","quantity":8,"unit":"kg","confidence":0.6,"estimation_method":"visual_estimate","notes":"~18L × 75% fill × 0.6kg/L ≈ 8kg"}],"scan_quality":"medium","suggestions":["Weigh for accuracy"]}
-
-[Example 8 - Frozen items in bags]
-Input: Freezer shelf with 6 frozen dumpling bags, stacked 2 deep
-{"items":[{"name":"Frozen Dumplings","quantity":6,"unit":"bag","confidence":0.7,"estimation_method":"partial_visible","notes":"3 visible × 2 deep = 6 bags"}],"scan_quality":"medium"}
-
-[Example 9 - Mixed containers on prep station]
-Input: Prep area with 2 full gastro pans of sliced peppers, 1 half-full pan of mushrooms
-{"items":[
-  {"name":"Sliced Peppers","quantity":4,"unit":"kg","confidence":0.75,"estimation_method":"visual_estimate","notes":"2 full GN pans × 2kg each"},
-  {"name":"Mushrooms","quantity":1,"unit":"kg","confidence":0.65,"estimation_method":"visual_estimate","notes":"1 half-full pan ≈ 1kg"}
-],"scan_quality":"medium"}
-
-[Example 10 - Low light/cluttered scene]
-Input: Dark storage corner, can see ~4 large bags, labels not readable
-{"items":[{"name":"Unknown Bags","quantity":4,"unit":"bag","confidence":0.4,"estimation_method":"partial_visible","notes":"4 bags visible, type unclear"}],"scan_quality":"poor","suggestions":["Improve lighting","Move for clearer view"]}
+[Multiple items]
+{"items":[{"name":"Oil","quantity":5,"unit":"bottle","confidence":0.9},{"name":"Cans","quantity":6,"unit":"pcs","confidence":0.7,"notes":"front row only"}],"scan_quality":"medium"}
 `;
 
 /**
- * Generate optimized scan prompt
+ * Generate optimized scan prompt (v2.0 - ~1800 chars)
  */
 export function generateScanPrompt(options: PromptOptions): string {
-  const { imageCount, scanArea, knownItems, language = 'en' } = options;
+  const { imageCount, scanArea, knownItems } = options;
 
-  // Build enhanced known items list (RAG dictionary with package sizes, visual descriptions)
+  // Build compact known items list
   const knownItemsList = knownItems.length > 0
-    ? knownItems
-      .map(item => {
-        let entry = `- ${item.name} (${item.unit})`;
-        if (item.typical_package_size) entry += ` [package: ${item.typical_package_size}]`;
-        if (item.visual_description) entry += ` [looks: ${item.visual_description}]`;
-        if (item.aliases?.length) entry += ` [also: ${item.aliases.join(', ')}]`;
-        if (item.typical_quantity) entry += ` [usual: ${item.typical_quantity}]`;
-        return entry;
-      })
-      .join('\n')
-    : '(No preset list, identify all visible items)';
+    ? knownItems.slice(0, 20).map(item => `${item.name}(${item.unit})`).join(', ')
+    : 'identify all visible food items';
 
-  const multiImageInstructions = imageCount > 1
-    ? `
-## ⚠️ CRITICAL - Multi-image Rules:
-These ${imageCount} images show the SAME area from different angles.
-- Count each item ONLY ONCE across all images
-- DO NOT double count items visible in multiple photos
-- Use the clearest image for quantity determination
-- Mark items seen in multiple images with higher confidence
-`
+  const multiImageWarning = imageCount > 1
+    ? `\n⚠️ ${imageCount} images of SAME area - count each item ONCE only!`
     : '';
 
   return `
-# Role
-Expert restaurant inventory scanner. Your PRIMARY task is to ACCURATELY estimate quantities from photos.
+# Restaurant Inventory Scanner
+Count food items in ${AREA_DESCRIPTIONS[scanArea]}.${multiImageWarning}
 
-# Task
-Analyze ${imageCount} image${imageCount > 1 ? 's' : ''} and identify all food items WITH PRECISE QUANTITIES.
-${imageCount > 1 ? 'Images are different angles of SAME area - AVOID DUPLICATE COUNTING.' : ''}
-
-# Scan Area
-${AREA_DESCRIPTIONS[scanArea][language]}
-
-# Known Items (prioritize matching)
+## Known Items
 ${knownItemsList}
 
-${COMMON_PACKAGE_SIZES}
+## Rules
+1. COUNT visible items only - never guess hidden quantities
+2. READ labels for weight/volume when visible
+3. For stacks: count front row, note uncertainty
+4. Confidence: 0.9+=clear, 0.7-0.9=partial, <0.7=uncertain
 
-# Output Format
-\`\`\`json
-{
-  "items": [
-    {
-      "name": "Item name (use known list names if matched)",
-      "quantity": number (must be > 0),
-      "unit": "ONLY use: ${ALLOWED_UNITS.join('/')}",
-      "confidence": 0.0-1.0,
-      "estimation_method": "direct_count/visual_estimate/weight_estimate/partial_visible",
-      "notes": "REQUIRED: Show your calculation (e.g., '3 bags × 5kg = 15kg')"
-    }
-  ],
-  "scan_quality": "good/medium/poor",
-  "suggestions": ["optional improvement suggestions"]
-}
-\`\`\`
+## Output (JSON only, no other text)
+{"items":[{"name":"str","quantity":num,"unit":"${ALLOWED_UNITS.join('/')}","confidence":0-1,"notes":"how counted"}],"scan_quality":"good/medium/poor"}
 
-## ⚠️ QUANTITY ESTIMATION RULES (CRITICAL):
-
-### 1. Direct Count (confidence 0.85-1.0)
-- Count EACH visible item individually
-- If stacked: count visible rows × estimated depth
-- Always write: "X items visible" or "X rows × Y deep"
-
-### 2. Package Size Estimation (confidence 0.7-0.95)
-- READ labels carefully for weight/volume (e.g., "5kg", "1L")
-- Calculate: number of packages × size per package
-- Example: "2 bags × 5kg = 10kg total"
-
-### 3. Visual Volume Estimation (confidence 0.5-0.8)
-- For containers: estimate fill level (e.g., "half full", "3/4 full")
-- Container volume × fill level = actual quantity
-- Reference: 1L container ≈ 500-800g for chopped vegetables
-
-### 4. Partial Visibility (confidence 0.3-0.6)
-- Only count what you can SEE, don't guess hidden items
-- If stacked behind: count visible row as MINIMUM
-- Mark as "minimum X, likely more"
-
-${multiImageInstructions}
-# Examples
+## Examples
 ${FEW_SHOT_EXAMPLES}
 
-# DON'T (IMPORTANT):
-- DON'T guess quantities without evidence - be conservative
-- DON'T assume standard package sizes without seeing labels
-- DON'T count the same item twice from different angles
-- DON'T return quantity as 0 (skip the item instead)
-- DON'T include non-food items unless kitchen supplies
-- DON'T add any text outside the JSON format
-- DON'T forget to show your calculation in notes
+Analyze now:`.trim();
+}
 
-Analyze the image(s) now:
+/**
+ * Ultra-fast prompt for quick scans (~300 chars)
+ */
+export function generateQuickScanPrompt(
+  imageCount: number,
+  knownItemNames: string[] = []
+): string {
+  const itemHint = knownItemNames.length > 0
+    ? `Match if possible: ${knownItemNames.slice(0, 10).join(', ')}\n`
+    : '';
+
+  return `
+Count food items.${imageCount > 1 ? ` ${imageCount} images = SAME area, count once.` : ''}
+${itemHint}
+JSON only: {"items":[{"name":"str","quantity":num,"unit":"pcs/kg/box/bag/bottle","confidence":0-1}],"scan_quality":"good/medium/poor"}
 `.trim();
 }
 
 /**
- * Generate a simpler prompt for quick scans
+ * Detailed prompt for complex scenes (~2500 chars)
+ * Use only when quick scan fails or returns low confidence
  */
-export function generateQuickScanPrompt(
-  imageCount: number,
-  knownItemNames: string[]
-): string {
-  return `
-Identify food items. Return JSON only, no other text.
-${imageCount > 1 ? `${imageCount} images of SAME area - count each item ONCE only.` : ''}
-${knownItemNames.length > 0 ? `Match these if possible: ${knownItemNames.join(', ')}` : ''}
+export function generateDetailedScanPrompt(options: PromptOptions): string {
+  const { imageCount, scanArea, knownItems } = options;
 
-{"items":[{"name":"str","quantity":num,"unit":"kg/g/pcs/box/bag/bottle","confidence":0-1}],"scan_quality":"good/medium/poor"}
-`.trim();
+  const knownItemsList = knownItems.length > 0
+    ? knownItems.map(item => {
+      let entry = `- ${item.name} (${item.unit})`;
+      if (item.visual_description) entry += ` [${item.visual_description}]`;
+      return entry;
+    }).join('\n')
+    : '- Identify all visible food items';
+
+  const multiImageRules = imageCount > 1 ? `
+## Multi-Image Rules (CRITICAL)
+- These ${imageCount} images show SAME area from different angles
+- Count each item ONLY ONCE across all images
+- Use clearest view for quantity determination
+- Higher confidence for items seen in multiple images
+` : '';
+
+  return `
+# Expert Restaurant Inventory Scanner
+
+## Task
+Analyze ${imageCount} image${imageCount > 1 ? 's' : ''} of ${AREA_DESCRIPTIONS[scanArea]} and count all food items.
+${multiImageRules}
+
+## Known Items (prioritize matching)
+${knownItemsList}
+
+## Counting Method
+1. **Direct Count** (confidence 0.85-1.0): Count each visible item
+2. **Label Reading** (confidence 0.7-0.95): Read weight/volume from labels, calculate total
+3. **Partial Visibility** (confidence 0.5-0.7): Count visible only, note "more may be behind"
+4. **Estimation** (confidence 0.3-0.5): Only when necessary, be conservative
+
+## Output Format
+\`\`\`json
+{
+  "items": [
+    {"name": "Item name", "quantity": number, "unit": "${ALLOWED_UNITS.join('/')}", "confidence": 0.0-1.0, "notes": "counting method"}
+  ],
+  "scan_quality": "good/medium/poor",
+  "suggestions": ["optional improvements"]
+}
+\`\`\`
+
+## DON'T
+- Don't guess hidden quantities
+- Don't double count across images
+- Don't return quantity 0 (skip instead)
+- Don't add text outside JSON
+
+## Examples
+${FEW_SHOT_EXAMPLES}
+
+Analyze the image(s) now:`.trim();
 }
 
 /**
  * Validate and parse AI scan result
- * - Cleans JSON format (removes ```json markers)
- * - Filters invalid items (quantity <= 0, missing fields)
- * - Normalizes number precision
  */
 export interface ScanResultItem {
   name: string;
@@ -257,11 +192,17 @@ export interface ScanResult {
 
 export function validateAndParseScanResult(raw: string): ScanResult | null {
   try {
-    // Clean JSON markers
-    const cleaned = raw
+    // Clean JSON markers and extra text
+    let cleaned = raw
       .replace(/```json\n?/g, '')
       .replace(/```\n?/g, '')
       .trim();
+
+    // Extract JSON if wrapped in other text
+    const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      cleaned = jsonMatch[0];
+    }
 
     const data = JSON.parse(cleaned);
 
@@ -276,14 +217,15 @@ export function validateAndParseScanResult(raw: string): ScanResult | null {
         item.name.length > 0 &&
         typeof item.quantity === 'number' &&
         item.quantity > 0 &&
-        typeof item.unit === 'string' &&
-        typeof item.confidence === 'number'
+        typeof item.unit === 'string'
       )
       .map((item: any) => ({
         name: item.name.trim(),
         quantity: Math.round(item.quantity * 100) / 100,
-        unit: item.unit.trim(),
-        confidence: Math.round(item.confidence * 100) / 100,
+        unit: item.unit.trim().toLowerCase(),
+        confidence: typeof item.confidence === 'number'
+          ? Math.min(1, Math.max(0, Math.round(item.confidence * 100) / 100))
+          : 0.7,
         estimation_method: item.estimation_method,
         notes: item.notes
       }));
@@ -299,4 +241,32 @@ export function validateAndParseScanResult(raw: string): ScanResult | null {
     console.error('Failed to parse scan result:', e);
     return null;
   }
+}
+
+/**
+ * Smart prompt selector based on context
+ */
+export function selectPrompt(options: PromptOptions & {
+  isRetry?: boolean;
+  previousConfidence?: number;
+}): string {
+  const { isRetry, previousConfidence, imageCount, knownItems } = options;
+
+  // Use detailed prompt for retries or low confidence results
+  if (isRetry || (previousConfidence !== undefined && previousConfidence < 0.6)) {
+    return generateDetailedScanPrompt(options);
+  }
+
+  // Use standard prompt if many known items (quick prompt would be too long)
+  if (knownItems.length > 15) {
+    return generateScanPrompt(options);
+  }
+
+  // Use quick prompt for simple cases
+  if (imageCount === 1 && knownItems.length <= 5) {
+    return generateQuickScanPrompt(imageCount, knownItems.map(i => i.name));
+  }
+
+  // Default to standard optimized prompt
+  return generateScanPrompt(options);
 }
