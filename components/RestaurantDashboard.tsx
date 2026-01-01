@@ -6,7 +6,7 @@ import { Plus, Loader2, Lightbulb, CheckCircle2, XCircle, RefreshCcw, Trash2 } f
 import { supabase } from '../lib/supabase';
 import AddShiftModal from './AddShiftModal';
 import StaffScheduleTable from './StaffScheduleTable';
-import MenuManager from './MenuManager';
+import { MenuManager } from '../features/menu';
 import { generateOperationalInsights } from '../services/geminiService';
 import { StaffCalendar } from './StaffCalendar';
 

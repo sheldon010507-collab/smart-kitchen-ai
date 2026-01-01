@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { supabase } from './supabase';
 import { Business, Staff, User } from '../types';
+import { normMemberStatus } from '../utils/transforms';
 
 // ============ Types ============
 interface BusinessContextType {
@@ -26,11 +27,7 @@ interface BusinessContextType {
 
 const BusinessContext = createContext<BusinessContextType | undefined>(undefined);
 
-// ============ Helper Functions ============
-const normMemberStatus = (s: any): 'Active' | 'Pending' => {
-    const v = String(s || '').toLowerCase();
-    return v === 'active' ? 'Active' : 'Pending';
-};
+// ✅ normMemberStatus 已統一至 utils/transforms.ts
 
 // ============ Provider ============
 interface BusinessProviderProps {

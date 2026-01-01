@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { X, UploadCloud, Loader2, Wand2, Trash2, Camera, Plus, ShoppingCart, ChefHat } from "lucide-react";
+import { X, UploadCloud, Loader2, Wand2, Trash2, Camera, Plus, ShoppingCart, ChefHat, AlertTriangle, Minus } from "lucide-react";
 import type { InventoryItem, SalesReceipt } from "../types";
 import { analyzeInventoryImage, analyzePOSReceipt } from "../services/geminiService";
 import { preprocessImage } from "../features/inventory-scan/utils/imagePreprocessing";
 import { generateScanPrompt } from "../features/inventory-scan/services/promptTemplates";
 import { calculateRequirements, formatRequirements } from "../features/inventory-scan/utils/calculateRequirements";
+import { saveScanCorrection } from "../features/inventory-scan/services/scanCorrectionService";
+import AddItemQuickForm from "../features/inventory-scan/components/AddItemQuickForm";
 
 type ScanMode = "receipt" | "fridge" | "sales";
 
@@ -14,6 +16,8 @@ type ReviewItem = InventoryItem & {
   is_new_item?: boolean;
   raw_name?: string;
   flags?: string[];
+  originalQuantity?: number;  // Track original for correction logging
+  isManuallyAdded?: boolean;  // Track if item was manually added
 };
 
 interface Props {
@@ -155,6 +159,7 @@ const Scanner: React.FC<Props> = ({
   const [rawOutput, setRawOutput] = useState<string>(""); // ✅ 保存原始输出用于调试
   const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
   const [salesDraft, setSalesDraft] = useState<SalesReceipt | null>(null);
+  const [showAddForm, setShowAddForm] = useState(false);  // For adding missed items
 
   // ✅ Multi-photo support for fridge mode
   const [fridgePhotos, setFridgePhotos] = useState<Array<{ file: File; preview: string }>>([]);
@@ -344,6 +349,26 @@ const Scanner: React.FC<Props> = ({
 
   const removeItem = (id: string) => setReviewItems((prev) => prev.filter((x) => x.id !== id));
 
+  // Add missing item handler
+  const addMissingItem = (item: { name: string; quantity: number; unit: string }) => {
+    const newItem: ReviewItem = {
+      id: `manual-${Date.now()}`,
+      businessId: '',
+      name: item.name,
+      quantity: `${item.quantity} ${item.unit}`,
+      quantityValue: item.quantity,
+      quantityUnit: item.unit,
+      category: '',
+      location: '',
+      expiryDate: '',
+      addedDate: new Date().toISOString().split('T')[0],
+      confidence: 1.0,
+      isManuallyAdded: true,
+    } as ReviewItem;
+    setReviewItems(prev => [...prev, newItem]);
+    setShowAddForm(false);
+  };
+
   const confirm = () => {
     setError("");
 
@@ -375,6 +400,32 @@ const Scanner: React.FC<Props> = ({
             expiryDate: normalizeDDMMYYYY((x as any).expiryDate),
           } as InventoryItem;
         });
+
+      // ✅ Save scan corrections (async, non-blocking)
+      const imageUrls = fridgePhotos.map(p => p.preview);
+      const originalItems = reviewItems
+        .filter(it => !it.isManuallyAdded)
+        .map(it => ({
+          id: it.id,
+          name: it.raw_name || it.name,
+          quantity: it.originalQuantity ?? normalizeNumber((it as any).quantityValue, 1),
+          unit: String((it as any).quantityUnit || 'pcs'),
+          confidence: it.confidence || 0.6,
+        }));
+      const correctedItems = cleaned.map(it => ({
+        id: it.id,
+        name: it.name,
+        quantity: normalizeNumber((it as any).quantityValue, 1),
+        unit: String((it as any).quantityUnit || 'pcs'),
+        confidence: 1.0,
+      }));
+      saveScanCorrection(
+        cleaned[0]?.businessId || '',
+        imageUrls,
+        originalItems,
+        correctedItems,
+        'fridge'
+      ).catch(err => console.warn('[ScanCorrection] Save failed:', err));
 
       onItemsFound(cleaned);
       onClose();
@@ -815,6 +866,25 @@ const Scanner: React.FC<Props> = ({
                       })}
                     </div>
                   )}
+
+                  {/* Add Missing Item Button/Form */}
+                  <div className="mt-4">
+                    {!showAddForm ? (
+                      <button
+                        onClick={() => setShowAddForm(true)}
+                        className="w-full p-3 border-2 border-dashed border-gray-300 rounded-xl text-gray-500 hover:border-blue-400 hover:text-blue-600 flex items-center justify-center gap-2 transition-colors"
+                      >
+                        <Plus className="w-4 h-4" />
+                        Add Missing Item
+                      </button>
+                    ) : (
+                      <AddItemQuickForm
+                        onAdd={addMissingItem}
+                        onCancel={() => setShowAddForm(false)}
+                        suggestions={dictionary}
+                      />
+                    )}
+                  </div>
                 </>
               )}
 

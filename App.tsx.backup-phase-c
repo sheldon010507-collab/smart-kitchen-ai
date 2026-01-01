@@ -42,7 +42,7 @@ import PrepList from './components/PrepList';
 import StoreModal from './components/StoreModal';
 import MobileNav from './components/MobileNav';
 import PrivacyPolicyPage from './components/PrivacyPolicyPage';
-import { MenuManager } from './features/menu';
+import MenuManager from './components/MenuManager';
 import StaffInventoryOverview from './components/StaffInventoryOverview';
 import SupabaseLogin from './components/SupabaseLogin';
 import { EditableTitle } from './components/EditableTitle';
@@ -68,7 +68,6 @@ import { StaffDashboard } from './features/dashboard/StaffDashboard';
 import { InventoryView } from './features/inventory/InventoryView';
 import { DesktopSidebar } from './components/layout/DesktopSidebar';
 import { MobileHeader } from './components/layout/MobileHeader';
-import { useBusinessHandlers } from './hooks/useBusinessHandlers';
 
 const COLORS = ['#475569', '#64748B', '#94A3B8', '#CBD5E1', '#E2E8F0', '#F1F5F9'];
 
@@ -327,38 +326,6 @@ export default function App() {
     [staff, user]
   );
 
-  // ✅ Phase D: 使用 useBusinessHandlers hook 集中管理業務邏輯
-  const {
-    handleLogout,
-    handleSwitchBusiness,
-    handleOpenCreateStore,
-    handleOpenEditStore,
-    handleSaveStore,
-    handleDeleteStore,
-    handleJoinStoreSubmit,
-  } = useBusinessHandlers({
-    user,
-    currentBusinessId,
-    staffMemberships,
-    setUser,
-    setBusinesses,
-    setCurrentBusinessId,
-    setView,
-    setIsBusinessDropdownOpen,
-    setIsStoreModalOpen,
-    setEditingBusiness,
-    setIsJoinStoreModalOpen,
-    setSales,
-    setStaff,
-    setShifts,
-    setMenu,
-    setPrepTasks,
-    clearInventoryForBusiness: inventoryCtx.clearInventoryForBusiness,
-    joinStoreCode,
-    setJoinStoreCode,
-    setJoinStoreNameAlias,
-  });
-
   const accessibleBusinesses = useMemo(() => {
     if (user?.role === 'Manager') {
       return businesses.filter(b => user?.ownedBusinessIds?.includes(b.id));
@@ -414,7 +381,25 @@ export default function App() {
     );
   };
 
-  // ✅ mapDbRowToInventoryItem 已統一至 utils/transforms.ts（L60 導入）
+  // ===== Step1: Inventory <-> Supabase =====
+  const mapDbRowToInventoryItem = (r: any): InventoryItem => {
+    const qtyVal = Number(r.quantity_value ?? 0);
+    const qtyUnit = (r.quantity_unit ?? 'pcs') as string;
+
+    return {
+      id: r.id,
+      businessId: r.business_id,
+      name: r.name,
+      category: r.category || '',
+      location: r.location || '',
+      unitCost: Number(r.unit_cost ?? 0),
+      quantityValue: qtyVal,
+      quantityUnit: qtyUnit,
+      quantity: `${qtyVal} ${qtyUnit}`,
+      expiryDate: r.expiry_date || '',
+      addedDate: r.added_date || '',
+    };
+  };
 
   // ✅ 使用 Context 加載庫存
   const loadInventory = async (bizId: string) => {
@@ -487,8 +472,227 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, user?.role, currentBusinessId]);
 
+  // ✅ 必须有：你 UI 里在用 handleLogout
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+    setBusinesses([]);
+    setCurrentBusinessId(null);
+    setView(ViewState.DASHBOARD);
 
-  // ✅ Phase D: 上述函數已移至 useBusinessHandlers hook
+    // 清空本地数据（避免换号后看到上个账号的数据）
+    // Note: inventory is now managed by context, it will be empty when no businessId is selected
+    setSales([]);
+    setStaff([]);
+    setShifts([]);
+    setMenu([]);
+    setPrepTasks([]);
+  };
+
+  const handleSwitchBusiness = (bizId: string | null) => {
+    // ✅ Staff：Pending 不允许切进去
+    if (user?.role === 'Staff' && bizId) {
+      const mem = staffMemberships.find(m => m.businessId === bizId);
+      if (mem?.status === 'Pending') {
+        alert('This store is pending approval. Please wait for manager approval.');
+        setIsBusinessDropdownOpen(false);
+        return;
+      }
+    }
+
+    setCurrentBusinessId(bizId);
+    setIsBusinessDropdownOpen(false);
+    setView(ViewState.DASHBOARD);
+  };
+
+  // --- Store Management Handlers ---
+  const handleOpenCreateStore = () => {
+    setEditingBusiness(null);
+    setIsStoreModalOpen(true);
+  };
+
+  const handleOpenEditStore = (biz: Business, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingBusiness(biz);
+    setIsStoreModalOpen(true);
+  };
+
+  const handleSaveStore = async (businessData: Partial<Business>) => {
+    if (!user) return;
+
+    try {
+      if (businessData.id) {
+        // Edit Mode
+        const { error } = await supabase
+          .from('businesses')
+          .update({
+            name: businessData.name,
+            // 嘗試更新這些字段，如果數據庫沒有對應列可能會報錯，請根據實際 Schema 調整
+            // address: businessData.address,
+            // hours: businessData.hours,
+            // contact_info: businessData.contactInfo, 
+          })
+          .eq('id', businessData.id);
+
+        if (error) throw error;
+
+        setBusinesses(prev => prev.map(b => (b.id === businessData.id ? { ...b, ...businessData } as Business : b)));
+      } else {
+        // Create Mode - ✅ 修复：前端不传 ID，让 Supabase 生成 UUID
+        const { data: biz, error } = await supabase
+          .from('businesses')
+          .insert({
+            name: businessData.name?.trim(),
+            owner_id: user.id
+            // 如果您的 Schema 支持其他字段，请在此添加，例如：
+            // address: businessData.address,
+          })
+          .select('id, name, owner_id')
+          .single();
+
+        if (error) throw error;
+        if (!biz) throw new Error('Failed to create business');
+
+        const realUUID = biz.id;
+
+        // ✅ 必须插 business_members，不然 manager 自己都看不见
+        const { error: memErr } = await supabase.from('business_members').insert({
+          business_id: realUUID,
+          user_id: user.id,
+          role: 'owner',
+          status: 'active'
+        });
+
+        if (memErr) throw memErr;
+
+        // 构造本地对象（填充 UUID）
+        const newBusinessFull: Business = {
+          ...businessData,
+          id: realUUID,
+          ownerId: user.id,
+          // 默认值
+          joinCode: 'PENDING',
+          customCategories: ['Produce', 'Dairy', 'Meat', 'Pantry'],
+          customLocations: ['Fridge', 'Freezer', 'Pantry'],
+          pendingStaffIds: [],
+        } as Business;
+
+        setBusinesses(prev => [...prev, newBusinessFull]);
+
+        if (user) {
+          setUser({ ...user, ownedBusinessIds: [...(user.ownedBusinessIds || []), realUUID] });
+        }
+
+        // 切換到新店
+        sessionStorage.setItem('active_business_id', realUUID);
+        setCurrentBusinessId(realUUID);
+      }
+    } catch (err: any) {
+      console.error('Save store failed:', err);
+      alert('Failed to save store: ' + (err.message || 'Unknown error'));
+    }
+  };
+
+  const handleDeleteStore = (businessId: string) => {
+    setBusinesses(prev => prev.filter(b => b.id !== businessId));
+    if (user) {
+      setUser({ ...user, ownedBusinessIds: user.ownedBusinessIds?.filter(id => id !== businessId) });
+    }
+    // ✅ 使用 Context 清除庫存
+    inventoryCtx.clearInventoryForBusiness(businessId);
+    setSales(prev => prev.filter(s => s.businessId !== businessId));
+    setStaff(prev => prev.filter(s => s.businessId !== businessId));
+    setShifts(prev => prev.filter(s => s.businessId !== businessId));
+    setMenu(prev => prev.filter(m => m.businessId !== businessId));
+    setPrepTasks(prev => prev.filter(t => t.businessId !== businessId));
+
+    if (currentBusinessId === businessId) setCurrentBusinessId(null);
+  };
+
+  // --- Staff Join Store (Modal Submit) ---
+  const handleJoinStoreSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!user || user.role !== 'Staff') return;
+
+    const code = joinStoreCode.trim().toUpperCase();
+    if (!code) return;
+
+    try {
+      // ✅ Fix: 不用 RPC，改前端直接查 + 插，确保 status = 'active'
+      // 1. 查店铺
+      const { data: business, error: findErr } = await supabase
+        .from('businesses')
+        .select('id, name, owner_id')
+        .eq('join_code', code)
+        .single();
+
+      if (findErr || !business) {
+        console.error('Find business failed:', findErr);
+        alert('Invalid or unauthorized store code.');
+        return;
+      }
+
+      // 2. 插入 pending member，等待 Manager 審批
+      const { error: joinErr } = await supabase
+        .from('business_members')
+        .insert({
+          business_id: business.id,
+          user_id: user.id,
+          role: 'staff', // 修正：使用 'staff' 符合資料庫 check constraint
+          status: 'pending' // ✅ 修復：需要 Manager 審批
+        });
+
+      if (joinErr) {
+        // 23505 = unique constraint violation (already joined)
+        if (joinErr.code === '23505') {
+          alert('You are already a member of this store.');
+        } else {
+          alert(joinErr.message || 'Join failed');
+        }
+        return;
+      }
+
+      // 3. 成功 -> 更新本地状态
+      const newMembership = {
+        id: `${user.id}_${business.id}`,
+        businessId: business.id,
+        name: user.name,
+        email: user.email,
+        role: 'Server',
+        hourlyRate: 0,
+        status: 'Pending', // ✅ 本地狀態也設為 Pending
+      };
+
+      setStaff(prev => [...prev, newMembership as Staff]);
+
+      // 还要把 business 加到 businesses 列表里供 dropdown 显示
+      setBusinesses(prev => {
+        if (prev.some(b => b.id === business.id)) return prev;
+        return [...prev, {
+          id: business.id,
+          name: business.name,
+          ownerId: business.owner_id,
+          joinCode: '',
+          address: '', hours: '', contactInfo: '', notes: '',
+          customCategories: [], customLocations: [], pendingStaffIds: []
+        }];
+      });
+
+      setJoinStoreCode('');
+      setJoinStoreNameAlias('');
+      setIsJoinStoreModalOpen(false);
+
+      // ✅ 告知用戶需要等待 Manager 審批
+      alert(`Your request to join ${business.name} has been submitted! Please wait for manager approval.`);
+
+      // 不自動切換，因為 Pending 狀態無法進入店鋪
+
+    } catch (err: any) {
+      console.error('Join store error:', err);
+      alert(err.message);
+    }
+  };
 
   // --- Data Handlers ---
   // ✅ 使用 InventoryContext 處理掃描結果

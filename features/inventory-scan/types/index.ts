@@ -4,6 +4,9 @@
  * Types for the AI-driven inventory scanning and requirement calculation feature.
  */
 
+// Correction types
+export * from './correction';
+
 // ===================
 // ENUMS (as union types)
 // ===================

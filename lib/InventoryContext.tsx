@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import { supabase } from './supabase';
 import { InventoryItem } from '../types';
+import { mapDbRowToInventoryItem } from '../utils/transforms';
+import { toISODate } from '../utils/dateUtils';
 
 // ============ Types ============
 interface InventoryContextType {
@@ -19,40 +21,8 @@ interface InventoryContextType {
 
 const InventoryContext = createContext<InventoryContextType | undefined>(undefined);
 
-// ============ Helper Functions ============
-const toISODate = (dateStr: string | undefined | null): string | null => {
-    if (!dateStr) return null;
-    const v = dateStr.trim();
-    if (!v) return null;
-    // Already YYYY-MM-DD format
-    if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
-    // dd/mm/yyyy format
-    const match = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-    if (match) {
-        const [, day, month, year] = match;
-        return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-    }
-    return null;
-};
-
-const mapDbRowToInventoryItem = (r: any): InventoryItem => {
-    const qtyVal = Number(r.quantity_value ?? 0);
-    const qtyUnit = (r.quantity_unit ?? 'pcs') as string;
-
-    return {
-        id: r.id,
-        businessId: r.business_id,
-        name: r.name,
-        category: r.category || '',
-        location: r.location || '',
-        unitCost: Number(r.unit_cost ?? 0),
-        quantityValue: qtyVal,
-        quantityUnit: qtyUnit,
-        quantity: `${qtyVal} ${qtyUnit}`,
-        expiryDate: r.expiry_date || '',
-        addedDate: r.added_date || '',
-    };
-};
+// ✅ toISODate 已統一至 utils/dateUtils.ts
+// ✅ mapDbRowToInventoryItem 已統一至 utils/transforms.ts
 
 // ============ Provider ============
 interface InventoryProviderProps {

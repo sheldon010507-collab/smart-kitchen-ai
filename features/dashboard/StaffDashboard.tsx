@@ -10,7 +10,7 @@
 import React from 'react';
 import { Store } from 'lucide-react';
 import StaffInventoryOverview from '../../components/StaffInventoryOverview';
-import MenuManager from '../../components/MenuManager';
+import { MenuManager } from '../menu';
 import PrepList from '../../components/PrepList';
 import { InventoryItem, MenuItem, PrepTask, User, Business } from '../../types';
 
