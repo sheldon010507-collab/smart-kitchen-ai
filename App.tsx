@@ -59,7 +59,7 @@ import { toISODate } from './utils/dateUtils';
 import { calculateIngredientCost } from './utils/costCalculations';
 import { normMemberStatus, mapDbRowToInventoryItem } from './utils/transforms';
 import { sanitizeStorage } from './utils/storageUtils';
-import { ErrorBoundary } from './components/common/ErrorBoundary';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { JoinStoreModal } from './components/modals/JoinStoreModal';
 import { MetaManagerModal } from './components/modals/MetaManagerModal';
 import { MasterDashboard } from './features/dashboard/MasterDashboard';
