@@ -123,22 +123,27 @@ export async function generateShoppingList(
             }
         }
 
-        // 2. Check low stock items
-        // Note: This requires a min_quantity field in inventory_items
-        // If not available, we'll skip this phase
+        // 2. Check low stock items using min_stock_level
         if (options.includeLowStock) {
-            // Check if min_quantity column exists by attempting query
+            // Query items where quantity is below min_stock_level
             const { data: lowStockItems, error: stockError } = await supabase
                 .from('inventory_items')
-                .select('id, name, category, quantity_value, quantity_unit')
+                .select('id, name, category, quantity_value, quantity_unit, min_stock_level')
                 .eq('business_id', businessId)
-                .lte('quantity_value', 2); // Simple low stock check if min_quantity not available
+                .gt('min_stock_level', 0);  // Only items with min_stock_level set
 
             if (stockError) {
-                // Column might not exist, skip this phase
-                errors.push(`Low stock check skipped: ${stockError.message}`);
+                errors.push(`Low stock check failed: ${stockError.message}`);
             } else if (lowStockItems) {
+                // Import prediction utilities
+                const { predictReorderQuantity, calculateReorderQuantity } = await import('./predictQuantity');
+
                 for (const item of lowStockItems) {
+                    // Skip if quantity is above min_stock_level
+                    if ((item.quantity_value || 0) >= (item.min_stock_level || 0)) {
+                        continue;
+                    }
+
                     if (shouldSkip(item.id, existingMap, options.mergeStrategy)) {
                         skipped++;
                         continue;
@@ -149,15 +154,29 @@ export async function generateShoppingList(
                         continue;
                     }
 
-                    // Basic restock quantity (could be enhanced with historical data)
-                    const restockQty = Math.max(5, 10 - (item.quantity_value || 0));
+                    const unit = item.quantity_unit || 'pcs';
+                    const category = item.category || null;
+
+                    // Use historical prediction (passes unit and category for optimization)
+                    const predictedQty = await predictReorderQuantity(
+                        supabase, businessId, item.name, unit, category
+                    );
+
+                    // Calculate final restock quantity
+                    const restockQty = calculateReorderQuantity(
+                        predictedQty,
+                        item.quantity_value || 0,
+                        item.min_stock_level || 0,
+                        unit,
+                        category
+                    );
 
                     items.push({
                         inventory_item_id: item.id,
                         item_name: item.name,
-                        category: item.category || null,
+                        category: category,
                         quantity_needed: restockQty,
-                        unit: item.quantity_unit || 'pcs',
+                        unit: unit,
                         reason: 'low_stock',
                         priority: getStockPriority(item.quantity_value || 0),
                     });

@@ -57,6 +57,7 @@ export interface InventoryItem {
   location: string;
   expiryDate: string;
   addedDate: string;
+  minStockLevel?: number;  // 最低庫存線，低於此值自動加入購物清單
 }
 
 /** SKU Master - for AI recognition */

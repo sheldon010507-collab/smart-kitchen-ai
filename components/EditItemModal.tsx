@@ -41,15 +41,15 @@ const EditItemModal: React.FC<Props> = ({ isOpen, onClose, onSave, item, categor
         setIsCustomCategory(false);
         setIsCustomLocation(false);
         if (item.unitCost && item.quantityValue) {
-            setTotalPrice((item.unitCost * item.quantityValue).toFixed(2));
+          setTotalPrice((item.unitCost * item.quantityValue).toFixed(2));
         } else {
-            setTotalPrice('');
+          setTotalPrice('');
         }
       } else {
         setFormData({
-            ...DEFAULT_ITEM,
-            category: categories[0] || 'Produce',
-            location: locations[0] || 'Fridge'
+          ...DEFAULT_ITEM,
+          category: categories[0] || 'Produce',
+          location: locations[0] || 'Fridge'
         });
         setTotalPrice('');
       }
@@ -64,24 +64,24 @@ const EditItemModal: React.FC<Props> = ({ isOpen, onClose, onSave, item, categor
     if (name === 'location' && value === 'add-new') { setIsCustomLocation(true); return; }
     setFormData(prev => ({ ...prev, [name]: value }));
   };
-  
+
   const handleNumericChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const { name, value } = e.target;
-      const numVal = parseFloat(value);
-      setFormData(prev => ({ ...prev, [name]: numVal }));
-      if (name === 'quantityValue' && totalPrice && numVal > 0) {
-          const tp = parseFloat(totalPrice);
-          setFormData(prev => ({ ...prev, unitCost: tp / numVal }));
-      }
+    const { name, value } = e.target;
+    const numVal = parseFloat(value);
+    setFormData(prev => ({ ...prev, [name]: numVal }));
+    if (name === 'quantityValue' && totalPrice && numVal > 0) {
+      const tp = parseFloat(totalPrice);
+      setFormData(prev => ({ ...prev, unitCost: tp / numVal }));
+    }
   };
 
   const handleTotalPriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const val = e.target.value;
-      setTotalPrice(val);
-      if (val && formData.quantityValue && formData.quantityValue > 0) {
-          const cost = parseFloat(val) / formData.quantityValue;
-          setFormData(prev => ({ ...prev, unitCost: cost }));
-      }
+    const val = e.target.value;
+    setTotalPrice(val);
+    if (val && formData.quantityValue && formData.quantityValue > 0) {
+      const cost = parseFloat(val) / formData.quantityValue;
+      setFormData(prev => ({ ...prev, unitCost: cost }));
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -92,17 +92,18 @@ const EditItemModal: React.FC<Props> = ({ isOpen, onClose, onSave, item, categor
     if (formData.name && formData.quantityValue && finalCategory && finalLocation) {
       const displayQuantity = `${formData.quantityValue} ${formData.quantityUnit}`;
       const savedItem: InventoryItem = {
-         id: item?.id || Date.now().toString(),
-         businessId: item?.businessId || '', 
-         name: formData.name!,
-         quantity: displayQuantity,
-         quantityValue: formData.quantityValue,
-         quantityUnit: formData.quantityUnit || 'pcs',
-         unitCost: formData.unitCost ? Number(formData.unitCost) : 0,
-         category: finalCategory,
-         location: finalLocation,
-         expiryDate: formData.expiryDate!,
-         addedDate: item?.addedDate || new Date().toISOString().split('T')[0]
+        id: item?.id || Date.now().toString(),
+        businessId: item?.businessId || '',
+        name: formData.name!,
+        quantity: displayQuantity,
+        quantityValue: formData.quantityValue,
+        quantityUnit: formData.quantityUnit || 'pcs',
+        unitCost: formData.unitCost ? Number(formData.unitCost) : 0,
+        category: finalCategory,
+        location: finalLocation,
+        expiryDate: formData.expiryDate!,
+        addedDate: item?.addedDate || new Date().toISOString().split('T')[0],
+        minStockLevel: formData.minStockLevel || 0,
       };
       onSave(savedItem, isCustomCategory ? customCategory : undefined, isCustomLocation ? customLocation : undefined);
       onClose();
@@ -136,23 +137,23 @@ const EditItemModal: React.FC<Props> = ({ isOpen, onClose, onSave, item, categor
             <div>
               <label className="block text-xs font-bold text-secondary uppercase tracking-wider mb-2">Qty</label>
               <div className="flex space-x-2">
-                  <input
-                    type="number"
-                    step="0.01"
-                    name="quantityValue"
-                    value={formData.quantityValue}
-                    onChange={handleNumericChange}
-                    className="w-2/3 px-3 py-2.5 rounded-lg border border-border focus:outline-none focus:border-accent text-sm"
-                    required
-                  />
-                  <select 
-                     name="quantityUnit"
-                     value={formData.quantityUnit}
-                     onChange={handleChange}
-                     className="w-1/3 px-2 py-2.5 rounded-lg border border-border bg-white text-sm focus:outline-none focus:border-accent"
-                  >
-                      {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
-                  </select>
+                <input
+                  type="number"
+                  step="0.01"
+                  name="quantityValue"
+                  value={formData.quantityValue}
+                  onChange={handleNumericChange}
+                  className="w-2/3 px-3 py-2.5 rounded-lg border border-border focus:outline-none focus:border-accent text-sm"
+                  required
+                />
+                <select
+                  name="quantityUnit"
+                  value={formData.quantityUnit}
+                  onChange={handleChange}
+                  className="w-1/3 px-2 py-2.5 rounded-lg border border-border bg-white text-sm focus:outline-none focus:border-accent"
+                >
+                  {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                </select>
               </div>
             </div>
             <div>
@@ -168,38 +169,56 @@ const EditItemModal: React.FC<Props> = ({ isOpen, onClose, onSave, item, categor
             </div>
           </div>
 
-           <div>
-              <label className="block text-xs font-bold text-secondary uppercase tracking-wider mb-2">Expiry Date</label>
-              <input
-                type="date"
-                name="expiryDate"
-                value={formData.expiryDate}
-                onChange={handleChange}
-                className="w-full px-4 py-2.5 rounded-lg border border-border focus:outline-none focus:border-accent text-sm"
-                required
-              />
-            </div>
+          <div>
+            <label className="block text-xs font-bold text-secondary uppercase tracking-wider mb-2">Expiry Date</label>
+            <input
+              type="date"
+              name="expiryDate"
+              value={formData.expiryDate}
+              onChange={handleChange}
+              className="w-full px-4 py-2.5 rounded-lg border border-border focus:outline-none focus:border-accent text-sm"
+              required
+            />
+          </div>
+
+          {/* Min Stock Level */}
+          <div>
+            <label className="block text-xs font-bold text-secondary uppercase tracking-wider mb-2">
+              Min Stock Level
+              <span className="font-normal text-gray-400 ml-1">(auto-reorder)</span>
+            </label>
+            <input
+              type="number"
+              name="minStockLevel"
+              value={formData.minStockLevel || 0}
+              onChange={handleNumericChange}
+              className="w-full px-4 py-2.5 rounded-lg border border-border focus:outline-none focus:border-accent text-sm"
+              min="0"
+              step="1"
+              placeholder="0 = disabled"
+            />
+          </div>
 
           <div className="grid grid-cols-2 gap-5">
             <div>
               <label className="block text-xs font-bold text-secondary uppercase tracking-wider mb-2">Category</label>
               {isCustomCategory ? (
-                  <input 
-                    type="text"
-                    value={customCategory}
-                    onChange={e => setCustomCategory(e.target.value)}
-                    placeholder="New..."
-                    className="w-full px-4 py-2.5 rounded-lg border border-border focus:outline-none focus:border-accent text-sm"
-                  />
+                <input
+                  type="text"
+                  value={customCategory}
+                  onChange={e => setCustomCategory(e.target.value)}
+                  placeholder="New..."
+                  className="w-full px-4 py-2.5 rounded-lg border border-border focus:outline-none focus:border-accent text-sm"
+                />
               ) : (
                 <select
-                    name="category"
-                    value={formData.category}
-                    onChange={handleChange}
-                    className="w-full px-4 py-2.5 rounded-lg border border-border bg-white text-sm focus:outline-none focus:border-accent"
+                  name="category"
+                  value={formData.category}
+                  onChange={handleChange}
+                  className="w-full px-4 py-2.5 rounded-lg border border-border bg-white text-sm focus:outline-none focus:border-accent"
                 >
-                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
-                    <option value="add-new">+ New</option>
+                  {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                  <option value="add-new">+ New</option>
                 </select>
               )}
             </div>
@@ -207,22 +226,22 @@ const EditItemModal: React.FC<Props> = ({ isOpen, onClose, onSave, item, categor
             <div>
               <label className="block text-xs font-bold text-secondary uppercase tracking-wider mb-2">Location</label>
               {isCustomLocation ? (
-                  <input 
-                    type="text"
-                    value={customLocation}
-                    onChange={e => setCustomLocation(e.target.value)}
-                    placeholder="New..."
-                    className="w-full px-4 py-2.5 rounded-lg border border-border focus:outline-none focus:border-accent text-sm"
-                  />
+                <input
+                  type="text"
+                  value={customLocation}
+                  onChange={e => setCustomLocation(e.target.value)}
+                  placeholder="New..."
+                  className="w-full px-4 py-2.5 rounded-lg border border-border focus:outline-none focus:border-accent text-sm"
+                />
               ) : (
                 <select
-                    name="location"
-                    value={formData.location}
-                    onChange={handleChange}
-                    className="w-full px-4 py-2.5 rounded-lg border border-border bg-white text-sm focus:outline-none focus:border-accent"
+                  name="location"
+                  value={formData.location}
+                  onChange={handleChange}
+                  className="w-full px-4 py-2.5 rounded-lg border border-border bg-white text-sm focus:outline-none focus:border-accent"
                 >
-                    {locations.map(l => <option key={l} value={l}>{l}</option>)}
-                    <option value="add-new">+ New</option>
+                  {locations.map(l => <option key={l} value={l}>{l}</option>)}
+                  <option value="add-new">+ New</option>
                 </select>
               )}
             </div>
