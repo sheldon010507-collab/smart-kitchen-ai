@@ -265,13 +265,13 @@ const Scanner: React.FC<Props> = ({
       // Mode: Fridge - multi-photo with preprocessing
       const photosToProcess = fridgePhotos.length > 0 ? fridgePhotos : [{ file: file!, preview: previewUrl }];
 
-      // Preprocess all images (compress & enhance)
+      // Preprocess all images (EXTREME compression for Vercel 10s limit)
       const processedImages: string[] = [];
       for (const photo of photosToProcess) {
         const processed = await preprocessImage(photo.file, {
-          maxWidth: 1280,      // Optimized: 1920→1280
-          maxHeight: 720,      // Optimized: 1080→720
-          targetSizeKB: 250,   // Optimized: 400→250
+          maxWidth: 800,       // Extreme: 1280→800
+          maxHeight: 600,      // Extreme: 720→600
+          targetSizeKB: 100,   // Extreme: 250→100 (Vercel timeout fix)
           autoEnhance: true
         });
         processedImages.push(processed.base64);
