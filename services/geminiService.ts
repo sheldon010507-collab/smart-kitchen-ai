@@ -73,7 +73,7 @@ const sanitizeIngredientName = (name: string): string => {
 
 /**
  * FEATURE: Analyze Images (Receipts for Inventory & Costing)
- * Supports RAG (dictionary) for better name matching
+ * ✅ OPTIMIZED: Uses selectPrompt for faster API response
  */
 export const analyzeInventoryImage = async (
   base64Image: string,
@@ -81,68 +81,38 @@ export const analyzeInventoryImage = async (
   mode: 'receipt' | 'fridge',
   dictionary: string[] = []
 ): Promise<any[]> => {
+  // Import optimized prompt generator
+  const { selectPrompt, validateAndParseScanResult } = await import(
+    '../features/inventory-scan/services/promptTemplates'
+  );
 
-  const today = new Date().toISOString().split('T')[0];
-
-  // ✅ Sanitize all dictionary entries before using in prompt
+  // ✅ Limit dictionary to 50 items for faster processing
   const sanitizedDict = dictionary
     .map(sanitizeIngredientName)
     .filter(name => name.length > 0)
-    .slice(0, 400);
+    .slice(0, 50);
 
-  const dictStr = sanitizedDict.join("、");
+  // Build known items for prompt
+  const knownItems = sanitizedDict.map(name => ({ name, unit: 'pcs' }));
 
-  const ragContext = dictStr
-    ? `Context: Known ingredients dictionary: [${dictStr}]. If a name is similar, prefer the dictionary name. If unsure, provide alternatives in 'candidates'.`
-    : "";
+  // ✅ Use optimized prompt selector
+  const prompt = selectPrompt({
+    imageCount: 1,
+    scanArea: mode === 'fridge' ? 'fridge' : 'storage',
+    knownItems,
+  });
 
-  const prompt = mode === 'receipt'
-    ? `Analyze this receipt/invoice. Extract food items.
-       ${ragContext}
-       For each item:
-       1. Name (standardized).
-       2. Quantity (value & unit). 
-       3. Unit Cost & Total Price.
-       4. Category (Produce/Dairy/Meat/Pantry/Frozen/Beverage/Other).
-       5. Expiry Date (dd/mm/yyyy) starting from ${today}.
-       6. Confidence (0-1).
-       Return a JSON array.`
-    : `Analyze this fridge/pantry photo. Identify ALL food items with ACCURATE QUANTITIES.
-       ${ragContext}
-       
-       QUANTITY ESTIMATION RULES:
-       - Direct count: Count visible items individually
-       - For packages: Read labels for weight (1kg, 500g, 1L, etc.)
-       - For stacked items: Count visible × estimated depth
-       - For containers: Estimate fill level (half full, 3/4 full)
-       - In "notes": ALWAYS show your calculation (e.g., "3 bags × 1kg = 3kg")
-       
-       Common container/package sizes:
-       - Eggs: 6/10/12/30 pcs
-       - Milk: 250ml/500ml/1L/2L
-       - Vegetables (bunch): ~200-300g
-       - Meat trays: 500g or 1kg
-       
-       Return a JSON array with name, quantityValue, quantityUnit, confidence (0-1), notes.
-       BE CONSERVATIVE - only report quantities you can verify from the image.`;
-
+  // Minimal schema for faster response
   const itemSchema = {
     type: "OBJECT",
     properties: {
       name: { type: "STRING" },
-      quantityValue: { type: "NUMBER" },
-      quantityUnit: { type: "STRING" },
-      unitCost: { type: "NUMBER" },
-      totalPrice: { type: "NUMBER" },
-      category: { type: "STRING" },
-      location: { type: "STRING" },
-      expiryDate: { type: "STRING" },
+      quantity: { type: "NUMBER" },
+      unit: { type: "STRING" },
       confidence: { type: "NUMBER" },
-      is_new_item: { type: "BOOLEAN" },
-      candidates: { type: "ARRAY", items: { type: "STRING" } },
       notes: { type: "STRING" }
     },
-    required: ["name"]
+    required: ["name", "quantity", "unit"]
   };
 
   const text = await callGeminiApi({
@@ -150,20 +120,36 @@ export const analyzeInventoryImage = async (
     imageBase64: base64Image,
     mimeType,
     config: {
-      temperature: 0,        // Zero temperature for accurate quantity estimation
-      topK: 1,               // Most likely token only
-      topP: 0.1,             // Very focused sampling
+      temperature: 0,
+      topK: 1,
+      topP: 0.1,
       responseMimeType: 'application/json',
       responseSchema: {
-        type: "ARRAY",
-        items: itemSchema
+        type: "OBJECT",
+        properties: {
+          items: { type: "ARRAY", items: itemSchema },
+          scan_quality: { type: "STRING" }
+        }
       }
     }
   });
 
   if (text) {
     try {
-      return JSON.parse(text);
+      // Try optimized parser first
+      const result = validateAndParseScanResult(text);
+      if (result && result.items.length > 0) {
+        return result.items.map(item => ({
+          name: item.name,
+          quantityValue: item.quantity,
+          quantityUnit: item.unit,
+          confidence: item.confidence,
+          notes: item.notes
+        }));
+      }
+      // Fallback to direct parse
+      const parsed = JSON.parse(text);
+      return Array.isArray(parsed) ? parsed : (parsed.items || []);
     } catch (e) {
       console.error("Failed to parse JSON", e);
       return [];
