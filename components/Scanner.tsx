@@ -243,11 +243,11 @@ const Scanner: React.FC<Props> = ({
         return;
       }
 
-      // Mode: Receipt - single photo
+      // Mode: Receipt - single photo (text-heavy, can compress more)
       if (mode === "receipt") {
         const processed = await preprocessImage(file!, {
-          targetSizeKB: 500,
-          maxWidth: 1500,
+          targetSizeKB: 200,   // Optimized: 500→200 (text still readable)
+          maxWidth: 1200,      // Optimized: 1500→1200
           autoEnhance: true
         });
 
@@ -269,9 +269,9 @@ const Scanner: React.FC<Props> = ({
       const processedImages: string[] = [];
       for (const photo of photosToProcess) {
         const processed = await preprocessImage(photo.file, {
-          maxWidth: 1920,
-          maxHeight: 1080,
-          targetSizeKB: 400,
+          maxWidth: 1280,      // Optimized: 1920→1280
+          maxHeight: 720,      // Optimized: 1080→720
+          targetSizeKB: 250,   // Optimized: 400→250
           autoEnhance: true
         });
         processedImages.push(processed.base64);

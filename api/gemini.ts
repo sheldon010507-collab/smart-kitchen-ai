@@ -144,8 +144,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(400).json({ error: imageError });
         }
 
-        // Model Selection - Use gemini-2.0-flash as default (fast and reliable)
-        const modelName = model || process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+        // Model Selection
+        const modelName = model || process.env.GEMINI_MODEL || 'gemini-3-flash-preview';
 
         // 🔍 Debug: Log which model is being used
         console.log(`[Gemini API] Using model: ${modelName}`);
