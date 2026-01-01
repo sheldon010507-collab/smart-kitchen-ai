@@ -180,19 +180,37 @@ export function useBusinessHandlers(props: UseBusinessHandlersProps) {
     }, [user, setBusinesses, setUser, setCurrentBusinessId]);
 
     // --- Delete Store ---
-    const handleDeleteStore = useCallback((businessId: string) => {
-        setBusinesses(prev => prev.filter(b => b.id !== businessId));
-        if (user) {
-            setUser({ ...user, ownedBusinessIds: user.ownedBusinessIds?.filter(id => id !== businessId) });
-        }
-        clearInventoryForBusiness(businessId);
-        setSales(prev => prev.filter(s => s.businessId !== businessId));
-        setStaff(prev => prev.filter(s => s.businessId !== businessId));
-        setShifts(prev => prev.filter(s => s.businessId !== businessId));
-        setMenu(prev => prev.filter(m => m.businessId !== businessId));
-        setPrepTasks(prev => prev.filter(t => t.businessId !== businessId));
+    const handleDeleteStore = useCallback(async (businessId: string) => {
+        try {
+            // ✅ Actually delete from database
+            const { error } = await supabase
+                .from('businesses')
+                .delete()
+                .eq('id', businessId);
 
-        if (currentBusinessId === businessId) setCurrentBusinessId(null);
+            if (error) {
+                console.error('Delete store failed:', error);
+                alert('Failed to delete store: ' + error.message);
+                return;
+            }
+
+            // Update local state after successful deletion
+            setBusinesses(prev => prev.filter(b => b.id !== businessId));
+            if (user) {
+                setUser({ ...user, ownedBusinessIds: user.ownedBusinessIds?.filter(id => id !== businessId) });
+            }
+            clearInventoryForBusiness(businessId);
+            setSales(prev => prev.filter(s => s.businessId !== businessId));
+            setStaff(prev => prev.filter(s => s.businessId !== businessId));
+            setShifts(prev => prev.filter(s => s.businessId !== businessId));
+            setMenu(prev => prev.filter(m => m.businessId !== businessId));
+            setPrepTasks(prev => prev.filter(t => t.businessId !== businessId));
+
+            if (currentBusinessId === businessId) setCurrentBusinessId(null);
+        } catch (err: any) {
+            console.error('Delete store failed:', err);
+            alert('Failed to delete store: ' + (err.message || 'Unknown error'));
+        }
     }, [user, currentBusinessId, setBusinesses, setUser, clearInventoryForBusiness, setSales, setStaff, setShifts, setMenu, setPrepTasks, setCurrentBusinessId]);
 
     // --- Staff Join Store ---
