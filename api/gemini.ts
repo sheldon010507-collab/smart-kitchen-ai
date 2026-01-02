@@ -136,26 +136,50 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         // 4. Validate & Prepare Request
-        const { prompt, imageBase64, mimeType, model, config } = req.body;
+        const { prompt, imageBase64, mimeType, images, model, config } = req.body;
 
-        // Validate image if provided
-        const imageError = validateImage(imageBase64, mimeType);
-        if (imageError) {
-            return res.status(400).json({ error: imageError });
-        }
-
-        // Model Selection - FORCED to gemini-2.0-flash for speed
-        const modelName = 'gemini-2.0-flash';  // Ignore env var, use fastest model
+        // Model Selection - gemini-3-flash-preview
+        const modelName = 'gemini-3-flash-preview';
 
         // 🔍 Debug: Log which model is being used
         console.log(`[Gemini API] Using model: ${modelName}`);
 
         const parts: any[] = [];
-        if (imageBase64 && mimeType) {
+
+        // 🆕 Support multi-image array (for multi-angle scanning)
+        if (images && Array.isArray(images) && images.length > 0) {
+            // Limit to 4 images max to control token usage
+            const limitedImages = images.slice(0, 4);
+
+            console.log(`[Gemini API] Processing ${limitedImages.length} images`);
+
+            for (const img of limitedImages) {
+                // Validate each image
+                const imgError = validateImage(img.base64, img.mimeType);
+                if (imgError) {
+                    return res.status(400).json({ error: `Image validation error: ${imgError}` });
+                }
+
+                parts.push({
+                    inlineData: {
+                        mimeType: img.mimeType || 'image/jpeg',
+                        data: img.base64
+                    }
+                });
+            }
+        }
+        // Backward compatible: single image format
+        else if (imageBase64 && mimeType) {
+            const imageError = validateImage(imageBase64, mimeType);
+            if (imageError) {
+                return res.status(400).json({ error: imageError });
+            }
             parts.push({
                 inlineData: { mimeType, data: imageBase64 }
             });
         }
+
+        // Add prompt text
         if (prompt) {
             parts.push({ text: prompt });
         }

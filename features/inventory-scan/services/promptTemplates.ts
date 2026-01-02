@@ -173,6 +173,72 @@ Analyze the image(s) now:`.trim();
 }
 
 /**
+ * Generate prompt for multi-angle image scanning
+ * Optimized for analyzing multiple photos of the same area from different angles
+ */
+export function generateMultiAngleScanPrompt(options: PromptOptions): string {
+  const { imageCount, scanArea, knownItems } = options;
+
+  const knownItemsList = knownItems.length > 0
+    ? knownItems.slice(0, 15).map(i => `${i.name}(${i.unit})`).join(', ')
+    : 'identify all food items';
+
+  return `
+# Multi-Angle Inventory Scanner
+
+You are analyzing ${imageCount} photos of the SAME ${AREA_DESCRIPTIONS[scanArea]} from DIFFERENT ANGLES.
+
+## CRITICAL: Multi-Angle Fusion Rules
+- Image 1 might be FRONT view (labels, brands visible)
+- Image 2 might be SIDE view (see depth, stacking)
+- Image 3 might be TOP/OTHER view (see hidden items)
+
+Your task: COMBINE information from ALL angles to get ACCURATE count.
+
+### Counting Strategy:
+1. First, identify items visible in EACH image
+2. Match same items across images by position/appearance
+3. Use SIDE view to determine depth (e.g., "3 bottles deep")
+4. Use FRONT view for labels and identification
+5. Final count = visible front × depth (if side view confirms)
+
+### Handling Partial Visibility:
+- If item is partially hidden, estimate based on visible portion
+- Mark hidden/estimated items with lower confidence (0.5-0.7)
+- If all images show same angle, note "depth unknown" in notes
+
+### Example:
+- Front view: 4 milk bottles visible
+- Side view: bottles are 2 deep
+- Correct count: 4 × 2 = 8 bottles
+
+## Known Items (prefer matching)
+${knownItemsList}
+
+## Output (JSON only)
+{
+  "items": [
+    {
+      "name": "Item name",
+      "quantity": number,
+      "unit": "${ALLOWED_UNITS.join('/')}",
+      "confidence": 0.0-1.0,
+      "notes": "front:X × depth:Y = total"
+    }
+  ],
+  "scan_quality": "good/medium/poor"
+}
+
+## DON'T
+- Don't count same item multiple times across angles
+- Don't guess depth without side view evidence
+- Don't ignore any image
+- Don't return quantity 0 (skip item instead)
+
+Analyze all ${imageCount} images now:`.trim();
+}
+
+/**
  * Validate and parse AI scan result
  */
 export interface ScanResultItem {
@@ -269,4 +335,126 @@ export function selectPrompt(options: PromptOptions & {
 
   // Default to standard optimized prompt
   return generateScanPrompt(options);
+}
+
+// ===================
+// FRIDGE AUDIT FUNCTIONS
+// ===================
+
+import type { DictionaryItem, FridgeAuditResult } from '../types';
+
+/**
+ * Generate Fridge Audit prompt for inventory reconciliation
+ * Returns found items, not_found items, and new items
+ */
+export function generateFridgeAuditPrompt(options: {
+  imageCount: number;
+  dictionary: DictionaryItem[];
+}): string {
+  const { imageCount, dictionary } = options;
+
+  const dictList = dictionary.length > 0
+    ? dictionary.map(i => `${i.name}(${i.unit})`).join(', ')
+    : '(no known items)';
+
+  const multiNote = imageCount > 1
+    ? `\n⚠️ ${imageCount} photos of SAME fridge - count items ONCE by combining all views.`
+    : '';
+
+  return `
+# Fridge Inventory Audit${multiNote}
+
+## Known Items (MATCH these names exactly):
+${dictList}
+
+## Task
+1. Count ACTUAL visible quantities for each item
+2. Use exact names from known items when matching
+3. Report NEW items not in the known list
+4. Report items from known list that are NOT visible
+
+## Output JSON (strict format)
+{
+  "found": [{"name":"exact name","quantity":num,"unit":"str","confidence":0-1,"notes":"optional"}],
+  "not_found": ["names of known items not visible in any photo"],
+  "new_items": [{"name":"descriptive name","quantity":num,"unit":"str","confidence":0-1}],
+  "scan_quality": "good/medium/poor"
+}
+
+## Rules
+- found: items that ARE visible and match known list
+- not_found: items from known list that you CANNOT see
+- new_items: visible items NOT in the known list
+- Don't guess hidden quantities
+
+Analyze:`.trim();
+}
+
+/**
+ * Parse and validate Fridge Audit result from AI
+ */
+export function validateFridgeAuditResult(raw: string): FridgeAuditResult | null {
+  try {
+    // Clean JSON markers
+    let cleaned = raw
+      .replace(/```json\n?/g, '')
+      .replace(/```\n?/g, '')
+      .trim();
+
+    // Extract JSON object
+    const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      cleaned = jsonMatch[0];
+    }
+
+    const data = JSON.parse(cleaned);
+
+    // Validate and filter found items
+    const found = (data.found || [])
+      .filter((i: any) =>
+        typeof i.name === 'string' &&
+        i.name.length > 0 &&
+        typeof i.quantity === 'number' &&
+        i.quantity >= 0
+      )
+      .map((i: any) => ({
+        name: i.name.trim(),
+        quantity: Math.round(i.quantity * 100) / 100,
+        unit: (i.unit || 'pcs').trim(),
+        confidence: typeof i.confidence === 'number' ? Math.min(1, Math.max(0, i.confidence)) : 0.7,
+        notes: i.notes,
+      }));
+
+    // Validate not_found (array of strings)
+    const notFound = (data.not_found || [])
+      .filter((name: any) => typeof name === 'string' && name.length > 0)
+      .map((name: any) => name.trim());
+
+    // Validate new_items
+    const newItems = (data.new_items || [])
+      .filter((i: any) =>
+        typeof i.name === 'string' &&
+        i.name.length > 0 &&
+        typeof i.quantity === 'number' &&
+        i.quantity > 0
+      )
+      .map((i: any) => ({
+        name: i.name.trim(),
+        quantity: Math.round(i.quantity * 100) / 100,
+        unit: (i.unit || 'pcs').trim(),
+        confidence: typeof i.confidence === 'number' ? Math.min(1, Math.max(0, i.confidence)) : 0.6,
+      }));
+
+    return {
+      found,
+      notFound,
+      newItems,
+      scanQuality: ['good', 'medium', 'poor'].includes(data.scan_quality)
+        ? data.scan_quality
+        : 'medium',
+    };
+  } catch (e) {
+    console.error('Failed to parse fridge audit result:', e);
+    return null;
+  }
 }

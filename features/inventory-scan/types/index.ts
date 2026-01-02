@@ -18,6 +18,42 @@ export type SKUType = 'raw' | 'prep';
 export type ScanAreaType = 'front' | 'back' | 'storage';
 
 // ===================
+// FRIDGE AUDIT TYPES
+// ===================
+
+/**
+ * RAG Dictionary item - loaded from inventory for smart matching
+ */
+export interface DictionaryItem {
+    id: string;
+    name: string;
+    unit: string;
+    currentQty: number;
+    category?: string;
+}
+
+/**
+ * Fridge audit result from AI
+ */
+export interface FridgeAuditResult {
+    found: Array<{
+        name: string;
+        quantity: number;
+        unit: string;
+        confidence: number;
+        notes?: string;
+    }>;
+    notFound: string[];           // Items in dictionary but not seen
+    newItems: Array<{
+        name: string;
+        quantity: number;
+        unit: string;
+        confidence: number;
+    }>;
+    scanQuality: 'good' | 'medium' | 'poor';
+}
+
+// ===================
 // SKU & INVENTORY INTERFACES
 // ===================
 

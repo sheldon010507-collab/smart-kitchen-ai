@@ -72,6 +72,173 @@ const sanitizeIngredientName = (name: string): string => {
 };
 
 /**
+ * 🆕 Multi-image API caller for multi-angle scanning
+ */
+const callGeminiMultiImageApi = async (payload: {
+  prompt: string;
+  images: Array<{ base64: string; mimeType: string }>;
+  config?: any;
+}): Promise<string> => {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+
+    if (!token) {
+      throw new Error("Unauthorized: You must be logged in to use AI features.");
+    }
+
+    const res = await fetch('/api/gemini', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      let errMsg = errText;
+      try {
+        const json = JSON.parse(errText);
+        if (json.error) errMsg = json.error;
+      } catch (e) { }
+      throw new Error(errMsg || `Server error: ${res.status}`);
+    }
+
+    const data = await res.json();
+    return data.text;
+  } catch (error: any) {
+    console.error('Gemini Multi-Image API Call Failed:', error);
+    throw error;
+  }
+};
+
+import type { DictionaryItem, FridgeAuditResult } from '../features/inventory-scan/types';
+
+/**
+ * 🆕 Analyze multiple images for Fridge Audit
+ * Returns found, not_found, and new_items for inventory reconciliation
+ */
+export const analyzeFridgeAudit = async (
+  images: Array<{ base64: string; mimeType: string }>,
+  dictionary: DictionaryItem[] = []
+): Promise<FridgeAuditResult | null> => {
+  const { generateFridgeAuditPrompt, validateFridgeAuditResult } = await import(
+    '../features/inventory-scan/services/promptTemplates'
+  );
+
+  // Generate Fridge Audit specific prompt
+  const prompt = generateFridgeAuditPrompt({
+    imageCount: images.length,
+    dictionary,
+  });
+
+  console.log(`[Gemini] Fridge Audit: ${images.length} images, ${dictionary.length} known items`);
+
+  const text = await callGeminiMultiImageApi({
+    prompt,
+    images,
+    config: {
+      temperature: 0,
+      topK: 1,
+      topP: 0.1,
+    }
+  });
+
+  if (text) {
+    return validateFridgeAuditResult(text);
+  }
+  return null;
+};
+
+/**
+ * Analyze multiple images from different angles (legacy - for backward compatibility)
+ * Sends all images in a single API call for accurate fusion
+ */
+export const analyzeMultiAngleImages = async (
+  images: Array<{ base64: string; mimeType: string }>,
+  scanArea: 'fridge' | 'storage' | 'prep' = 'fridge',
+  dictionary: string[] = []
+): Promise<any[]> => {
+  const { generateMultiAngleScanPrompt, validateAndParseScanResult } = await import(
+    '../features/inventory-scan/services/promptTemplates'
+  );
+
+  // Sanitize and limit dictionary
+  const sanitizedDict = dictionary
+    .map(sanitizeIngredientName)
+    .filter(name => name.length > 0)
+    .slice(0, 50);
+
+  // Build known items for prompt
+  const knownItems = sanitizedDict.map(name => ({ name, unit: 'pcs' }));
+
+  // Generate multi-angle specific prompt
+  const prompt = generateMultiAngleScanPrompt({
+    imageCount: images.length,
+    scanArea,
+    knownItems,
+  });
+
+  console.log(`[Gemini] Analyzing ${images.length} images, prompt length: ${prompt.length}`);
+
+  // Minimal schema for faster response
+  const itemSchema = {
+    type: "OBJECT",
+    properties: {
+      name: { type: "STRING" },
+      quantity: { type: "NUMBER" },
+      unit: { type: "STRING" },
+      confidence: { type: "NUMBER" },
+      notes: { type: "STRING" }
+    },
+    required: ["name", "quantity", "unit"]
+  };
+
+  const text = await callGeminiMultiImageApi({
+    prompt,
+    images,
+    config: {
+      temperature: 0,
+      topK: 1,
+      topP: 0.1,
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: "OBJECT",
+        properties: {
+          items: { type: "ARRAY", items: itemSchema },
+          scan_quality: { type: "STRING" }
+        }
+      }
+    }
+  });
+
+  if (text) {
+    try {
+      // Try optimized parser first
+      const result = validateAndParseScanResult(text);
+      if (result && result.items.length > 0) {
+        return result.items.map(item => ({
+          name: item.name,
+          quantityValue: item.quantity,
+          quantityUnit: item.unit,
+          confidence: item.confidence,
+          notes: item.notes
+        }));
+      }
+      // Fallback to direct parse
+      const parsed = JSON.parse(text);
+      return Array.isArray(parsed) ? parsed : (parsed.items || []);
+    } catch (e) {
+      console.error("Failed to parse multi-image JSON", e);
+      return [];
+    }
+  }
+  return [];
+};
+
+/**
  * FEATURE: Analyze Images (Receipts for Inventory & Costing)
  * ✅ OPTIMIZED: Uses selectPrompt for faster API response
  */

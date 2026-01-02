@@ -69,6 +69,8 @@ import { InventoryView } from './features/inventory/InventoryView';
 import { DesktopSidebar } from './components/layout/DesktopSidebar';
 import { MobileHeader } from './components/layout/MobileHeader';
 import { useBusinessHandlers } from './hooks/useBusinessHandlers';
+import WastageModal from './components/WastageModal';
+import { recordWastage } from './services/wastageService';
 
 const COLORS = ['#475569', '#64748B', '#94A3B8', '#CBD5E1', '#E2E8F0', '#F1F5F9'];
 
@@ -132,6 +134,9 @@ export default function App() {
 
   // Inventory Search State
   const [inventorySearchQuery, setInventorySearchQuery] = useState('');
+
+  // 🆕 Wastage Modal State
+  const [wastageItem, setWastageItem] = useState<InventoryItem | null>(null);
 
   // ✅ P1 優化：使用 useRef 避免 popstate 監聽器頻繁重新註冊
   const modalStatesRef = useRef({
@@ -844,6 +849,7 @@ export default function App() {
                 setEditingItem(null);
                 setIsEditModalOpen(true);
               }}
+              onWastage={setWastageItem}
             />
           )}
 
@@ -998,6 +1004,36 @@ export default function App() {
         onRename={renameMetaItem}
         onDelete={deleteMetaItem}
         onAdd={addMetaItem}
+      />
+
+      {/* 🆕 WASTAGE MODAL */}
+      <WastageModal
+        item={wastageItem}
+        onClose={() => setWastageItem(null)}
+        onConfirm={async (data) => {
+          if (!currentBusinessId || !wastageItem) return;
+
+          const result = await recordWastage({
+            businessId: currentBusinessId,
+            inventoryItemId: data.itemId,
+            itemName: wastageItem.name,
+            quantity: data.quantity,
+            unit: wastageItem.quantityUnit || 'pcs',
+            unitCost: wastageItem.unitCost || 0,
+            reason: data.reason,
+            notes: data.notes,
+            expiryDate: wastageItem.expiryDate,
+            category: wastageItem.category,
+            userId: user?.id,
+          });
+
+          if (result.success) {
+            await loadInventory(currentBusinessId);
+            setWastageItem(null);
+          } else {
+            throw new Error(result.error || 'Failed to record wastage');
+          }
+        }}
       />
 
     </div>

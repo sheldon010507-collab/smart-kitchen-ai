@@ -96,6 +96,32 @@ export interface InventoryState {
 }
 
 // ============================================================
+// WASTAGE TRACKING
+// ============================================================
+
+/** Wastage reason types */
+export type WastageReason = 'expired' | 'damaged' | 'spoiled' | 'preparation' | 'other';
+
+/** Wastage record - for tracking losses */
+export interface WastageRecord {
+  id: string;
+  businessId: string;
+  inventoryItemId?: string;
+  itemName: string;
+  quantity: number;
+  unit: string;
+  unitCost: number;
+  totalCost: number;
+  reason: WastageReason;
+  notes?: string;
+  expiryDate?: string;
+  daysPastExpiry?: number;
+  category?: string;
+  recordedBy?: string;
+  recordedAt: string;
+}
+
+// ============================================================
 // MENU MODULE (NEW - matches database)
 // ============================================================
 

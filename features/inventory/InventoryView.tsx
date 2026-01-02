@@ -24,6 +24,7 @@ interface InventoryViewProps {
     onOpenScanner: (mode: 'receipt' | 'fridge' | 'sales') => void;
     onOpenMetaManager: () => void;
     onAddItem: () => void;
+    onWastage?: (item: InventoryItem) => void;
 }
 
 export function InventoryView({
@@ -37,6 +38,7 @@ export function InventoryView({
     onOpenScanner,
     onOpenMetaManager,
     onAddItem,
+    onWastage,
 }: InventoryViewProps) {
 
     if (isMasterView) {
@@ -119,6 +121,7 @@ export function InventoryView({
                                 item={item}
                                 onRemove={onDeleteInventoryItem}
                                 onEdit={onEditInventoryItem}
+                                onWastage={onWastage}
                             />
                         </div>
                     ))}

@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { X, UploadCloud, Loader2, Wand2, Trash2, Camera, Plus, ShoppingCart, ChefHat, AlertTriangle, Minus } from "lucide-react";
 import type { InventoryItem, SalesReceipt } from "../types";
-import { analyzeInventoryImage, analyzePOSReceipt } from "../services/geminiService";
+import { analyzeInventoryImage, analyzePOSReceipt, analyzeMultiAngleImages, analyzeFridgeAudit } from "../services/geminiService";
+import { getSmartDictionary } from "../features/inventory-scan/services/dictionaryService";
+import type { DictionaryItem, FridgeAuditResult } from "../features/inventory-scan/types";
 import { preprocessImage } from "../features/inventory-scan/utils/imagePreprocessing";
 import { generateScanPrompt } from "../features/inventory-scan/services/promptTemplates";
 import { calculateRequirements, formatRequirements } from "../features/inventory-scan/utils/calculateRequirements";
@@ -148,7 +150,14 @@ const Scanner: React.FC<Props> = ({
   const [fridgePhotos, setFridgePhotos] = useState<Array<{ file: File; preview: string }>>([]);
   const [calculationResult, setCalculationResult] = useState<string | null>(null);
 
-  const dictionary = useMemo(() => uniq(inventoryNameOptions), [inventoryNameOptions]);
+  // 🆕 Fridge Audit state
+  const [dictionaryItems, setDictionaryItems] = useState<DictionaryItem[]>([]);
+  const [auditResult, setAuditResult] = useState<FridgeAuditResult | null>(null);
+  const [notSeenAction, setNotSeenAction] = useState<Record<string, 'keep' | 'zero'>>({});
+
+  const dictionary = useMemo(() => dictionaryItems.length > 0
+    ? dictionaryItems.map(d => d.name)
+    : uniq(inventoryNameOptions), [dictionaryItems, inventoryNameOptions]);
 
   useEffect(() => {
     // Cleanup old preview
@@ -285,35 +294,62 @@ const Scanner: React.FC<Props> = ({
         return;
       }
 
-      // Mode: Fridge - multi-photo with preprocessing
+      // Mode: Fridge - multi-photo with preprocessing + Fridge Audit
       const photosToProcess = fridgePhotos.length > 0 ? fridgePhotos : [{ file: file!, preview: previewUrl }];
 
-      // Preprocess all images (EXTREME compression for Vercel 10s limit)
-      const processedImages: string[] = [];
+      // 🆕 Load smart dictionary for matching
+      const businessId = (window as any).__currentBusinessId || '';
+      const loadedDict = await getSmartDictionary(businessId, 30);
+      setDictionaryItems(loadedDict);
+      console.log(`[Scanner] Loaded ${loadedDict.length} dictionary items`);
+
+      // Preprocess all images (optimized compression for multi-image scanning)
+      const processedImages: Array<{ base64: string; mimeType: string }> = [];
       for (const photo of photosToProcess) {
         const processed = await preprocessImage(photo.file, {
-          maxWidth: 800,       // Extreme: 1280→800
-          maxHeight: 600,      // Extreme: 720→600
-          targetSizeKB: 100,   // Extreme: 250→100 (Vercel timeout fix)
+          maxWidth: 800,       // Optimized for multi-image
+          maxHeight: 600,
+          targetSizeKB: 100,   // Each image ~100KB
           autoEnhance: true
         });
-        processedImages.push(processed.base64);
+        processedImages.push({
+          base64: processed.base64,
+          mimeType: 'image/jpeg'
+        });
       }
 
-      // Use first image for now (multi-image fusion requires API update)
-      // TODO: Update API to support multi-image
-      const rawItems = await analyzeInventoryImage(
-        processedImages[0],
-        'image/jpeg',
-        'fridge',
-        dictionary // Pass dictionary for RAG
-      );
+      console.log(`[Scanner] Fridge Audit: ${processedImages.length} images, ${loadedDict.length} known items`);
 
-      if (!rawItems || rawItems.length === 0) {
-        throw new Error("No items found. Please try a clearer photo.");
+      // 🆕 Use Fridge Audit API
+      const result = await analyzeFridgeAudit(processedImages, loadedDict);
+
+      if (!result) {
+        throw new Error("Failed to analyze images. Please try again.");
       }
 
-      setReviewItems(validateAndFlagItems(mapRawItems(rawItems)));
+      // Store audit result for UI
+      setAuditResult(result);
+      setNotSeenAction({}); // Reset actions
+
+      // Combine found + new items for review
+      const allItems = [
+        ...result.found.map(item => ({
+          ...item,
+          isMatchedFromDict: true,
+          dictItem: loadedDict.find(d => d.name === item.name),
+        })),
+        ...result.newItems.map(item => ({
+          ...item,
+          isMatchedFromDict: false,
+          is_new_item: true,
+        })),
+      ];
+
+      if (allItems.length === 0 && result.notFound.length === 0) {
+        throw new Error("No items found. Please try clearer photos from different angles.");
+      }
+
+      setReviewItems(validateAndFlagItems(mapRawItems(allItems as any)));
       setStep("review");
 
     } catch (e: any) {
@@ -384,6 +420,32 @@ const Scanner: React.FC<Props> = ({
           } as InventoryItem;
         });
 
+      // 🆕 Add zero-quantity items for "not seen" items marked as "zero"
+      const zeroItems: InventoryItem[] = [];
+      Object.entries(notSeenAction).forEach(([name, action]) => {
+        if (action === 'zero') {
+          const dictItem = dictionaryItems.find(d => d.name === name);
+          if (dictItem) {
+            zeroItems.push({
+              id: dictItem.id,
+              businessId: '',
+              name: dictItem.name,
+              quantity: `0 ${dictItem.unit}`,
+              quantityValue: 0,
+              quantityUnit: dictItem.unit,
+              unitCost: 0,
+              category: dictItem.category || '',
+              location: '',
+              expiryDate: '',
+              addedDate: new Date().toISOString().split('T')[0],
+            });
+          }
+        }
+      });
+
+      // Combine scanned items with zero items
+      const allUpdates = [...cleaned, ...zeroItems];
+
       // ✅ Save scan corrections (async, non-blocking)
       const imageUrls = fridgePhotos.map(p => p.preview);
       const originalItems = reviewItems
@@ -395,22 +457,23 @@ const Scanner: React.FC<Props> = ({
           unit: String((it as any).quantityUnit || 'pcs'),
           confidence: it.confidence || 0.6,
         }));
-      const correctedItems = cleaned.map(it => ({
+      const correctedItems = allUpdates.map(it => ({
         id: it.id,
         name: it.name,
-        quantity: normalizeNumber((it as any).quantityValue, 1),
+        quantity: normalizeNumber((it as any).quantityValue, 0),
         unit: String((it as any).quantityUnit || 'pcs'),
         confidence: 1.0,
       }));
       saveScanCorrection(
-        cleaned[0]?.businessId || '',
+        allUpdates[0]?.businessId || '',
         imageUrls,
         originalItems,
         correctedItems,
         'fridge'
       ).catch(err => console.warn('[ScanCorrection] Save failed:', err));
 
-      onItemsFound(cleaned);
+      console.log(`[Scanner] Fridge confirm: ${cleaned.length} scanned, ${zeroItems.length} zeroed`);
+      onItemsFound(allUpdates);
       onClose();
       return;
     }
@@ -844,6 +907,48 @@ const Scanner: React.FC<Props> = ({
                                 <Trash2 className="w-4 h-4" />
                               </button>
                             </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* 🆕 Not Found Items (Fridge Audit) */}
+                  {mode === "fridge" && auditResult && auditResult.notFound.length > 0 && (
+                    <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-xl">
+                      <div className="flex items-center gap-2 mb-3">
+                        <AlertTriangle className="w-5 h-5 text-yellow-600" />
+                        <h4 className="font-bold text-yellow-800">
+                          未掃描到 ({auditResult.notFound.length})
+                        </h4>
+                      </div>
+                      <p className="text-xs text-yellow-700 mb-3">
+                        這些物品在系統中有記錄，但本次掃描未發現。請選擇處理方式：
+                      </p>
+                      {auditResult.notFound.map((name, idx) => {
+                        const dictItem = dictionaryItems.find(d => d.name === name);
+                        return (
+                          <div
+                            key={idx}
+                            className="flex justify-between items-center py-2 border-b border-yellow-200 last:border-0"
+                          >
+                            <div>
+                              <span className="font-medium">{name}</span>
+                              <span className="text-xs text-yellow-600 ml-2">
+                                當前: {dictItem?.currentQty || 0} {dictItem?.unit}
+                              </span>
+                            </div>
+                            <select
+                              value={notSeenAction[name] || 'keep'}
+                              onChange={(e) => setNotSeenAction({
+                                ...notSeenAction,
+                                [name]: e.target.value as 'keep' | 'zero'
+                              })}
+                              className="text-sm border border-yellow-300 rounded px-2 py-1 bg-white"
+                            >
+                              <option value="keep">保持不變</option>
+                              <option value="zero">歸零 (用完了)</option>
+                            </select>
                           </div>
                         );
                       })}
