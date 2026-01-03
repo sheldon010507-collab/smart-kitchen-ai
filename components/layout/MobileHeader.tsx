@@ -15,6 +15,7 @@ import {
     Check,
     Plus,
     LayoutDashboard,
+    Sparkles,
 } from 'lucide-react';
 import { User, Business, Staff } from '../../types';
 
@@ -29,6 +30,7 @@ interface MobileHeaderProps {
     onSwitchBusiness: (bizId: string | null) => void;
     onOpenJoinStore: () => void;
     onLogout: () => void;
+    onUpgrade: () => void;
 }
 
 export function MobileHeader({
@@ -42,6 +44,7 @@ export function MobileHeader({
     onSwitchBusiness,
     onOpenJoinStore,
     onLogout,
+    onUpgrade,
 }: MobileHeaderProps) {
 
     return (
@@ -130,7 +133,15 @@ export function MobileHeader({
                     )}
                 </div>
 
-                {/* Action Buttons */}
+                {/* Upgrade Button */}
+                <button
+                    onClick={onUpgrade}
+                    className="w-9 h-9 flex items-center justify-center rounded-lg bg-gradient-to-br from-amber-100 to-amber-200 text-amber-700 active:scale-95 transition-all"
+                >
+                    <Sparkles className="w-4 h-4" />
+                </button>
+
+                {/* Logout Button */}
                 <button
                     onClick={onLogout}
                     className="w-9 h-9 flex items-center justify-center rounded-lg bg-gray-100 active:bg-gray-200 transition-colors"

@@ -18,6 +18,7 @@ import {
     Check,
     Shield,
     ShoppingCart,
+    Sparkles, // Added for Subscription
 } from 'lucide-react';
 import { ViewState, User, Business, Staff } from '../../types';
 import { FEATURE_SHOPPING_LIST_ENABLED } from '../../features/shopping-list';
@@ -199,6 +200,19 @@ export function DesktopSidebar({
 
             {/* Sidebar Footer */}
             <div className="p-6 mt-auto border-t border-border bg-background/50">
+                {/* Upgrade Button - Highlighted */}
+                <button
+                    onClick={() => setView(ViewState.SUBSCRIPTION)}
+                    className={`w-full flex items-center space-x-3 px-4 py-3 mb-4 rounded-xl transition-all group relative overflow-hidden ${view === ViewState.SUBSCRIPTION
+                            ? 'bg-gradient-to-r from-primary to-slate-800 text-white shadow-md'
+                            : 'bg-white border border-primary/20 text-primary hover:shadow-md'
+                        }`}
+                >
+                    <div className={`absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity ${view === ViewState.SUBSCRIPTION ? 'hidden' : ''}`} />
+                    <Sparkles className="w-5 h-5" />
+                    <span className="font-bold">Upgrade Plan</span>
+                </button>
+
                 <button
                     onClick={onLogout}
                     className="w-full flex items-center space-x-3 px-4 py-2.5 text-secondary hover:text-primary rounded-lg transition-colors text-sm font-medium hover:bg-white mb-2"

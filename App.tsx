@@ -47,6 +47,7 @@ import StaffInventoryOverview from './components/StaffInventoryOverview';
 import SupabaseLogin from './components/SupabaseLogin';
 import { EditableTitle } from './components/EditableTitle';
 import { ShoppingListView, ShoppingListSummary, FEATURE_SHOPPING_LIST_ENABLED, useShoppingListSummary } from './features/shopping-list';
+import { SubscriptionView } from './components/SubscriptionView'; // Added import
 // ✅ 注意：StaffCalendar 应该在 RestaurantDashboard 内部使用，不在这里导入
 import { supabase } from './lib/supabase';
 import { useInventoryContext } from './lib/InventoryContext';
@@ -735,6 +736,7 @@ export default function App() {
           onSwitchBusiness={handleSwitchBusiness}
           onOpenJoinStore={() => setIsJoinStoreModalOpen(true)}
           onLogout={handleLogout}
+          onUpgrade={() => setView(ViewState.SUBSCRIPTION)}
         />
 
         <div className="p-4 md:p-16 max-w-6xl mx-auto min-h-screen">
@@ -941,6 +943,11 @@ export default function App() {
 
           {/* PRIVACY VIEW */}
           {view === ViewState.PRIVACY && <PrivacyPolicyPage />}
+
+          {/* SUBSCRIPTION VIEW */}
+          {view === ViewState.SUBSCRIPTION && (
+            <SubscriptionView user={user} activeBusiness={activeBusiness} />
+          )}
         </div>
       </main>
 
