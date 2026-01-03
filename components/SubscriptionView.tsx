@@ -2,6 +2,12 @@ import React, { useState } from 'react';
 import { plans, PlanCard } from '../data/plans';
 import { Check, Loader2, CreditCard, Sparkles } from 'lucide-react';
 import { User, Business } from '../types';
+import { supabase } from '../lib/supabase';
+import { loadStripe } from '@stripe/stripe-js';
+
+// Initialize Stripe (Lazy load)
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || 'pk_test_TYooMQauvdEDq54NiTphI7jx');
+
 
 interface SubscriptionViewProps {
     user: User;
@@ -24,16 +30,49 @@ export function SubscriptionView({ user, activeBusiness }: SubscriptionViewProps
 
         setLoadingPlan(plan.id);
 
-        // Simulate API delay
-        setTimeout(() => {
-            // Here we would create a Stripe Checkout session
-            const confirm = window.confirm(`Proceed to payment for ${plan.name} plan? (£${plan.price})`);
-            if (confirm) {
-                alert('Redirecting to Stripe Checkout...');
-                // window.location.href = checkoutUrl;
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+
+            // 1. Create Checkout Session via API
+            const response = await fetch('/api/create-checkout-session', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session?.access_token}`
+                },
+                body: JSON.stringify({
+                    planId: plan.id,
+                    // customerEmail: user.email // Optional, API can get it from token if needed, but safer to send
+                    customerEmail: user.email
+                })
+            });
+
+            const { sessionId, url, error } = await response.json();
+
+            if (error) {
+                console.error('Checkout error:', error);
+                alert('Checkout failed: ' + error);
+                setLoadingPlan(null);
+                return;
             }
+
+            // 2. Redirect to Stripe
+            if (url) {
+                window.location.href = url; // Preferred for Vercel/Stripe integration
+            } else if (sessionId) {
+                const stripe = await stripePromise;
+                const { error: stripeError } = await (stripe as any).redirectToCheckout({ sessionId });
+                if (stripeError) {
+                    alert(stripeError.message);
+                }
+            }
+
+        } catch (err) {
+            console.error(err);
+            alert('Failed to connect to payment service.');
+        } finally {
             setLoadingPlan(null);
-        }, 800);
+        }
     };
 
     return (
@@ -55,8 +94,8 @@ export function SubscriptionView({ user, activeBusiness }: SubscriptionViewProps
 
                     return (
                         <div key={plan.id} className={`relative bg-white rounded-2xl p-8 border-2 transition-all duration-300 ${plan.highlighted
-                                ? 'border-primary shadow-xl scale-105 z-10'
-                                : 'border-gray-100 hover:border-gray-200 hover:shadow-md'
+                            ? 'border-primary shadow-xl scale-105 z-10'
+                            : 'border-gray-100 hover:border-gray-200 hover:shadow-md'
                             }`}>
                             {plan.badge && (
                                 <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-primary text-white px-4 py-1 rounded-full text-xs font-bold tracking-wide shadow-lg">
@@ -87,10 +126,10 @@ export function SubscriptionView({ user, activeBusiness }: SubscriptionViewProps
                                 onClick={() => handleSelect(plan)}
                                 disabled={isCurrent || isLoading}
                                 className={`w-full py-3.5 px-4 rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${isCurrent
-                                        ? 'bg-gray-100 text-gray-400 cursor-default'
-                                        : plan.highlighted
-                                            ? 'bg-primary text-white hover:bg-black shadow-lg shadow-primary/20 hover:shadow-xl hover:-translate-y-0.5'
-                                            : 'bg-white text-gray-900 border-2 border-gray-100 hover:border-gray-900 hover:bg-gray-50'
+                                    ? 'bg-gray-100 text-gray-400 cursor-default'
+                                    : plan.highlighted
+                                        ? 'bg-primary text-white hover:bg-black shadow-lg shadow-primary/20 hover:shadow-xl hover:-translate-y-0.5'
+                                        : 'bg-white text-gray-900 border-2 border-gray-100 hover:border-gray-900 hover:bg-gray-50'
                                     }`}
                             >
                                 {isLoading ? (
