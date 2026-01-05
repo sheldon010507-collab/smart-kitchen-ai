@@ -638,6 +638,18 @@ export default function App() {
 
             setUser(nextUser);
             setCurrentBusinessId(null); // manager 进 master view
+
+            // ✅ 處理 URL 中的 plan 參數（來自 Landing Page 重導向）
+            const urlParams = new URLSearchParams(window.location.search);
+            const targetPlan = urlParams.get('plan') || sessionStorage.getItem('target_plan');
+            if (targetPlan && targetPlan !== 'free') {
+              sessionStorage.removeItem('target_plan');
+              // 清理 URL 參數
+              window.history.replaceState({}, '', window.location.pathname);
+              setView(ViewState.SUBSCRIPTION);
+              return;
+            }
+
             setView(ViewState.DASHBOARD);
             return;
           }
@@ -693,13 +705,34 @@ export default function App() {
 
             setUser(nextUser);
             setCurrentBusinessId(null); // staff 先不自动进店（Pending 会被拦）
+
+            // ✅ 處理 URL 中的 plan 參數（來自 Landing Page 重導向）
+            const urlParams = new URLSearchParams(window.location.search);
+            const targetPlan = urlParams.get('plan') || sessionStorage.getItem('target_plan');
+            if (targetPlan && targetPlan !== 'free') {
+              sessionStorage.removeItem('target_plan');
+              window.history.replaceState({}, '', window.location.pathname);
+              setView(ViewState.SUBSCRIPTION);
+              return;
+            }
+
             setView(ViewState.DASHBOARD);
             return;
           }
 
           setUser(nextUser);
           setCurrentBusinessId(null);
-          setView(ViewState.DASHBOARD);
+
+          // ✅ 處理 URL 中的 plan 參數（通用 fallback）
+          const urlParams = new URLSearchParams(window.location.search);
+          const targetPlan = urlParams.get('plan') || sessionStorage.getItem('target_plan');
+          if (targetPlan && targetPlan !== 'free') {
+            sessionStorage.removeItem('target_plan');
+            window.history.replaceState({}, '', window.location.pathname);
+            setView(ViewState.SUBSCRIPTION);
+          } else {
+            setView(ViewState.DASHBOARD);
+          }
         }}
       />
     );
