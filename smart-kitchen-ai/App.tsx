@@ -1254,24 +1254,24 @@ export default function App() {
                 </div>
 
                 {user.role === 'Manager' && (
-                  <div className="flex space-x-4">
+                  <div className="flex space-x-4 overflow-x-auto pb-4 -mx-4 px-4 scrollbar-hide">
                     <button
                       onClick={() => setIsSetupWizardOpen(true)}
-                      className="flex items-center px-6 py-3 bg-purple-600 text-white rounded-lg shadow-sm hover:bg-purple-700 text-sm font-semibold transition-colors"
+                      className="flex-shrink-0 flex items-center px-6 py-3 bg-purple-600 text-white rounded-lg shadow-sm hover:bg-purple-700 text-sm font-semibold transition-colors whitespace-nowrap"
                     >
                       <Plus className="w-5 h-5 mr-2" />
                       Setup Inventory
                     </button>
                     <button
                       onClick={() => openScanner('receipt')}
-                      className="flex items-center px-6 py-3 bg-white text-primary border border-border rounded-lg shadow-sm hover:bg-background text-sm font-semibold transition-colors"
+                      className="flex-shrink-0 flex items-center px-6 py-3 bg-white text-primary border border-border rounded-lg shadow-sm hover:bg-background text-sm font-semibold transition-colors whitespace-nowrap"
                     >
                       <ScanLine className="w-5 h-5 mr-2" />
                       Scan Invoice
                     </button>
                     <button
                       onClick={() => openScanner('fridge')}
-                      className="flex items-center px-6 py-3 bg-accent text-white rounded-lg shadow-sm hover:bg-accentHover text-sm font-semibold transition-colors"
+                      className="flex-shrink-0 flex items-center px-6 py-3 bg-accent text-white rounded-lg shadow-sm hover:bg-accentHover text-sm font-semibold transition-colors whitespace-nowrap"
                     >
                       <ScanLine className="w-5 h-5 mr-2" />
                       Scan Fridge
@@ -1418,12 +1418,12 @@ export default function App() {
                     </h2>
                     <p className="text-secondary mt-3 text-lg font-light">Manage ingredients and stock for {activeBusiness?.name}</p>
                   </div>
-                  <div className="flex space-x-3">
+                  <div className="flex space-x-4 overflow-x-auto pb-2 -mx-4 px-4 md:pb-0 md:mx-0 md:px-0 scrollbar-hide">
                     <button
                       onClick={() => openScanner('receipt')}
-                      className="flex items-center px-6 py-3 bg-white text-primary border border-border rounded-lg shadow-sm text-sm font-semibold hover:bg-background transition-colors"
+                      className="flex-shrink-0 flex items-center px-4 py-2 bg-white border border-border rounded-lg shadow-sm text-sm font-medium hover:bg-background whitespace-nowrap"
                     >
-                      <ScanLine className="w-5 h-5 mr-2" /> Scan
+                      <ScanLine className="w-4 h-4 mr-2" /> Scan
                     </button>
                     <button
                       onClick={() => {
@@ -1431,17 +1431,16 @@ export default function App() {
                         setMetaNewValue('');
                         setIsMetaManagerOpen(true);
                       }}
-                      className="flex items-center px-6 py-3 bg-white text-primary border border-border rounded-lg shadow-sm text-sm font-semibold hover:bg-background transition-colors"
+                      className="flex-shrink-0 flex items-center px-4 py-2 bg-white border border-border rounded-lg shadow-sm text-sm font-medium hover:bg-background whitespace-nowrap"
                     >
-                      <Edit className="w-5 h-5 mr-2" />
-                      Manage
+                      <Edit className="w-4 h-4 mr-2" /> Manage
                     </button>
                     <button
                       onClick={() => {
                         setEditingItem(null);
                         setIsEditModalOpen(true);
                       }}
-                      className="flex items-center px-6 py-3 bg-accent text-white rounded-lg shadow-sm text-sm font-semibold hover:bg-accentHover"
+                      className="flex-shrink-0 flex items-center px-6 py-3 bg-accent text-white rounded-lg shadow-sm text-sm font-semibold hover:bg-accentHover whitespace-nowrap"
                     >
                       <Plus className="w-5 h-5 mr-2" /> Add Item
                     </button>

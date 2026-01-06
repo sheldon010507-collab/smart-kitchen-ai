@@ -156,14 +156,13 @@ const RestaurantDashboard: React.FC<Props> = ({
       {/* Header with Tabs */}
       <div className="border-b border-border">
         <h2 className="text-4xl font-bold text-primary mb-8 tracking-tight">Operations</h2>
-        <div className="flex space-x-8 pb-px overflow-x-auto">
+        <div className="flex space-x-8 pb-2 overflow-x-auto -mx-8 px-8 scrollbar-hide">
           {['overview', 'sales', 'staff', 'menu', 'insights'].map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab as any)}
-              className={`pb-4 text-sm font-bold uppercase tracking-wider transition-colors border-b-2 ${
-                activeTab === tab ? 'border-primary text-primary' : 'border-transparent text-secondary hover:text-primary'
-              }`}
+              className={`pb-4 text-sm font-bold uppercase tracking-wider transition-colors border-b-2 ${activeTab === tab ? 'border-primary text-primary' : 'border-transparent text-secondary hover:text-primary'
+                }`}
             >
               {tab}
             </button>
