@@ -24,71 +24,106 @@ export const fileToGenerativePart = async (file: File): Promise<string> => {
  * FEATURE: Analyze Images (Receipts for Inventory & Costing)
  * Model: gemini-3-pro-preview
  */
+// Helper - check if we have a local key (Dev mode)
+const getLocalKey = () => process.env.VITE_GEMINI_API_KEY || (import.meta as any).env.VITE_GEMINI_API_KEY || '';
+
+/**
+ * FEATURE: Analyze Images (Receipts for Inventory & Costing)
+ * Model: gemini-3-pro-preview
+ * Updated: Hybrid Model (Local Key -> Direct, No Key -> Serverless Proxy)
+ */
 export const analyzeInventoryImage = async (
-  base64Image: string, 
-  mimeType: string, 
+  base64Image: string,
+  mimeType: string,
   mode: 'receipt' | 'fridge'
 ): Promise<Partial<InventoryItem>[]> => {
-  
-  const today = new Date().toISOString().split('T')[0];
-  
-  // Prompt optimized for Supplier Invoices (Butcher/Wholesale) and POS Receipts
-  const prompt = mode === 'receipt' 
-    ? `Analyze this image. It could be a standard POS receipt OR a Supplier Invoice (e.g. butcher, wholesale). 
-       Extract all food/inventory items.
-       For each line item:
-       1. Identify the Name (e.g. 'Brisket Beef', '5Lb pack bacon').
-       2. Extract Quantity and Unit (e.g. '3.61 kg', '500 g', '2 packs'). 
-          - If the line has 'Packs' and 'Weight', prefer the Weight for quantity if it matches the pricing unit.
-       3. Calculate the Unit Cost (Cost per 1 unit of the Quantity).
-          - Look for a 'Price Per' column (e.g. £11.70/kg).
-          - OR Calculate: Line Total / Quantity (e.g. £42.24 / 3.61kg = 11.70).
-       4. Categorize it (Produce, Dairy, Meat, Pantry, etc).
-       5. Estimate a typical expiry date starting from today (${today}).
-       Return a JSON array.`
-    : `Analyze this photo of a fridge/pantry. Identify all visible food items. Estimate quantity if possible. For each item, estimate a reasonable expiry date from today (${today}). Return a JSON array.`;
 
-  const itemSchema: Schema = {
-    type: Type.OBJECT,
-    properties: {
-      name: { type: Type.STRING, description: "Standardized ingredient name" },
-      quantity: { type: Type.STRING, description: "Amount with unit (e.g. 2 kg, 500g)" },
-      quantityValue: { type: Type.NUMBER, description: "Numeric amount (e.g. 2)" },
-      quantityUnit: { type: Type.STRING, description: "Unit code (e.g. kg, g, L, ml, pcs)" },
-      unitCost: { type: Type.NUMBER, description: "Cost per 1 unit of quantityUnit" },
-      category: { type: Type.STRING, enum: ['Produce', 'Dairy', 'Meat', 'Pantry', 'Frozen', 'Beverage', 'Other'] },
-      location: { type: Type.STRING, enum: ['Fridge', 'Freezer', 'Pantry', 'Walk-in'], description: "Default storage location" },
-      expiryDate: { type: Type.STRING, description: "YYYY-MM-DD format" }
-    },
-    required: ["name", "category", "location", "expiryDate"]
-  };
+  const localKey = getLocalKey();
 
-  const response = await ai.models.generateContent({
-    model: 'gemini-3-pro-preview',
-    contents: {
-      parts: [
-        { inlineData: { mimeType, data: base64Image } },
-        { text: prompt }
-      ]
-    },
-    config: {
-      responseMimeType: 'application/json',
-      responseSchema: {
-        type: Type.ARRAY,
-        items: itemSchema
+  // --- 1. LOCAL DEV MODE (Direct Call) ---
+  if (localKey) {
+    console.log("Using Local Gemini Key (Direct Mode)");
+    const ai = new GoogleGenAI({ apiKey: localKey });
+    const today = new Date().toISOString().split('T')[0];
+
+    const prompt = mode === 'receipt'
+      ? `Analyze this image. It could be a standard POS receipt OR a Supplier Invoice (e.g. butcher, wholesale). 
+         Extract all food/inventory items.
+         For each line item:
+         1. Identify the Name (e.g. 'Brisket Beef', '5Lb pack bacon').
+         2. Extract Quantity and Unit (e.g. '3.61 kg', '500 g', '2 packs'). 
+            - If the line has 'Packs' and 'Weight', prefer the Weight for quantity if it matches the pricing unit.
+         3. Calculate the Unit Cost (Cost per 1 unit of the Quantity).
+            - Look for a 'Price Per' column (e.g. £11.70/kg).
+            - OR Calculate: Line Total / Quantity (e.g. £42.24 / 3.61kg = 11.70).
+         4. Categorize it (Produce, Dairy, Meat, Pantry, etc).
+         5. Estimate a typical expiry date starting from today (${today}).
+         Return a JSON array.`
+      : `Analyze this photo of a fridge/pantry. Identify all visible food items. Estimate quantity if possible. For each item, estimate a reasonable expiry date from today (${today}). Return a JSON array.`;
+
+    const itemSchema: Schema = {
+      type: Type.OBJECT,
+      properties: {
+        name: { type: Type.STRING, description: "Standardized ingredient name" },
+        quantity: { type: Type.STRING, description: "Amount with unit (e.g. 2 kg, 500g)" },
+        quantityValue: { type: Type.NUMBER, description: "Numeric amount (e.g. 2)" },
+        quantityUnit: { type: Type.STRING, description: "Unit code (e.g. kg, g, L, ml, pcs)" },
+        unitCost: { type: Type.NUMBER, description: "Cost per 1 unit of quantityUnit" },
+        category: { type: Type.STRING, enum: ['Produce', 'Dairy', 'Meat', 'Pantry', 'Frozen', 'Beverage', 'Other'] },
+        location: { type: Type.STRING, enum: ['Fridge', 'Freezer', 'Pantry', 'Walk-in'], description: "Default storage location" },
+        expiryDate: { type: Type.STRING, description: "YYYY-MM-DD format" }
+      },
+      required: ["name", "category", "location", "expiryDate"]
+    };
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: {
+        parts: [
+          { inlineData: { mimeType, data: base64Image } },
+          { text: prompt }
+        ]
+      },
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.ARRAY,
+          items: itemSchema
+        }
+      }
+    });
+
+    if (response.text) {
+      try {
+        return JSON.parse(response.text);
+      } catch (e) {
+        console.error("Failed to parse JSON", e);
+        return [];
       }
     }
-  });
-
-  if (response.text) {
-    try {
-      return JSON.parse(response.text);
-    } catch (e) {
-      console.error("Failed to parse JSON", e);
-      return [];
-    }
+    return [];
   }
-  return [];
+
+  // --- 2. PRODUCTION MODE (Serverless Proxy) ---
+  console.log("No Local Key found - Switching to Serverless Proxy");
+  try {
+    const res = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        image: base64Image,
+        mimeType,
+        mode
+      })
+    });
+
+    if (!res.ok) throw new Error(await res.text());
+
+    return await res.json();
+  } catch (e) {
+    console.error("Serverless AI Error:", e);
+    return [];
+  }
 };
 
 /**
@@ -126,7 +161,7 @@ export const analyzePOSReceipt = async (base64Image: string, mimeType: string): 
   };
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3-pro-preview',
+    model: 'gemini-3-flash-preview',
     contents: {
       parts: [
         { inlineData: { mimeType, data: base64Image } },
@@ -177,7 +212,7 @@ export const analyzeMenuPhoto = async (base64Image: string, mimeType: string): P
   };
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3-pro-preview',
+    model: 'gemini-3-flash-preview',
     contents: {
       parts: [
         { inlineData: { mimeType, data: base64Image } },
@@ -233,7 +268,7 @@ export const estimateMenuCosts = async (menuItems: string[]): Promise<MenuItem[]
   };
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3-pro-preview',
+    model: 'gemini-3-flash-preview',
     contents: prompt,
     config: {
       responseMimeType: 'application/json',
@@ -260,18 +295,18 @@ export const estimateMenuCosts = async (menuItems: string[]): Promise<MenuItem[]
 export const generateThinkingChefRecipes = async (inventory: InventoryItem[], menuItems: MenuItem[] = []): Promise<Recipe[]> => {
   // Sort by expiring soon to help the AI context
   const sortedInventory = [...inventory].sort((a, b) => new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime());
-  
+
   // Create a descriptive list for the AI
   const inventoryList = sortedInventory.map(i => {
-      const daysLeft = Math.ceil((new Date(i.expiryDate).getTime() - Date.now()) / (1000 * 3600 * 24));
-      return `- ${i.quantity} ${i.name} (${daysLeft} days left)`;
+    const daysLeft = Math.ceil((new Date(i.expiryDate).getTime() - Date.now()) / (1000 * 3600 * 24));
+    return `- ${i.quantity} ${i.name} (${daysLeft} days left)`;
   }).join('\n');
 
   // Build existing menu context for style learning
   let menuStyleContext = "";
   if (menuItems.length > 0) {
-      const menuList = menuItems.map(m => `- ${m.name} (${m.category})${m.description ? `: ${m.description}` : ''}`).join('\n');
-      menuStyleContext = `
+    const menuList = menuItems.map(m => `- ${m.name} (${m.category})${m.description ? `: ${m.description}` : ''}`).join('\n');
+    menuStyleContext = `
       
       === CONTEXT: EXISTING MENU STYLE ===
       The restaurant currently serves the following dishes. Analyze them to understand the "House Style" (cuisine, naming conventions, complexity, flavor profiles):
@@ -322,7 +357,7 @@ export const generateThinkingChefRecipes = async (inventory: InventoryItem[], me
   };
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3-pro-preview',
+    model: 'gemini-3-flash-preview',
     contents: prompt,
     config: {
       responseMimeType: 'application/json',
@@ -348,7 +383,7 @@ export const generateThinkingChefRecipes = async (inventory: InventoryItem[], me
  */
 export const getQuickKitchenTip = async (query: string): Promise<string> => {
   const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash-lite',
+    model: 'gemini-3-flash-preview',
     contents: `Give me a one-sentence kitchen hack about: ${query}.`,
   });
   return response.text || "Keep your knives sharp!";
@@ -358,13 +393,13 @@ export const getQuickKitchenTip = async (query: string): Promise<string> => {
  * FEATURE: Operational Insights
  */
 export const generateOperationalInsights = async (
-  sales: SalesReceipt[], 
+  sales: SalesReceipt[],
   shifts: Shift[],
   menu: MenuItem[]
 ): Promise<string> => {
   const totalRevenue = sales.reduce((acc, s) => acc + s.totalAmount, 0);
   const totalLabor = shifts.reduce((acc, s) => acc + s.totalCost, 0);
-  
+
   const dataSummary = `
     Total Revenue: $${totalRevenue}
     Total Labor Cost: $${totalLabor}
@@ -377,7 +412,7 @@ export const generateOperationalInsights = async (
   `;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3-pro-preview',
+    model: 'gemini-3-flash-preview',
     contents: prompt,
   });
 

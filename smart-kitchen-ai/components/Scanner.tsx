@@ -22,6 +22,13 @@ interface Props {
 
 function getEnvApiKey() {
   const env = (import.meta as any).env ?? {};
+
+  // Try process.env first (for Vercel/Vite define replacement), then import.meta.env
+  // @ts-ignore
+  if (typeof process !== 'undefined' && process.env && process.env.GEMINI_API_KEY) return process.env.GEMINI_API_KEY;
+  // @ts-ignore
+  if (typeof process !== 'undefined' && process.env && process.env.API_KEY) return process.env.API_KEY;
+
   return (
     env.VITE_GEMINI_API_KEY ||
     env.VITE_GOOGLE_API_KEY ||
