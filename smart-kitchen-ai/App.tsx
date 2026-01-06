@@ -1093,7 +1093,7 @@ export default function App() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 md:ml-72 pb-24 md:pb-12 bg-white min-h-screen md:rounded-tl-2xl md:border-l md:border-border overflow-hidden relative">
+      <main className="flex-1 md:ml-72 pb-32 md:pb-12 bg-white min-h-screen md:rounded-tl-2xl md:border-l md:border-border overflow-hidden relative">
         {/* Mobile Header */}
         <div className="md:hidden bg-white border-b border-border p-4 flex justify-between items-center sticky top-0 z-20">
           <h1 className="font-bold text-primary">SmartKitchen</h1>
