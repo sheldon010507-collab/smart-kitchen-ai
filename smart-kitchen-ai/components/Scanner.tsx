@@ -447,12 +447,6 @@ const Scanner: React.FC<Props> = ({
       return;
     }
 
-    const apiKey = getEnvApiKey();
-    if (!apiKey) {
-      setError("Missing API key. Put VITE_GEMINI_API_KEY in your .env and restart dev server.");
-      return;
-    }
-
     setAnalyzing(true);
     setError("");
     setRawOutput("");
@@ -460,158 +454,72 @@ const Scanner: React.FC<Props> = ({
     try {
       const { base64, mime } = await fileToBase64(file);
 
-      // ✅ 选择模型
-      let model = getEnvModel();
-      if (!model) {
-        try {
-          const available = await listModels(apiKey);
-          console.log("[Available models]:", available);
-          model = pickPreferredModel(available);
-        } catch (e) {
-          console.warn("[listModels failed]:", e);
+      // Call service - let it handle Local vs Serverless logic
+      const modeArg = mode === 'sales' ? 'receipt' : mode as 'receipt' | 'fridge';
+
+      // Handle Sales separately if needed by service, or post-process
+      // Current service supports 'receipt' and 'fridge'. Sales is a type of receipt analysis.
+      // If mode is sales, we might need a specific call or just treat as receipt for now.
+      // Looking at service, analyzePOSReceipt is separate.
+
+      let data: any;
+
+      if (mode === 'sales') {
+        const { analyzePOSReceipt } = await import('../services/geminiService');
+        data = await analyzePOSReceipt(base64, mime);
+      } else {
+        const { analyzeInventoryImage } = await import('../services/geminiService');
+        // analyzeInventoryImage returns an array of items directly
+        data = await analyzeInventoryImage(base64, mime, modeArg);
+      }
+
+      if (!data) throw new Error("No data returned from AI.");
+
+      // If Sales Mode
+      if (mode === 'sales') {
+        if (!data.totalAmount && !data.items) {
+          throw new Error("Failed to extract sales data.");
         }
-      }
-
-      // ✅ 使用更稳定的模型列表
-      const modelsToTry = uniq([
-        model,
-        "gemini-1.5-flash",
-        "gemini-1.5-pro",
-        "gemini-2.0-flash-exp",
-        "gemini-pro-vision",
-      ]).filter(Boolean);
-
-      console.log("[Models to try]:", modelsToTry);
-
-      const prompt = buildPrompt(mode, dictionary);
-
-      let outText = "";
-      let lastErr: any = null;
-      let usedModel = "";
-
-      for (const m of modelsToTry) {
-        try {
-          console.log(`[Trying model]: ${m}`);
-          outText = await generateContentVision({ apiKey, model: m, prompt, mime, base64 });
-          if (outText) {
-            usedModel = m;
-            break;
-          }
-        } catch (e: any) {
-          lastErr = e;
-          console.warn(`[Model ${m} failed]:`, e?.message);
-          const msg = String(e?.message || "");
-          if (msg.includes("(404)") || msg.includes("NOT_FOUND") || msg.includes("not found")) {
-            continue;
-          }
-          // 其他错误也继续尝试下一个模型
-          continue;
-        }
-      }
-
-      if (!outText) {
-        throw lastErr || new Error("No output from Gemini. All models failed.");
-      }
-
-      console.log(`[Success with model]: ${usedModel}`);
-      setRawOutput(outText); // 保存原始输出
-
-      // ✅ 使用更健壮的 JSON 提取
-      const jsonText = sanitizeJson(extractJsonFromText(outText));
-      console.log("[Extracted JSON]:", jsonText.slice(0, 500));
-
-      if (!jsonText) {
-        throw new Error(`Gemini returned non-JSON output. Raw: ${outText.slice(0, 200)}...`);
-      }
-
-      let parsed: any;
-      try {
-        parsed = JSON.parse(jsonText);
-      } catch (parseErr) {
-        console.error("[JSON parse error]:", parseErr);
-        console.error("[Raw text]:", outText);
-        console.error("[Extracted text]:", jsonText);
-        throw new Error(`JSON parse failed. Check console for details. Raw output: ${outText.slice(0, 100)}...`);
-      }
-
-      if (mode === "sales") {
-        const items = Array.isArray(parsed?.items) ? parsed.items : Array.isArray(parsed) ? parsed : [];
-        const receipt: SalesReceipt = {
-          id: (crypto as any)?.randomUUID?.() ?? String(Date.now()),
-          date: parsed?.date || "",
-          time: parsed?.time || "",
-          items: items.map((x: any) => ({
-            name: String(x?.name || ""),
-            quantity: normalizeNumber(x?.quantity, 1),
-            price: normalizeNumber(x?.price, 0),
-          })),
-          totalAmount: normalizeNumber(parsed?.total_amount, 0),
-        } as any;
-
-        setSalesDraft(receipt);
+        setSalesDraft(data as SalesReceipt);
         setStep("review");
         return;
       }
 
-      // ✅ 处理可能的不同响应格式
-      let rawItems: any[] = [];
-      if (Array.isArray(parsed?.items)) {
-        rawItems = parsed.items;
-      } else if (Array.isArray(parsed?.found_items)) {
-        rawItems = parsed.found_items;
-      } else if (Array.isArray(parsed)) {
-        rawItems = parsed;
-      }
+      // If Inventory/Fridge Mode (expecting array)
+      const rawItems = Array.isArray(data) ? data : [];
 
       if (rawItems.length === 0) {
-        setError("No items found in the image. Please try with a clearer photo.");
-        return;
+        throw new Error("No items identified. Please try a clearer image.");
       }
 
-      const mapped: ReviewItem[] = rawItems.map((x: any, idx: number) => {
-        const qv = normalizeNumber(x?.quantity_value ?? x?.quantity ?? 1, 1);
-        const qu = String(x?.quantity_unit ?? x?.unit ?? "pcs");
-        const unitCost = normalizeNumber(x?.unit_cost ?? x?.unitPrice ?? 0, 0);
+      const mapped = rawItems.map((x: any, idx: number) => {
+        const qv = normalizeNumber(x?.quantityValue ?? x?.quantity_value ?? 1, 1);
+        const qu = String(x?.quantityUnit ?? x?.quantity_unit ?? "pcs");
+        const unitCost = normalizeNumber(x?.unitCost ?? x?.unit_cost ?? 0, 0);
 
-        const totalPrice =
-          normalizeNumber(x?.total_price ?? x?.total ?? 0, 0) || unitCost * qv;
-
-        const name = String(x?.name || "").trim();
-        const sug = suggestionsFor(name, Array.isArray(x?.candidates) ? x.candidates : []);
-
-        const inDict =
-          dictionary.length > 0 &&
-          topMatches(name, dictionary, 1).length > 0 &&
-          simpleScore(name, topMatches(name, dictionary, 1)[0]) >= 300;
-
-        const confidence = normalizeNumber(x?.confidence, 0.6);
-        const isNew = typeof x?.is_new_item === "boolean" ? x.is_new_item : !inDict;
-
-        const item: ReviewItem = {
+        return {
           id: `${Date.now()}_${idx}`,
-          name,
+          name: String(x.name || "Unknown").trim(),
           quantityValue: qv,
           quantityUnit: qu,
           quantity: `${qv} ${qu}`,
-          unitCost,
-          totalPrice,
-          expiryDate: normalizeDDMMYYYY(x?.expiry_date),
-          category: String(x?.category || ""),
-          location: String(x?.location || ""),
-          confidence: Math.max(0, Math.min(1, confidence)),
-          candidates: sug,
-          is_new_item: isNew,
-          raw_name: String(x?.raw_name || ""),
-        } as any;
-
-        return item;
+          unitCost: unitCost,
+          category: x.category || "Other",
+          location: x.location || "Pantry",
+          expiryDate: x.expiryDate || "",
+          confidence: 0.9, // Default confidence from direct service
+          candidates: [],
+          is_new_item: true
+        } as ReviewItem;
       });
 
-      setReviewItems(validateAndFlagItems(mapped));
+      const flagged = validateAndFlagItems(mapped);
+      setReviewItems(flagged);
       setStep("review");
+
     } catch (e: any) {
-      console.error("[runAI error]:", e);
-      setError(e?.message || "Analyze failed");
+      console.error(e);
+      setError(e.message || "AI Analysis failed.");
     } finally {
       setAnalyzing(false);
     }
