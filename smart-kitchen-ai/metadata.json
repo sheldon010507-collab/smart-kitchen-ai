@@ -1,0 +1,8 @@
+{
+  "name": "Copy of Copy of Smart Kitchen AI",
+  "description": "Intelligent inventory management using Gemini to scan receipts, analyze fridge contents, and generate recipes with deep thinking capabilities.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
