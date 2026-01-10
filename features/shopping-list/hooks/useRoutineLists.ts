@@ -26,7 +26,7 @@ interface UseRoutineListsReturn {
     updateListItem: (id: string, data: Partial<CreateRoutineListItem>) => Promise<{ error: string | null }>;
     deleteListItem: (id: string) => Promise<{ error: string | null }>;
     // Apply to shopping list
-    applyToShoppingList: (listId: string, userId: string) => Promise<{ added: number; error: string | null }>;
+    applyToShoppingList: (listId: string, userId: string) => Promise<{ added: number; skipped: number; error: string | null }>;
 }
 
 export function useRoutineLists({ businessId }: UseRoutineListsOptions): UseRoutineListsReturn {
@@ -204,8 +204,8 @@ export function useRoutineLists({ businessId }: UseRoutineListsOptions): UseRout
         }
     }, []);
 
-    // Apply routine list items to shopping list
-    const applyToShoppingList = useCallback(async (listId: string, userId: string): Promise<{ added: number; error: string | null }> => {
+    // Apply routine list items to shopping list (with deduplication)
+    const applyToShoppingList = useCallback(async (listId: string, userId: string): Promise<{ added: number; skipped: number; error: string | null }> => {
         try {
             // Get routine list items
             const { data: items, error: itemsError } = await getListItems(listId);
@@ -215,9 +215,27 @@ export function useRoutineLists({ businessId }: UseRoutineListsOptions): UseRout
             const list = lists.find(l => l.id === listId);
             if (!list) throw new Error('List not found');
 
-            // Insert each item into shopping_list
+            // 🆕 Get existing pending items for deduplication
+            const { data: existingItems } = await supabase
+                .from('shopping_list')
+                .select('item_name')
+                .eq('business_id', list.business_id)
+                .eq('status', 'pending');
+
+            const existingNames = new Set(
+                (existingItems ?? []).map(i => i.item_name.toLowerCase().trim())
+            );
+
+            // Insert each item into shopping_list (skip duplicates)
             let added = 0;
+            let skipped = 0;
             for (const item of items) {
+                // Skip if already exists in pending list
+                if (existingNames.has(item.item_name.toLowerCase().trim())) {
+                    skipped++;
+                    continue;
+                }
+
                 const { error } = await supabase.from('shopping_list').insert({
                     business_id: list.business_id,
                     item_name: item.item_name,
@@ -234,9 +252,9 @@ export function useRoutineLists({ businessId }: UseRoutineListsOptions): UseRout
                 if (!error) added++;
             }
 
-            return { added, error: null };
+            return { added, skipped, error: null };
         } catch (err: any) {
-            return { added: 0, error: err.message || 'Failed to apply list' };
+            return { added: 0, skipped: 0, error: err.message || 'Failed to apply list' };
         }
     }, [lists, getListItems]);
 

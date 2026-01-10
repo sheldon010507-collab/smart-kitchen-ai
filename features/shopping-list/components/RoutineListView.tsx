@@ -24,6 +24,7 @@ const RoutineListView: React.FC<RoutineListViewProps> = ({ businessId, onApplyCo
         deleteList,
         getListItems,
         addListItem,
+        updateListItem,
         deleteListItem,
         applyToShoppingList,
     } = useRoutineLists({ businessId });
@@ -53,12 +54,13 @@ const RoutineListView: React.FC<RoutineListViewProps> = ({ businessId, onApplyCo
     const handleApply = async (listId: string) => {
         if (!user?.id) return;
         setApplying(listId);
-        const { added, error } = await applyToShoppingList(listId, user.id);
+        const { added, skipped, error } = await applyToShoppingList(listId, user.id);
         setApplying(null);
         if (error) {
             alert(`Error: ${error}`);
         } else {
-            alert(`Added ${added} items to shopping list!`);
+            const skipMsg = skipped > 0 ? ` (${skipped} already in list)` : '';
+            alert(`Added ${added} items to shopping list!${skipMsg}`);
             onApplyComplete?.();
         }
     };
@@ -182,12 +184,28 @@ const RoutineListView: React.FC<RoutineListViewProps> = ({ businessId, onApplyCo
                                                             <span className="text-blue-600 ml-2">🏭 {item.supplier}</span>
                                                         )}
                                                     </div>
-                                                    <button
-                                                        onClick={() => deleteListItem(item.id).then(() => handleToggleExpand(list.id))}
-                                                        className="text-gray-400 hover:text-red-500"
-                                                    >
-                                                        <X className="w-4 h-4" />
-                                                    </button>
+                                                    <div className="flex items-center space-x-1">
+                                                        <button
+                                                            onClick={async () => {
+                                                                const newQty = window.prompt('New quantity:', String(item.quantity_needed));
+                                                                if (newQty !== null) {
+                                                                    await updateListItem(item.id, { quantity_needed: parseFloat(newQty) || item.quantity_needed });
+                                                                    handleToggleExpand(list.id);
+                                                                }
+                                                            }}
+                                                            className="text-gray-400 hover:text-blue-500"
+                                                            title="Edit quantity"
+                                                        >
+                                                            <Edit2 className="w-4 h-4" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => deleteListItem(item.id).then(() => handleToggleExpand(list.id))}
+                                                            className="text-gray-400 hover:text-red-500"
+                                                            title="Delete item"
+                                                        >
+                                                            <X className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             ))}
                                         </div>
@@ -204,8 +222,14 @@ const RoutineListView: React.FC<RoutineListViewProps> = ({ businessId, onApplyCo
                 <CreateRoutineListModal
                     businessId={businessId}
                     onClose={() => setShowCreateModal(false)}
-                    onCreate={async (name, description) => {
-                        await createList({ business_id: businessId, name, description });
+                    onCreate={async (name, description, items) => {
+                        const { data: newList } = await createList({ business_id: businessId, name, description });
+                        if (newList && items.length > 0) {
+                            for (const item of items) {
+                                await addListItem({ ...item, routine_list_id: newList.id });
+                            }
+                            await refetch();
+                        }
                         setShowCreateModal(false);
                     }}
                 />
@@ -232,29 +256,54 @@ const RoutineListView: React.FC<RoutineListViewProps> = ({ businessId, onApplyCo
     );
 };
 
-// Create Routine List Modal
+// Create Routine List Modal - Enhanced with item builder
 const CreateRoutineListModal: React.FC<{
     businessId: string;
     onClose: () => void;
-    onCreate: (name: string, description: string) => Promise<void>;
-}> = ({ onClose, onCreate }) => {
+    onCreate: (name: string, description: string, items: Omit<CreateRoutineListItem, 'routine_list_id'>[]) => Promise<void>;
+}> = ({ businessId, onClose, onCreate }) => {
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
     const [saving, setSaving] = useState(false);
+
+    // Item builder state
+    const [items, setItems] = useState<Array<{
+        item_name: string;
+        quantity_needed: number;
+        unit: string;
+        supplier: string;
+    }>>([]);
+    const [newItem, setNewItem] = useState({ item_name: '', quantity_needed: 1, unit: 'pcs', supplier: '' });
+
+    const handleAddItem = () => {
+        if (!newItem.item_name.trim()) return;
+        setItems(prev => [...prev, { ...newItem, item_name: newItem.item_name.trim(), supplier: newItem.supplier.trim() }]);
+        setNewItem({ item_name: '', quantity_needed: 1, unit: 'pcs', supplier: '' });
+    };
+
+    const handleRemoveItem = (index: number) => {
+        setItems(prev => prev.filter((_, i) => i !== index));
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!name.trim()) return;
         setSaving(true);
-        await onCreate(name.trim(), description.trim());
+        await onCreate(name.trim(), description.trim(), items.map((item, i) => ({
+            ...item,
+            category: null,
+            notes: null,
+            sort_order: i,
+        })));
         setSaving(false);
     };
 
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[85vh] overflow-y-auto p-6">
                 <h3 className="text-lg font-semibold mb-4">Create Routine List</h3>
                 <form onSubmit={handleSubmit} className="space-y-4">
+                    {/* List Name */}
                     <div>
                         <label className="block text-sm font-medium mb-1">Name *</label>
                         <input
@@ -266,6 +315,8 @@ const CreateRoutineListModal: React.FC<{
                             autoFocus
                         />
                     </div>
+
+                    {/* Description */}
                     <div>
                         <label className="block text-sm font-medium mb-1">Description</label>
                         <input
@@ -276,7 +327,81 @@ const CreateRoutineListModal: React.FC<{
                             placeholder="Optional description"
                         />
                     </div>
-                    <div className="flex space-x-3">
+
+                    {/* Add Item Section */}
+                    <div className="border-t pt-4">
+                        <label className="block text-sm font-medium mb-2">Add Items</label>
+                        <div className="grid grid-cols-12 gap-2 mb-2">
+                            <input
+                                type="text"
+                                value={newItem.item_name}
+                                onChange={(e) => setNewItem(prev => ({ ...prev, item_name: e.target.value }))}
+                                className="col-span-4 px-2 py-1.5 border rounded text-sm"
+                                placeholder="Item name"
+                            />
+                            <input
+                                type="number"
+                                value={newItem.quantity_needed}
+                                onChange={(e) => setNewItem(prev => ({ ...prev, quantity_needed: parseFloat(e.target.value) || 1 }))}
+                                className="col-span-2 px-2 py-1.5 border rounded text-sm"
+                                min="0.1"
+                                step="0.1"
+                            />
+                            <select
+                                value={newItem.unit}
+                                onChange={(e) => setNewItem(prev => ({ ...prev, unit: e.target.value }))}
+                                className="col-span-2 px-2 py-1.5 border rounded text-sm"
+                            >
+                                <option value="pcs">pcs</option>
+                                <option value="kg">kg</option>
+                                <option value="g">g</option>
+                                <option value="L">L</option>
+                                <option value="ml">ml</option>
+                                <option value="box">box</option>
+                                <option value="bag">bag</option>
+                            </select>
+                            <input
+                                type="text"
+                                value={newItem.supplier}
+                                onChange={(e) => setNewItem(prev => ({ ...prev, supplier: e.target.value }))}
+                                className="col-span-3 px-2 py-1.5 border rounded text-sm"
+                                placeholder="Supplier"
+                            />
+                            <button
+                                type="button"
+                                onClick={handleAddItem}
+                                disabled={!newItem.item_name.trim()}
+                                className="col-span-1 px-2 py-1.5 bg-gray-100 rounded text-sm hover:bg-gray-200 disabled:opacity-50"
+                            >
+                                +
+                            </button>
+                        </div>
+
+                        {/* Items List */}
+                        {items.length > 0 && (
+                            <div className="border rounded-lg divide-y max-h-40 overflow-y-auto">
+                                {items.map((item, i) => (
+                                    <div key={i} className="px-3 py-2 flex items-center justify-between text-sm">
+                                        <div>
+                                            <span className="font-medium">{item.item_name}</span>
+                                            <span className="text-gray-500 ml-2">{item.quantity_needed} {item.unit}</span>
+                                            {item.supplier && <span className="text-blue-600 ml-2">🏭 {item.supplier}</span>}
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleRemoveItem(i)}
+                                            className="text-gray-400 hover:text-red-500"
+                                        >
+                                            <X className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex space-x-3 pt-2">
                         <button type="button" onClick={onClose} className="flex-1 py-2 border rounded-lg hover:bg-gray-50">
                             Cancel
                         </button>
@@ -285,7 +410,7 @@ const CreateRoutineListModal: React.FC<{
                             disabled={!name.trim() || saving}
                             className="flex-1 py-2 bg-[#37352F] text-white rounded-lg disabled:opacity-50"
                         >
-                            {saving ? 'Creating...' : 'Create'}
+                            {saving ? 'Creating...' : `Create (${items.length} items)`}
                         </button>
                     </div>
                 </form>

@@ -109,7 +109,7 @@ const AutoGenerateButton: React.FC<AutoGenerateButtonProps> = ({
             {/* Preview Modal */}
             {showPreview && result && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 md:p-4">
-                    <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] md:max-h-[80vh] flex flex-col overflow-hidden">
+                    <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[70vh] md:max-h-[80vh] flex flex-col overflow-hidden mb-20 md:mb-0">
                         {/* Header */}
                         <div className="flex items-center justify-between px-4 md:px-6 py-3 md:py-4 border-b border-[#E9E9E7]">
                             <div>

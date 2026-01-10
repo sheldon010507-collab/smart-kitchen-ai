@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { InventoryItem } from '../types';
-import { X } from 'lucide-react';
+import { InventoryItem, Container } from '../types';
+import { X, Box } from 'lucide-react';
 
 interface Props {
   isOpen: boolean;
@@ -9,6 +9,7 @@ interface Props {
   item: InventoryItem | null;
   categories: string[];
   locations: string[];
+  containers?: Container[];  // 已註冊的容器列表
 }
 
 const DEFAULT_ITEM: Partial<InventoryItem> = {
@@ -22,9 +23,10 @@ const DEFAULT_ITEM: Partial<InventoryItem> = {
   expiryDate: new Date(Date.now() + 86400000 * 7).toISOString().split('T')[0]
 };
 
-const UNITS = ['kg', 'g', 'L', 'ml', 'pcs', 'lb', 'oz'];
 
-const EditItemModal: React.FC<Props> = ({ isOpen, onClose, onSave, item, categories, locations }) => {
+const UNITS = ['kg', 'g', 'L', 'ml', 'pcs', 'lb', 'oz', 'jar', 'tub', 'container', 'bottle', 'box', 'bag'];
+
+const EditItemModal: React.FC<Props> = ({ isOpen, onClose, onSave, item, categories, locations, containers = [] }) => {
   const [formData, setFormData] = useState<Partial<InventoryItem>>(DEFAULT_ITEM);
   const [isCustomCategory, setIsCustomCategory] = useState(false);
   const [isCustomLocation, setIsCustomLocation] = useState(false);
@@ -198,6 +200,40 @@ const EditItemModal: React.FC<Props> = ({ isOpen, onClose, onSave, item, categor
               placeholder="0 = disabled"
             />
           </div>
+
+          {/* Container Selector */}
+          {containers.length > 0 && (
+            <div>
+              <label className="block text-xs font-bold text-secondary uppercase tracking-wider mb-2 flex items-center">
+                <Box className="w-3 h-3 mr-1" />
+                Container
+                <span className="font-normal text-gray-400 ml-1">(auto-unit)</span>
+              </label>
+              <select
+                name="containerId"
+                value={formData.containerId || ''}
+                onChange={(e) => {
+                  const containerId = e.target.value || undefined;
+                  const container = containers.find(c => c.id === containerId);
+                  setFormData(prev => ({
+                    ...prev,
+                    containerId,
+                    containerName: container?.name,
+                    // Auto-set unit based on container capacity unit
+                    quantityUnit: container ? container.capacityUnit.toLowerCase() : prev.quantityUnit,
+                  }));
+                }}
+                className="w-full px-4 py-2.5 rounded-lg border border-border bg-white text-sm focus:outline-none focus:border-accent"
+              >
+                <option value="">None (loose item)</option>
+                {containers.map(c => (
+                  <option key={c.id} value={c.id}>
+                    📦 {c.name} ({c.capacityValue} {c.capacityUnit})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-5">
             <div>

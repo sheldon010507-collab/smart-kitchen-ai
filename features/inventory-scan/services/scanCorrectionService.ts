@@ -192,3 +192,45 @@ export async function exportCorrectionsForTraining(
         return [];
     }
 }
+
+/**
+ * Record a fill level correction for container self-learning
+ * Stores corrections in scan_corrections table with type 'fill_level_changed'
+ */
+export async function recordFillLevelCorrection(
+    businessId: string,
+    containerId: string | null,
+    itemName: string,
+    originalFillLevel: string,
+    correctedFillLevel: string,
+    userId: string
+): Promise<boolean> {
+    try {
+        const correction: CorrectionEntry = {
+            type: 'fill_level_changed',
+            itemName,
+            originalValue: originalFillLevel,
+            newValue: correctedFillLevel,
+        };
+
+        const { error } = await supabase.from('scan_corrections').insert({
+            business_id: businessId,
+            container_id: containerId,
+            image_urls: [],
+            scan_area: 'fridge',
+            original_result: [{ name: itemName, fill_level: originalFillLevel }],
+            corrected_result: [{ name: itemName, fill_level: correctedFillLevel }],
+            corrections: [correction],
+            created_by: userId,
+        });
+
+        if (error) throw error;
+
+        console.log('[ScanCorrection] Fill level correction saved:', itemName, originalFillLevel, '->', correctedFillLevel);
+        return true;
+    } catch (err) {
+        console.error('[ScanCorrection] Fill level correction failed:', err);
+        return false;
+    }
+}
+

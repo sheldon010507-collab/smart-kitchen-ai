@@ -252,6 +252,10 @@ export interface ScanResultItem {
   confidence: number;
   estimation_method?: string;
   notes?: string;
+  // Container matching fields (for fridge scans with registered containers)
+  container_match?: string;  // Container ID if recognized
+  container_name?: string;   // Container name if recognized
+  fill_level?: 'full' | 'medium' | 'low' | 'empty';  // Estimated fill level
 }
 
 export interface ScanResult {
@@ -462,3 +466,77 @@ export function validateFridgeAuditResult(raw: string): FridgeAuditResult | null
     return null;
   }
 }
+
+/**
+ * Container info for AI prompt
+ */
+export interface ContainerInfo {
+  id: string;
+  name: string;
+  capacity: string;  // e.g., "6 L"
+  imageUrl?: string;
+}
+
+/**
+ * Generate container-aware fridge scan prompt
+ * Includes registered containers for matching and fill level estimation
+ */
+export function generateContainerScanPrompt(
+  imageCount: number,
+  containers: ContainerInfo[],
+  knownItems: KnownItem[] = []
+): string {
+  // Build container reference list
+  const containerList = containers.length > 0
+    ? containers.map(c => `- "${c.name}" (${c.capacity})`).join('\n')
+    : '(No registered containers)';
+
+  const knownItemsList = knownItems.slice(0, 10).map(i => `${i.name}(${i.unit})`).join(', ');
+
+  return `
+# Fridge Inventory Scanner with Container Recognition
+
+## Task
+Analyze ${imageCount} image(s) of refrigerator contents. For EACH item:
+1. Identify the item
+2. If in a container, match to registered containers below
+3. Estimate fill level (full/medium/low/empty)
+
+## Registered Containers
+${containerList}
+
+## Fill Level Definitions
+- full: >75% capacity
+- medium: 25-75% capacity  
+- low: 10-25% capacity
+- empty: <10% capacity
+
+## Known Items
+${knownItemsList || 'identify all food items'}
+
+## Output Format (JSON only)
+{
+  "items": [
+    {
+      "name": "Item name",
+      "quantity": number,
+      "unit": "kg/L/pcs/box",
+      "confidence": 0.0-1.0,
+      "container_name": "Red Lid Box or null if not in container",
+      "fill_level": "full/medium/low/empty or null if loose item",
+      "notes": "how estimated"
+    }
+  ],
+  "scan_quality": "good/medium/poor"
+}
+
+## Examples
+Container in fridge:
+{"items":[{"name":"Beef broth","quantity":4.5,"unit":"L","confidence":0.8,"container_name":"Red Lid Box","fill_level":"medium","notes":"6L container ~75% full"}],"scan_quality":"good"}
+
+Loose items:
+{"items":[{"name":"Eggs","quantity":12,"unit":"pcs","confidence":0.95,"container_name":null,"fill_level":null,"notes":"one carton visible"}],"scan_quality":"good"}
+
+Analyze now:`.trim();
+}
+

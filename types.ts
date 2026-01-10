@@ -87,6 +87,10 @@ export interface InventoryItem {
   minStockLevel?: number;  // 最低庫存線，低於此值自動加入購物清單
   supplier?: string;       // 供應商
   notes?: string;          // 備註
+  // Container linking (for unit consistency)
+  containerId?: string;    // 綁定的容器 ID
+  containerName?: string;  // 容器名稱 (from join)
+  fillLevel?: FillLevel;   // 填充度
 }
 
 /** SKU Master - for AI recognition */
