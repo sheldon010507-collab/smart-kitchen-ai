@@ -37,6 +37,8 @@ export interface ShoppingListItem {
     updated_at: string;
     purchased_at: string | null;
     notes: string | null;
+    // 從 inventory_items JOIN 或直接存儲
+    supplier?: string | null;
 }
 
 // ===================
@@ -101,6 +103,7 @@ export interface GeneratedShoppingItem {
     unit: string;
     reason: ShoppingListReason;
     priority: ShoppingListPriority;
+    supplier?: string | null;
 }
 
 /**
@@ -148,7 +151,7 @@ export interface GroupedShoppingItem {
 // UI STATE
 // ===================
 
-export type ShoppingListTab = 'pending' | 'purchased' | 'cancelled';
+export type ShoppingListTab = 'pending' | 'purchased' | 'cancelled' | 'routines';
 
 export interface ShoppingListFilters {
     tab: ShoppingListTab;
@@ -164,3 +167,60 @@ export interface ShoppingListSort {
     field: ShoppingListSortField;
     direction: SortDirection;
 }
+
+// ===================
+// ROUTINE LIST (定期採購模板)
+// ===================
+
+/**
+ * Routine list - reusable shopping list templates
+ */
+export interface RoutineList {
+    id: string;
+    business_id: string;
+    name: string;
+    description: string | null;
+    created_by: string;
+    created_at: string;
+    updated_at: string;
+    item_count?: number;  // Computed from items
+}
+
+/**
+ * Routine list item
+ */
+export interface RoutineListItem {
+    id: string;
+    routine_list_id: string;
+    item_name: string;
+    quantity_needed: number;
+    unit: string;
+    category: string | null;
+    supplier: string | null;
+    notes: string | null;
+    sort_order: number;
+}
+
+/**
+ * Create routine list input
+ */
+export interface CreateRoutineList {
+    business_id: string;
+    name: string;
+    description?: string;
+}
+
+/**
+ * Create routine list item input
+ */
+export interface CreateRoutineListItem {
+    routine_list_id: string;
+    item_name: string;
+    quantity_needed: number;
+    unit: string;
+    category?: string;
+    supplier?: string;
+    notes?: string;
+    sort_order?: number;
+}
+

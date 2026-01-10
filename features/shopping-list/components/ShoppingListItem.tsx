@@ -35,10 +35,10 @@ const ShoppingListItemRow: React.FC<ShoppingListItemRowProps> = ({
     return (
         <div
             className={`group flex items-center justify-between p-3 rounded-lg border transition-colors ${isPurchased
-                    ? 'bg-green-50/50 border-green-100'
-                    : isCancelled
-                        ? 'bg-gray-50 border-gray-100 opacity-60'
-                        : 'bg-white border-[#E9E9E7] hover:border-[#D3D1CB]'
+                ? 'bg-green-50/50 border-green-100'
+                : isCancelled
+                    ? 'bg-gray-50 border-gray-100 opacity-60'
+                    : 'bg-white border-[#E9E9E7] hover:border-[#D3D1CB]'
                 }`}
         >
             {/* Left: Checkbox/Status + Item Info */}
@@ -98,6 +98,12 @@ const ShoppingListItemRow: React.FC<ShoppingListItemRowProps> = ({
                             <>
                                 <span>•</span>
                                 <span>{item.category}</span>
+                            </>
+                        )}
+                        {item.supplier && (
+                            <>
+                                <span>•</span>
+                                <span className="text-blue-600" title="Supplier">🏭 {item.supplier}</span>
                             </>
                         )}
                         <span>•</span>

@@ -17,6 +17,10 @@ interface InventoryContextType {
     deleteItem: (id: string, businessId: string) => Promise<boolean>;
     getFilteredInventory: (businessId: string | null, isMasterView: boolean) => InventoryItem[];
     clearInventoryForBusiness: (businessId: string) => void;
+
+    // Setup Wizard Functions
+    deleteAllInventoryForBusiness: (businessId: string) => Promise<boolean>;
+    addItemsWithDbCheck: (items: InventoryItem[], businessId: string) => Promise<void>;
 }
 
 const InventoryContext = createContext<InventoryContextType | undefined>(undefined);
@@ -98,6 +102,9 @@ export function InventoryProvider({ children }: InventoryProviderProps) {
                         unit_cost: Number(newItem.unitCost || 0),
                         expiry_date: toISODate(newItem.expiryDate),
                         added_date: new Date().toISOString().split('T')[0],
+                        min_stock_level: newItem.minStockLevel || null,
+                        supplier: newItem.supplier || null,
+                        notes: newItem.notes || null,
                     };
 
                     await supabase.from('inventory_items').insert(payload);
@@ -126,6 +133,9 @@ export function InventoryProvider({ children }: InventoryProviderProps) {
             unit_cost: Number(item.unitCost || 0),
             expiry_date: toISODate(item.expiryDate),
             added_date: toISODate(item.addedDate) || new Date().toISOString().split('T')[0],
+            min_stock_level: item.minStockLevel || null,
+            supplier: item.supplier || null,
+            notes: item.notes || null,
         };
 
         try {
@@ -176,6 +186,109 @@ export function InventoryProvider({ children }: InventoryProviderProps) {
         setInventory(prev => prev.filter(i => i.businessId !== businessId));
     }, []);
 
+    /**
+     * Delete ALL inventory items for a business from DATABASE
+     * Use for "Overwrite" merge strategy in Setup Wizard
+     */
+    const deleteAllInventoryForBusiness = useCallback(async (businessId: string): Promise<boolean> => {
+        try {
+            const { error } = await supabase
+                .from('inventory_items')
+                .delete()
+                .eq('business_id', businessId);
+
+            if (error) throw error;
+
+            // Also clear local state
+            setInventory(prev => prev.filter(i => i.businessId !== businessId));
+            return true;
+        } catch (e: any) {
+            console.error('deleteAllInventoryForBusiness error:', e);
+            return false;
+        }
+    }, []);
+
+    /**
+     * Add items with fresh DB check to prevent multi-tab duplicates
+     * Fetches latest inventory from DB before duplicate detection
+     */
+    const addItemsWithDbCheck = useCallback(async (items: InventoryItem[], businessId: string): Promise<void> => {
+        // Fetch latest state from DB to prevent multi-tab race conditions
+        const { data: dbItems, error: fetchError } = await supabase
+            .from('inventory_items')
+            .select('*')
+            .eq('business_id', businessId);
+
+        if (fetchError) {
+            console.error('addItemsWithDbCheck fetch error:', fetchError);
+            throw fetchError;
+        }
+
+        const existingItems = (dbItems || []).map(mapDbRowToInventoryItem);
+        const existingNamesLower = new Set(
+            existingItems.map(i => i.name.trim().toLowerCase())
+        );
+
+        try {
+            for (const newItem of items) {
+                const nameLower = (newItem.name || '').trim().toLowerCase();
+                const matched = existingItems.find(
+                    i => i.name.trim().toLowerCase() === nameLower
+                );
+
+                if (matched) {
+                    // Update existing item (accumulate quantity)
+                    const newQtyValue = Number(matched.quantityValue || 0) + Number(newItem.quantityValue || 0);
+
+                    const payload = {
+                        name: matched.name,
+                        canonical_name: matched.name,
+                        category: newItem.category || matched.category || null,
+                        location: newItem.location || matched.location || null,
+                        quantity_value: newQtyValue,
+                        quantity_unit: matched.quantityUnit || newItem.quantityUnit || 'pcs',
+                        unit_cost: Number(newItem.unitCost ?? matched.unitCost ?? 0),
+                        expiry_date: toISODate(newItem.expiryDate) || toISODate(matched.expiryDate),
+                    };
+
+                    await supabase
+                        .from('inventory_items')
+                        .update(payload)
+                        .eq('id', matched.id)
+                        .eq('business_id', businessId);
+                } else {
+                    // Insert new item
+                    const payload = {
+                        business_id: businessId,
+                        name: newItem.name,
+                        canonical_name: newItem.name,
+                        category: newItem.category || null,
+                        location: newItem.location || null,
+                        quantity_value: Number(newItem.quantityValue || 0),
+                        quantity_unit: newItem.quantityUnit || 'pcs',
+                        unit_cost: Number(newItem.unitCost || 0),
+                        expiry_date: toISODate(newItem.expiryDate),
+                        added_date: new Date().toISOString().split('T')[0],
+                        min_stock_level: newItem.minStockLevel || null,
+                        supplier: newItem.supplier || null,
+                        notes: newItem.notes || null,
+                    };
+
+                    await supabase.from('inventory_items').insert(payload);
+
+                    // Add to existingNamesLower to prevent duplicates within same batch
+                    existingNamesLower.add(nameLower);
+                }
+            }
+
+            // Reload after changes
+            await loadInventory(businessId);
+        } catch (e: any) {
+            console.error('addItemsWithDbCheck error:', e);
+            throw e;
+        }
+    }, [loadInventory]);
+
     // ============ Context Value ============
     const value: InventoryContextType = {
         inventory,
@@ -186,6 +299,8 @@ export function InventoryProvider({ children }: InventoryProviderProps) {
         deleteItem,
         getFilteredInventory,
         clearInventoryForBusiness,
+        deleteAllInventoryForBusiness,
+        addItemsWithDbCheck,
     };
 
     return (

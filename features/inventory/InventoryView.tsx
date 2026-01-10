@@ -8,7 +8,7 @@
  */
 
 import React from 'react';
-import { Store, ScanLine, Edit, Plus, Search, X } from 'lucide-react';
+import { Store, ScanLine, Edit, Plus, Search, X, Package } from 'lucide-react';
 import InventoryCard from '../../components/InventoryCard';
 import { EditableTitle } from '../../components/EditableTitle';
 import { InventoryItem, Business } from '../../types';
@@ -25,6 +25,7 @@ interface InventoryViewProps {
     onOpenMetaManager: () => void;
     onAddItem: () => void;
     onWastage?: (item: InventoryItem) => void;
+    onOpenSetupWizard?: () => void;
 }
 
 export function InventoryView({
@@ -39,6 +40,7 @@ export function InventoryView({
     onOpenMetaManager,
     onAddItem,
     onWastage,
+    onOpenSetupWizard,
 }: InventoryViewProps) {
 
     if (isMasterView) {
@@ -59,7 +61,16 @@ export function InventoryView({
                     </h2>
                     <p className="text-secondary mt-2 md:mt-3 text-sm md:text-lg font-light">Manage stock for {activeBusiness?.name}</p>
                 </div>
-                <div className="grid grid-cols-3 md:flex md:space-x-3 gap-2 md:gap-0">
+                <div className="grid grid-cols-4 md:flex md:space-x-3 gap-2 md:gap-0">
+                    {onOpenSetupWizard && (
+                        <button
+                            onClick={onOpenSetupWizard}
+                            className="flex items-center justify-center px-3 md:px-6 py-2 md:py-3 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg shadow-sm text-xs md:text-sm font-semibold hover:from-blue-600 hover:to-indigo-600 transition-colors"
+                        >
+                            <Package className="w-4 md:w-5 h-4 md:h-5 md:mr-2" />
+                            <span className="hidden md:inline">Setup</span>
+                        </button>
+                    )}
                     <button
                         onClick={() => onOpenScanner('receipt')}
                         className="flex items-center justify-center px-3 md:px-6 py-2 md:py-3 bg-white text-primary border border-border rounded-lg shadow-sm text-xs md:text-sm font-semibold hover:bg-background transition-colors"

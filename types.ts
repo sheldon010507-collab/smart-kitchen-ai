@@ -58,6 +58,8 @@ export interface InventoryItem {
   expiryDate: string;
   addedDate: string;
   minStockLevel?: number;  // 最低庫存線，低於此值自動加入購物清單
+  supplier?: string;       // 供應商
+  notes?: string;          // 備註
 }
 
 /** SKU Master - for AI recognition */
@@ -327,7 +329,8 @@ export enum ViewState {
   RESTAURANT = 'RESTAURANT',
   PRIVACY = 'PRIVACY',
   INVENTORY_SCAN = 'INVENTORY_SCAN',
-  SUBSCRIPTION = 'SUBSCRIPTION'
+  SUBSCRIPTION = 'SUBSCRIPTION',
+  TEMPLATE_MANAGER = 'TEMPLATE_MANAGER'
 }
 
 export interface ChartData {

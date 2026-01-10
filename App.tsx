@@ -72,6 +72,7 @@ import { MobileHeader } from './components/layout/MobileHeader';
 import { useBusinessHandlers } from './hooks/useBusinessHandlers';
 import WastageModal from './components/WastageModal';
 import { recordWastage } from './services/wastageService';
+import { InventorySetupWizard, DraftInventoryItem, MergeStrategy } from './components/setup';
 
 const COLORS = ['#475569', '#64748B', '#94A3B8', '#CBD5E1', '#E2E8F0', '#F1F5F9'];
 
@@ -138,6 +139,9 @@ export default function App() {
 
   // 🆕 Wastage Modal State
   const [wastageItem, setWastageItem] = useState<InventoryItem | null>(null);
+
+  // 🆕 Setup Wizard State
+  const [isSetupWizardOpen, setIsSetupWizardOpen] = useState(false);
 
   // ✅ P1 優化：使用 useRef 避免 popstate 監聽器頻繁重新註冊
   const modalStatesRef = useRef({
@@ -885,6 +889,7 @@ export default function App() {
                 setIsEditModalOpen(true);
               }}
               onWastage={setWastageItem}
+              onOpenSetupWizard={() => setIsSetupWizardOpen(true)}
             />
           )}
 
@@ -1075,6 +1080,90 @@ export default function App() {
           }
         }}
       />
+
+      {/* 🆕 INVENTORY SETUP WIZARD */}
+      {isSetupWizardOpen && currentBusinessId && user && (
+        <InventorySetupWizard
+          businessId={currentBusinessId}
+          userId={user.id}
+          existingCategories={derivedCategories}
+          existingLocations={derivedLocations}
+          existingItemCount={inventory.filter(i => i.businessId === currentBusinessId).length}
+          onClose={() => setIsSetupWizardOpen(false)}
+          onComplete={async (items: DraftInventoryItem[], strategy: MergeStrategy) => {
+            if (strategy === 'overwrite') {
+              await inventoryCtx.deleteAllInventoryForBusiness(currentBusinessId);
+            }
+
+            const mapped: InventoryItem[] = items.filter(i => !i.isDeleted).map(d => ({
+              id: d.id,
+              businessId: currentBusinessId,
+              name: d.name,
+              quantity: '0',
+              quantityValue: 0,
+              quantityUnit: d.quantityUnit || d.unit || 'pcs',
+              unitCost: d.unitCost ?? d.cost ?? 0,
+              category: d.category || '',
+              location: d.location || '',
+              minStockLevel: d.minStockLevel ?? d.suggestedPar,
+              supplier: d.supplier || '',
+              notes: d.notes || '',
+              expiryDate: '',
+              addedDate: new Date().toISOString().split('T')[0],
+            }));
+
+            // Build lookup map of existing items by name
+            const existingItems = inventory.filter(i => i.businessId === currentBusinessId);
+            const existingByName = new Map<string, InventoryItem>(
+              existingItems.map(i => [i.name.toLowerCase().trim(), i])
+            );
+
+            if (strategy === 'add-new-only') {
+              // Only add items that don't exist
+              const newItems = mapped.filter(i => !existingByName.has(i.name.toLowerCase().trim()));
+              await inventoryCtx.addItemsWithDbCheck(newItems, currentBusinessId);
+            } else if (strategy === 'smart-merge') {
+              // Smart merge: update existing items' settings, add new items
+              const itemsToUpdate: InventoryItem[] = [];
+              const itemsToAdd: InventoryItem[] = [];
+
+              for (const item of mapped) {
+                const existing = existingByName.get(item.name.toLowerCase().trim());
+                if (existing) {
+                  // Update existing item's settings but preserve quantity
+                  itemsToUpdate.push({
+                    ...existing,
+                    category: item.category || existing.category,
+                    location: item.location || existing.location,
+                    quantityUnit: item.quantityUnit || existing.quantityUnit,
+                    unitCost: item.unitCost ?? existing.unitCost,
+                    minStockLevel: item.minStockLevel ?? existing.minStockLevel,
+                    supplier: item.supplier || existing.supplier,
+                    notes: item.notes || existing.notes,
+                    // Preserve quantity - don't change it
+                  });
+                } else {
+                  itemsToAdd.push(item);
+                }
+              }
+
+              // Update existing items
+              for (const item of itemsToUpdate) {
+                await inventoryCtx.updateItem(item.id, item);
+              }
+              // Add new items
+              if (itemsToAdd.length > 0) {
+                await inventoryCtx.addItemsWithDbCheck(itemsToAdd, currentBusinessId);
+              }
+            } else {
+              // Default: just add all (for overwrite, items were already deleted)
+              await inventoryCtx.addItemsWithDbCheck(mapped, currentBusinessId);
+            }
+
+            setIsSetupWizardOpen(false);
+          }}
+        />
+      )}
 
     </div>
   );

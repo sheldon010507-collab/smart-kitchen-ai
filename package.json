@@ -20,6 +20,7 @@
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
     "react-error-boundary": "^6.0.1",
+    "react-is": "^19.2.3",
     "react-router-dom": "^7.11.0",
     "recharts": "^3.5.1",
     "stripe": "^20.1.0",

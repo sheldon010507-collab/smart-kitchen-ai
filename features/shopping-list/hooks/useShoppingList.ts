@@ -47,10 +47,15 @@ export function useShoppingList({
             setLoading(true);
             setError(null);
 
-            // Build query
+            // Build query - include inventory_items for supplier
             let query = supabase
                 .from('shopping_list')
-                .select('*', { count: 'exact' })
+                .select(`
+                    *,
+                    inventory_items (
+                        supplier
+                    )
+                `, { count: 'exact' })
                 .eq('business_id', businessId);
 
             // Apply status filter from tab
@@ -87,7 +92,14 @@ export function useShoppingList({
                 throw queryError;
             }
 
-            setItems(data ?? []);
+            // Map the result to include supplier from inventory_items
+            const mappedItems: ShoppingListItem[] = (data ?? []).map((item: any) => ({
+                ...item,
+                supplier: item.inventory_items?.supplier || null,
+                inventory_items: undefined, // Remove nested object
+            }));
+
+            setItems(mappedItems);
             setTotalCount(count ?? 0);
         } catch (err: any) {
             console.error('Error fetching shopping list:', err);

@@ -87,7 +87,7 @@ export async function generateShoppingList(
 
             const { data: expiringItems, error: expiryError } = await supabase
                 .from('inventory_items')
-                .select('id, name, category, quantity_value, quantity_unit, expiry_date')
+                .select('id, name, category, quantity_value, quantity_unit, expiry_date, supplier')
                 .eq('business_id', businessId)
                 .lte('expiry_date', expiryDateStr)
                 .gt('quantity_value', 0);
@@ -118,6 +118,7 @@ export async function generateShoppingList(
                         unit: item.quantity_unit || 'pcs',
                         reason: 'expiring',
                         priority: getExpiryPriority(daysUntilExpiry),
+                        supplier: item.supplier || null,
                     });
                 }
             }
@@ -128,7 +129,7 @@ export async function generateShoppingList(
             // Query items where quantity is below min_stock_level
             const { data: lowStockItems, error: stockError } = await supabase
                 .from('inventory_items')
-                .select('id, name, category, quantity_value, quantity_unit, min_stock_level')
+                .select('id, name, category, quantity_value, quantity_unit, min_stock_level, supplier')
                 .eq('business_id', businessId)
                 .gt('min_stock_level', 0);  // Only items with min_stock_level set
 
@@ -179,6 +180,7 @@ export async function generateShoppingList(
                         unit: unit,
                         reason: 'low_stock',
                         priority: getStockPriority(item.quantity_value || 0),
+                        supplier: item.supplier || null,
                     });
                 }
             }

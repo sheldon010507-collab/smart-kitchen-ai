@@ -2,10 +2,11 @@
  * Add/Edit shopping list item modal
  */
 
-import React, { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { X, Search } from 'lucide-react';
 import type { ShoppingListItem, CreateShoppingListItem, ShoppingListPriority, ShoppingListReason } from '../types';
 import { PRIORITY_LABELS, COMMON_UNITS, DEFAULT_PRIORITY, DEFAULT_REASON } from '../constants';
+import { useInventorySearch } from '../hooks/useInventorySearch';
 
 interface AddItemModalProps {
     isOpen: boolean;
@@ -32,6 +33,12 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
     const [notes, setNotes] = useState('');
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [selectedInventoryId, setSelectedInventoryId] = useState<string | null>(null);
+    const [supplier, setSupplier] = useState<string | null>(null);
+    const [showSearch, setShowSearch] = useState(true);
+
+    // Inventory search hook
+    const { results: searchResults, search: searchInventory, clear: clearSearch, loading: searching } = useInventorySearch({ businessId });
 
     // Reset form when modal opens or editingItem changes
     useEffect(() => {
@@ -43,6 +50,8 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
                 setUnit(editingItem.unit);
                 setPriority(editingItem.priority);
                 setNotes(editingItem.notes || '');
+                setSupplier(editingItem.supplier || null);
+                setShowSearch(false);
             } else {
                 setItemName('');
                 setCategory('');
@@ -50,10 +59,35 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
                 setUnit('pcs');
                 setPriority(DEFAULT_PRIORITY);
                 setNotes('');
+                setSelectedInventoryId(null);
+                setSupplier(null);
+                setShowSearch(true);
+                clearSearch();
             }
             setError(null);
         }
-    }, [isOpen, editingItem]);
+    }, [isOpen, editingItem, clearSearch]);
+
+    // Handle search input change with debounce
+    const handleSearchChange = useCallback((value: string) => {
+        setItemName(value);
+        if (value.length >= 2) {
+            searchInventory(value);
+        } else {
+            clearSearch();
+        }
+    }, [searchInventory, clearSearch]);
+
+    // Handle selecting an inventory item
+    const handleSelectInventoryItem = useCallback((item: typeof searchResults[0]) => {
+        setItemName(item.name);
+        setCategory(item.category);
+        setUnit(item.quantityUnit);
+        setSupplier(item.supplier);
+        setSelectedInventoryId(item.id);
+        setShowSearch(false);
+        clearSearch();
+    }, [clearSearch]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -129,20 +163,65 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
                         </div>
                     )}
 
-                    {/* Item Name */}
-                    <div>
+                    {/* Item Name / Search */}
+                    <div className="relative">
                         <label className="block text-sm font-medium text-[#37352F] mb-1">
                             Item Name <span className="text-red-500">*</span>
                         </label>
-                        <input
-                            type="text"
-                            value={itemName}
-                            onChange={(e) => setItemName(e.target.value)}
-                            maxLength={100}
-                            className="w-full px-3 py-2 border border-[#E9E9E7] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            placeholder="e.g., Tomatoes"
-                            autoFocus
-                        />
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                            <input
+                                type="text"
+                                value={itemName}
+                                onChange={(e) => showSearch ? handleSearchChange(e.target.value) : setItemName(e.target.value)}
+                                maxLength={100}
+                                className="w-full pl-10 pr-3 py-2 border border-[#E9E9E7] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                placeholder="Search inventory or enter name..."
+                                autoFocus
+                            />
+                            {searching && (
+                                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                    <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Search Results Dropdown */}
+                        {showSearch && searchResults.length > 0 && (
+                            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                                {searchResults.map((item) => (
+                                    <button
+                                        key={item.id}
+                                        type="button"
+                                        onClick={() => handleSelectInventoryItem(item)}
+                                        className="w-full px-4 py-2 text-left hover:bg-blue-50 flex items-center justify-between gap-2 border-b border-gray-100 last:border-0"
+                                    >
+                                        <div>
+                                            <div className="font-medium text-gray-900">{item.name}</div>
+                                            <div className="text-xs text-gray-500 flex gap-2">
+                                                <span>{item.category}</span>
+                                                {item.supplier && <span>• 🏭 {item.supplier}</span>}
+                                            </div>
+                                        </div>
+                                        <span className="text-xs text-gray-400">{item.quantityUnit}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Supplier display (if selected from inventory) */}
+                        {supplier && (
+                            <div className="mt-2 text-xs text-blue-600 flex items-center gap-1">
+                                🏭 Supplier: <span className="font-medium">{supplier}</span>
+                                <button
+                                    type="button"
+                                    onClick={() => { setShowSearch(true); setSupplier(null); setSelectedInventoryId(null); }}
+                                    className="ml-2 text-gray-400 hover:text-gray-600"
+                                >
+                                    (change)
+                                </button>
+                            </div>
+                        )}
                     </div>
 
                     {/* Quantity and Unit */}
@@ -196,6 +275,23 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
                                 <option key={cat} value={cat} />
                             ))}
                         </datalist>
+                    </div>
+
+                    {/* Supplier */}
+                    <div>
+                        <label className="block text-sm font-medium text-[#37352F] mb-1">
+                            Supplier
+                        </label>
+                        <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🏭</span>
+                            <input
+                                type="text"
+                                value={supplier || ''}
+                                onChange={(e) => setSupplier(e.target.value || null)}
+                                className="w-full pl-9 pr-3 py-2 border border-[#E9E9E7] rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                placeholder="e.g., Sysco, US Foods"
+                            />
+                        </div>
                     </div>
 
                     {/* Priority */}
