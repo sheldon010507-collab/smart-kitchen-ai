@@ -418,18 +418,55 @@ export const generateThinkingChefRecipes = async (inventory: InventoryItem[], me
     return `- ${i.quantity} ${i.name} (${daysLeft} days left)`;
   }).join('\n');
 
-  let menuStyleContext = "";
+  // 🆕 Analyze existing menu to determine cuisine style
+  let cuisineContext = "";
+  let detectedCuisine = "General";
+
   if (menuItems.length > 0) {
-    const menuList = menuItems.map(m => `- ${m.name} (${m.category})`).join('\n');
-    menuStyleContext = `\n=== EXISTING MENU ===\n${menuList}\nGenerate specials that fit this style.\n`;
+    const menuList = menuItems.slice(0, 15).map(m => `${m.name} (${m.category})`).join(', ');
+    const categories = [...new Set(menuItems.map(m => m.category))].join(', ');
+
+    // Detect cuisine from menu items
+    const menuText = menuItems.map(m => m.name.toLowerCase()).join(' ');
+    if (menuText.includes('pizza') || menuText.includes('pasta') || menuText.includes('risotto')) {
+      detectedCuisine = "Italian";
+    } else if (menuText.includes('brunch') || menuText.includes('latte') || menuText.includes('cappuccino') || menuText.includes('sandwich')) {
+      detectedCuisine = "Cafe/Brunch";
+    } else if (menuText.includes('sushi') || menuText.includes('ramen') || menuText.includes('tempura')) {
+      detectedCuisine = "Japanese";
+    } else if (menuText.includes('dim sum') || menuText.includes('fried rice') || menuText.includes('noodle')) {
+      detectedCuisine = "Chinese";
+    } else if (menuText.includes('taco') || menuText.includes('burrito') || menuText.includes('quesadilla')) {
+      detectedCuisine = "Mexican";
+    } else if (menuText.includes('curry') || menuText.includes('biryani') || menuText.includes('naan')) {
+      detectedCuisine = "Indian";
+    }
+
+    cuisineContext = `
+=== YOUR EXISTING MENU (Learn from this!) ===
+Categories: ${categories}
+Sample items: ${menuList}
+
+DETECTED CUISINE STYLE: ${detectedCuisine}
+⚠️ IMPORTANT: Generated recipes MUST match this cuisine style!
+- If it's a Pizza shop → suggest Italian dishes (pizza variations, pasta, salads)
+- If it's a Coffee shop → suggest brunch items (sandwiches, toasts, eggs)
+- Match the flavor profile, ingredients, and presentation style of the existing menu.
+`;
   }
 
   const prompt = `
-    I have these ingredients (expiring first):
-    ${inventoryList}
-    ${menuStyleContext}
-    Act as a Chef (British Cuisine). Create 2 specials utilizing expiring items.
-    Return JSON array of recipes.
+You are a creative Chef specializing in ${detectedCuisine} cuisine.
+
+=== AVAILABLE INGREDIENTS (prioritize expiring items!) ===
+${inventoryList}
+${cuisineContext}
+Create 2 daily specials that:
+1. Use ingredients that are expiring soon (marked with fewer days left)
+2. Match the detected cuisine style perfectly
+3. Would fit naturally on this restaurant's menu
+
+Return JSON array of recipes.
   `;
 
   const recipeSchema = {
@@ -473,3 +510,101 @@ export const generateOperationalInsights = async (sales: SalesReceipt[], shifts:
   const prompt = `Analyze: Revenue $${totalRevenue}, Labor $${totalLabor}. 3 recommendations.`;
   try { return await callGeminiApi({ prompt }) || "No data."; } catch (e) { return "Error."; }
 };
+
+/**
+ * 🆕 Ask Operations Advisor - with topic validation to save tokens
+ * Only allows questions related to restaurant/store operations
+ */
+const ALLOWED_TOPICS = [
+  'inventory', 'stock', '庫存', '存貨',
+  'cost', 'pricing', '成本', '定價', '價格',
+  'staff', 'shift', 'labor', '員工', '排班', '人工',
+  'menu', 'recipe', '菜單', '食譜',
+  'sales', 'revenue', 'profit', '銷售', '營收', '利潤',
+  'waste', 'expiry', '浪費', '過期',
+  'supplier', 'order', '供應商', '訂貨',
+  'efficiency', 'improve', '效率', '改善',
+  'forecast', 'predict', '預測',
+  'peak', 'busy', '高峰', '繁忙',
+];
+
+const OFF_TOPIC_RESPONSES = [
+  "🚫 這個問題與店鋪運營無關，請詢問庫存、成本、員工、銷售等相關問題。",
+  "🚫 This question is not related to store operations. Please ask about inventory, costs, staff, or sales.",
+];
+
+function isOperationsRelated(query: string): boolean {
+  const lowerQuery = query.toLowerCase();
+  return ALLOWED_TOPICS.some(topic => lowerQuery.includes(topic.toLowerCase()));
+}
+
+export const askOperationsAdvisor = async (
+  userQuery: string,
+  context: {
+    inventory?: InventoryItem[];
+    sales?: SalesReceipt[];
+    shifts?: Shift[];
+    menu?: MenuItem[];
+  }
+): Promise<string> => {
+  // Validate query is operations-related
+  if (!isOperationsRelated(userQuery)) {
+    return OFF_TOPIC_RESPONSES[Math.random() < 0.5 ? 0 : 1];
+  }
+
+  // Sanitize user input
+  const sanitizedQuery = userQuery
+    .replace(/[<>{}[\]\\|`~!@#$%^&*()=+]/g, '')
+    .slice(0, 200)
+    .trim();
+
+  // Build context summary
+  const contextParts: string[] = [];
+
+  if (context.inventory && context.inventory.length > 0) {
+    const expiringItems = context.inventory
+      .filter(i => {
+        const daysLeft = Math.ceil((new Date(i.expiryDate).getTime() - Date.now()) / (1000 * 3600 * 24));
+        return daysLeft <= 3;
+      })
+      .slice(0, 5);
+    if (expiringItems.length > 0) {
+      contextParts.push(`即將過期: ${expiringItems.map(i => i.name).join(', ')}`);
+    }
+    contextParts.push(`庫存項目數: ${context.inventory.length}`);
+  }
+
+  if (context.sales && context.sales.length > 0) {
+    const totalRevenue = context.sales.reduce((acc, s) => acc + s.totalAmount, 0);
+    contextParts.push(`近期營收: $${totalRevenue.toFixed(2)}`);
+  }
+
+  if (context.shifts && context.shifts.length > 0) {
+    const totalLabor = context.shifts.reduce((acc, s) => acc + s.totalCost, 0);
+    contextParts.push(`人工成本: $${totalLabor.toFixed(2)}`);
+  }
+
+  if (context.menu && context.menu.length > 0) {
+    contextParts.push(`菜單項目數: ${context.menu.length}`);
+  }
+
+  const prompt = `
+You are a restaurant operations advisor. Answer ONLY questions related to restaurant/store operations.
+
+=== STORE CONTEXT ===
+${contextParts.join('\n') || 'No data available'}
+
+=== USER QUESTION ===
+${sanitizedQuery}
+
+Provide a concise, actionable answer (max 3-4 sentences). If the question is off-topic, politely redirect to operations topics.
+  `;
+
+  try {
+    const response = await callGeminiApi({ prompt });
+    return response || "無法獲取建議，請稍後再試。";
+  } catch (e) {
+    return "服務暫時不可用，請稍後再試。";
+  }
+};
+
