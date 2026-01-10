@@ -19,6 +19,10 @@ export interface KnownItem {
   typical_package_size?: string;
   visual_description?: string;
   aliases?: string[];
+  // Container fields (for container-aware scanning)
+  container_id?: string;
+  container_name?: string;
+  container_capacity?: string;  // e.g., "6 L"
 }
 
 export type ScanAreaType = 'storage' | 'prep' | 'fridge';

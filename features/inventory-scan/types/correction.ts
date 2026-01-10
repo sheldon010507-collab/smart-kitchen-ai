@@ -19,7 +19,8 @@ export type CorrectionType =
     | 'quantity_changed'
     | 'item_added'
     | 'item_removed'
-    | 'name_changed';
+    | 'name_changed'
+    | 'fill_level_changed';
 
 export interface CorrectionEntry {
     type: CorrectionType;

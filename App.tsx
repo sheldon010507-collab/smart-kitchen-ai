@@ -122,7 +122,7 @@ export default function App() {
   const [isBusinessDropdownOpen, setIsBusinessDropdownOpen] = useState(false);
   // ✅ Manage Category/Location
   const [isMetaManagerOpen, setIsMetaManagerOpen] = useState(false);
-  const [metaTab, setMetaTab] = useState<'categories' | 'locations'>('categories');
+  const [metaTab, setMetaTab] = useState<'categories' | 'locations' | 'containers'>('categories');
   const [metaNewValue, setMetaNewValue] = useState('');
 
   // Store Modal State
@@ -1046,6 +1046,7 @@ export default function App() {
         setMetaNewValue={setMetaNewValue}
         categories={derivedCategories}
         locations={derivedLocations}
+        businessId={currentBusinessId || ''}
         onRename={renameMetaItem}
         onDelete={deleteMetaItem}
         onAdd={addMetaItem}

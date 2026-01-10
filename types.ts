@@ -42,6 +42,33 @@ export interface BusinessMember {
 }
 
 // ============================================================
+// CONTAINER MODULE (容器註冊)
+// ============================================================
+
+export type FillLevel = 'full' | 'medium' | 'low' | 'empty';
+export type CapacityUnit = 'L' | 'kg' | 'pcs' | 'ml' | 'g';
+
+export interface Container {
+  id: string;
+  businessId: string;
+  name: string;
+  capacityValue: number;
+  capacityUnit: CapacityUnit;
+  images: string[];  // URLs to container photos (1-3)
+  visualFeatures?: Record<string, any>;  // AI-extracted features
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateContainerInput {
+  businessId: string;
+  name: string;
+  capacityValue: number;
+  capacityUnit: CapacityUnit;
+  images?: string[];
+}
+
+// ============================================================
 // INVENTORY MODULE
 // ============================================================
 
