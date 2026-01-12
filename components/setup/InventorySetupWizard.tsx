@@ -249,8 +249,14 @@ export const InventorySetupWizard: React.FC<InventorySetupWizardProps> = ({
                     {currentStage === 4 && (
                         <Stage3Cleanse
                             items={draftItems}
-                            existingCategories={existingCategories}
-                            existingLocations={existingLocations}
+                            existingCategories={[
+                                ...existingCategories,
+                                ...draftCategories.map(c => c.name)
+                            ]}
+                            existingLocations={[
+                                ...existingLocations,
+                                ...draftLocations.map(l => l.name)
+                            ]}
                             onNext={handleStage4Next}
                             onBack={handleStage4Back}
                         />

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { X, UploadCloud, Loader2, Wand2, Trash2, Camera, Plus, ShoppingCart, ChefHat, AlertTriangle, Minus } from "lucide-react";
 import type { InventoryItem, SalesReceipt } from "../types";
-import { analyzeInventoryImage, analyzePOSReceipt, analyzeMultiAngleImages, analyzeFridgeAudit } from "../services/geminiService";
+import { analyzeInventoryImage, analyzePOSReceipt, analyzeMultiAngleImages, analyzeFridgeAudit, analyzeInvoice } from "../services/geminiService";
 import { getSmartDictionary } from "../features/inventory-scan/services/dictionaryService";
 import type { DictionaryItem, FridgeAuditResult } from "../features/inventory-scan/types";
 import { preprocessImage } from "../features/inventory-scan/utils/imagePreprocessing";
@@ -275,21 +275,49 @@ const Scanner: React.FC<Props> = ({
         return;
       }
 
-      // Mode: Receipt - single photo (text-heavy, can compress more)
+      // Mode: Receipt - 🆕 Use Invoice OCR for accurate supplier/cost extraction
       if (mode === "receipt") {
         const processed = await preprocessImage(file!, {
-          targetSizeKB: 200,   // Optimized: 500→200 (text still readable)
-          maxWidth: 1200,      // Optimized: 1500→1200
+          targetSizeKB: 300,   // Higher quality for OCR text
+          maxWidth: 1500,      // Keep good resolution for text
           autoEnhance: true
         });
 
-        const rawItems = await analyzeInventoryImage(processed.base64, 'image/jpeg', 'receipt', dictionary);
+        // 🆕 Use new invoice analyzer with supplier/cost extraction
+        const invoiceResult = await analyzeInvoice(processed.base64, 'image/jpeg', dictionary);
 
-        if (!rawItems || rawItems.length === 0) {
+        if (!invoiceResult.items || invoiceResult.items.length === 0) {
           throw new Error("No items found. Please try a clearer photo.");
         }
 
-        setReviewItems(validateAndFlagItems(mapRawItems(rawItems)));
+        // Log supplier if detected
+        if (invoiceResult.supplier) {
+          console.log(`[Scanner] Detected supplier: ${invoiceResult.supplier}`);
+        }
+
+        // Map invoice items to ReviewItem format with cost data
+        const mappedItems = invoiceResult.items.map((item, idx) => ({
+          id: `${Date.now()}_${idx}`,
+          businessId: '',
+          name: item.name,
+          quantityValue: item.quantity,
+          quantityUnit: item.unit,
+          quantity: `${item.quantity} ${item.unit}`,
+          unitCost: item.unitCost,
+          totalPrice: item.totalPrice,
+          expiryDate: getDefaultExpiry(''),
+          category: '',
+          location: '',
+          addedDate: new Date().toISOString().split('T')[0],
+          confidence: item.confidence,
+          candidates: [],
+          is_new_item: false,
+          flags: [],
+          raw_name: item.name,
+          supplier: invoiceResult.supplier,  // Attach supplier to each item
+        }));
+
+        setReviewItems(validateAndFlagItems(mappedItems as ReviewItem[]));
         setStep("review");
         return;
       }

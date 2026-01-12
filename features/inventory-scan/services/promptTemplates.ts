@@ -353,6 +353,7 @@ import type { DictionaryItem, FridgeAuditResult } from '../types';
 
 /**
  * Generate Fridge Audit prompt for inventory reconciliation
+ * 🆕 Enhanced with label reading (OCR) capabilities
  * Returns found items, not_found items, and new items
  */
 export function generateFridgeAuditPrompt(options: {
@@ -370,7 +371,7 @@ export function generateFridgeAuditPrompt(options: {
     : '';
 
   return `
-# Fridge Inventory Audit${multiNote}
+# Fridge Inventory Audit with Label Reading${multiNote}
 
 ## Known Items (MATCH these names exactly):
 ${dictList}
@@ -378,22 +379,56 @@ ${dictList}
 ## Task
 1. Count ACTUAL visible quantities for each item
 2. Use exact names from known items when matching
-3. Report NEW items not in the known list
-4. Report items from known list that are NOT visible
+3. **🔍 READ LABELS** - extract weight, brand, and expiry if visible
+4. Report NEW items not in the known list
+5. Report items from known list that are NOT visible
+
+## 🔍 LABEL READING RULES (IMPORTANT!)
+When you see packages, containers, or bottles:
+1. **Read the WEIGHT/VOLUME** from the label (e.g., "500g", "1L", "2kg")
+2. **Read the BRAND NAME** if visible
+3. **Read EXPIRY DATE** if visible (format: YYYY-MM-DD)
+4. Use label info to improve quantity accuracy:
+   - "3 bottles × 500ml each" → quantity: 1.5, unit: L
+   - "2 bags × 1kg each" → quantity: 2, unit: kg
 
 ## Output JSON (strict format)
 {
-  "found": [{"name":"exact name","quantity":num,"unit":"str","confidence":0-1,"notes":"optional"}],
+  "found": [{
+    "name": "exact name",
+    "quantity": num,
+    "unit": "str",
+    "confidence": 0-1,
+    "label_weight": "500g (if read from label)",
+    "brand": "Brand name (if visible)",
+    "expiry": "YYYY-MM-DD (if visible)",
+    "notes": "how counted"
+  }],
   "not_found": ["names of known items not visible in any photo"],
-  "new_items": [{"name":"descriptive name","quantity":num,"unit":"str","confidence":0-1}],
+  "new_items": [{
+    "name": "descriptive name with brand if visible",
+    "quantity": num,
+    "unit": "str",
+    "confidence": 0-1,
+    "label_weight": "from label if visible",
+    "brand": "if visible"
+  }],
   "scan_quality": "good/medium/poor"
 }
+
+## Examples
+Reading labels:
+{"found":[{"name":"Milk","quantity":2,"unit":"L","confidence":0.95,"label_weight":"1L each","brand":"Anchor","notes":"2 bottles × 1L"}],"scan_quality":"good"}
+
+New item with brand:
+{"new_items":[{"name":"Orange Juice","quantity":1.5,"unit":"L","confidence":0.8,"brand":"Tropicana","label_weight":"1.5L"}],"scan_quality":"good"}
 
 ## Rules
 - found: items that ARE visible and match known list
 - not_found: items from known list that you CANNOT see
 - new_items: visible items NOT in the known list
 - Don't guess hidden quantities
+- **ALWAYS try to read labels for accurate weight/volume**
 
 Analyze:`.trim();
 }
@@ -539,4 +574,159 @@ Loose items:
 
 Analyze now:`.trim();
 }
+
+// ===================
+// INVOICE/RECEIPT OCR FUNCTIONS
+// ===================
+
+/**
+ * Invoice scan result item with cost information
+ */
+export interface InvoiceItem {
+  name: string;
+  quantity: number;
+  unit: string;
+  unitCost: number;
+  totalPrice: number;
+  confidence: number;
+  notes?: string;
+}
+
+/**
+ * Full invoice scan result
+ */
+export interface InvoiceScanResult {
+  supplier?: string;
+  invoiceNumber?: string;
+  date?: string;
+  items: InvoiceItem[];
+  subtotal?: number;
+  tax?: number;
+  grandTotal?: number;
+  scanQuality: 'good' | 'medium' | 'poor';
+}
+
+/**
+ * Generate prompt for scanning supplier invoices/delivery notes
+ * Optimized for OCR text extraction with cost information
+ */
+export function generateInvoiceScanPrompt(knownItems: string[] = []): string {
+  const knownItemsList = knownItems.length > 0
+    ? `Known items (prefer matching these names): ${knownItems.slice(0, 20).join(', ')}`
+    : '';
+
+  return `
+# Supplier Invoice/Delivery Note Scanner
+
+## Task
+Analyze this invoice/delivery note image and extract ALL information.
+
+## Extract These Fields:
+1. **Supplier Name** (company/vendor name at top of document)
+2. **Invoice/Order Number** (reference number)
+3. **Date** (delivery or invoice date)
+4. **Line Items** - for EACH item extract:
+   - Item Name (product description)
+   - Quantity (number ordered)
+   - Unit (kg/box/pcs/bottle/case/pack/bag/L/ml)
+   - Unit Cost (price per unit)
+   - Total Price (quantity × unit cost)
+
+${knownItemsList}
+
+## Output Format (JSON only, no other text)
+{
+  "supplier": "Supplier Company Name",
+  "invoiceNumber": "INV-12345",
+  "date": "YYYY-MM-DD",
+  "items": [
+    {
+      "name": "Item name",
+      "quantity": 10,
+      "unit": "kg/box/pcs/bottle/case",
+      "unitCost": 5.99,
+      "totalPrice": 59.90,
+      "confidence": 0.0-1.0,
+      "notes": "optional - if text unclear"
+    }
+  ],
+  "subtotal": 100.00,
+  "tax": 10.00,
+  "grandTotal": 110.00,
+  "scanQuality": "good/medium/poor"
+}
+
+## Rules
+1. READ text carefully - this is OCR, not visual counting
+2. If unit cost missing, calculate from total ÷ quantity
+3. If total missing, calculate from unit cost × quantity
+4. Use confidence < 0.8 for blurry or unclear text
+5. Supplier name is usually at TOP of document (company logo area)
+6. Look for "Bill To" vs "Ship From" - we want the SUPPLIER (ship from)
+
+## Examples
+Clean invoice:
+{"supplier":"Sysco Foods","invoiceNumber":"INV-2024-001","date":"2024-01-15","items":[{"name":"Fresh Salmon","quantity":5,"unit":"kg","unitCost":25.00,"totalPrice":125.00,"confidence":0.95}],"subtotal":125.00,"tax":12.50,"grandTotal":137.50,"scanQuality":"good"}
+
+Partial visibility:
+{"supplier":"Gordon Food Service","invoiceNumber":"ORD-789","date":"2024-01-10","items":[{"name":"Chicken Breast","quantity":10,"unit":"kg","unitCost":8.50,"totalPrice":85.00,"confidence":0.7,"notes":"price partially obscured"}],"scanQuality":"medium"}
+
+Analyze now:`.trim();
+}
+
+/**
+ * Parse and validate invoice scan result from AI
+ */
+export function validateInvoiceScanResult(raw: string): InvoiceScanResult | null {
+  try {
+    // Clean JSON markers
+    let cleaned = raw
+      .replace(/```json\n?/g, '')
+      .replace(/```\n?/g, '')
+      .trim();
+
+    // Extract JSON object
+    const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      cleaned = jsonMatch[0];
+    }
+
+    const data = JSON.parse(cleaned);
+
+    // Validate items array
+    const items: InvoiceItem[] = (data.items || [])
+      .filter((i: any) =>
+        typeof i.name === 'string' &&
+        i.name.length > 0 &&
+        typeof i.quantity === 'number' &&
+        i.quantity > 0
+      )
+      .map((i: any) => ({
+        name: i.name.trim(),
+        quantity: Math.round(i.quantity * 100) / 100,
+        unit: (i.unit || 'pcs').trim(),
+        unitCost: typeof i.unitCost === 'number' ? Math.round(i.unitCost * 100) / 100 : 0,
+        totalPrice: typeof i.totalPrice === 'number' ? Math.round(i.totalPrice * 100) / 100 : 0,
+        confidence: typeof i.confidence === 'number' ? Math.min(1, Math.max(0, i.confidence)) : 0.7,
+        notes: i.notes,
+      }));
+
+    return {
+      supplier: typeof data.supplier === 'string' ? data.supplier.trim() : undefined,
+      invoiceNumber: typeof data.invoiceNumber === 'string' ? data.invoiceNumber.trim() : undefined,
+      date: typeof data.date === 'string' ? data.date.trim() : undefined,
+      items,
+      subtotal: typeof data.subtotal === 'number' ? data.subtotal : undefined,
+      tax: typeof data.tax === 'number' ? data.tax : undefined,
+      grandTotal: typeof data.grandTotal === 'number' ? data.grandTotal : undefined,
+      scanQuality: ['good', 'medium', 'poor'].includes(data.scanQuality)
+        ? data.scanQuality
+        : 'medium',
+    };
+  } catch (e) {
+    console.error('Failed to parse invoice scan result:', e);
+    return null;
+  }
+}
+
 

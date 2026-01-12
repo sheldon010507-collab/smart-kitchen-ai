@@ -380,6 +380,70 @@ export const analyzePOSReceipt = async (base64Image: string, mimeType: string): 
   return {};
 };
 
+/**
+ * 🆕 FEATURE: Analyze Supplier Invoices/Delivery Notes (Inventory + Costing)
+ * Uses OCR-optimized prompt to extract Supplier, Items, and Costs
+ */
+export const analyzeInvoice = async (
+  base64Image: string,
+  mimeType: string,
+  knownItems: string[] = []
+): Promise<{
+  supplier?: string;
+  invoiceNumber?: string;
+  date?: string;
+  items: Array<{
+    name: string;
+    quantity: number;
+    unit: string;
+    unitCost: number;
+    totalPrice: number;
+    confidence: number;
+    notes?: string;
+  }>;
+  grandTotal?: number;
+}> => {
+  const { generateInvoiceScanPrompt, validateInvoiceScanResult } = await import(
+    '../features/inventory-scan/services/promptTemplates'
+  );
+
+  // Sanitize known items
+  const sanitizedItems = knownItems
+    .map(name => name.replace(/[<>{}[\]\\|`~!@#$%^&*()=+;:'"]/g, '').slice(0, 50).trim())
+    .filter(name => name.length > 0)
+    .slice(0, 20);
+
+  const prompt = generateInvoiceScanPrompt(sanitizedItems);
+
+  console.log(`[Gemini] Invoice scan: ${sanitizedItems.length} known items`);
+
+  const text = await callGeminiApi({
+    prompt,
+    imageBase64: base64Image,
+    mimeType,
+    config: {
+      temperature: 0,
+      topK: 1,
+      topP: 0.1,
+    }
+  });
+
+  if (text) {
+    const result = validateInvoiceScanResult(text);
+    if (result) {
+      return {
+        supplier: result.supplier,
+        invoiceNumber: result.invoiceNumber,
+        date: result.date,
+        items: result.items,
+        grandTotal: result.grandTotal,
+      };
+    }
+  }
+
+  return { items: [] };
+};
+
 // ... Rest of the file (Menu Photo, Costs, Recipes, Tips, Insights) ...
 // Reuse previous implementations for those
 export const analyzeMenuPhoto = async (base64Image: string, mimeType: string): Promise<MenuItem[]> => {

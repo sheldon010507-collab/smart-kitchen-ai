@@ -183,10 +183,10 @@ const EditItemModal: React.FC<Props> = ({ isOpen, onClose, onSave, item, categor
             />
           </div>
 
-          {/* Min Stock Level */}
+          {/* Par Level */}
           <div>
             <label className="block text-xs font-bold text-secondary uppercase tracking-wider mb-2">
-              Min Stock Level
+              Par Level
               <span className="font-normal text-gray-400 ml-1">(auto-reorder)</span>
             </label>
             <input

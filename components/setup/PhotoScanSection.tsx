@@ -1,11 +1,12 @@
 /**
  * Photo Scan Section
  * Multi-photo upload with AI recognition for inventory items
+ * 🆕 Uses Invoice OCR for accurate supplier/cost extraction
  */
 import React, { useState, useRef, useCallback } from 'react';
 import { DraftInventoryItem } from './types';
 import { WIZARD_STRINGS } from './constants';
-import { analyzeMultiAngleImages } from '../../services/geminiService';
+import { analyzeInvoice } from '../../services/geminiService';
 import { preprocessImage } from '../../features/inventory-scan/utils/imagePreprocessing';
 
 interface PhotoScanSectionProps {
@@ -67,7 +68,7 @@ export const PhotoScanSection: React.FC<PhotoScanSectionProps> = ({
         fileInputRef.current?.click();
     }, []);
 
-    // Run AI analysis
+    // Run AI analysis - 🆕 Use Invoice OCR for accurate cost/supplier
     const handleAnalyze = useCallback(async () => {
         if (photos.length === 0) return;
 
@@ -75,30 +76,39 @@ export const PhotoScanSection: React.FC<PhotoScanSectionProps> = ({
         setError(null);
 
         try {
-            // Preprocess all images
-            const images: Array<{ base64: string; mimeType: string }> = [];
-            for (const photo of photos) {
-                const processed = await preprocessImage(photo.file);
-                images.push({
-                    base64: processed.base64,
-                    mimeType: photo.file.type || 'image/jpeg',
-                });
-            }
+            // Process first photo for invoice analysis (single image OCR)
+            const firstPhoto = photos[0];
+            const processed = await preprocessImage(firstPhoto.file, {
+                targetSizeKB: 300,  // Higher quality for OCR
+                maxWidth: 1500,
+                autoEnhance: true
+            });
 
-            // Call multi-image analysis
-            const rawItems = await analyzeMultiAngleImages(
-                images,
-                'fridge',
+            // 🆕 Use invoice analyzer with supplier/cost extraction
+            const invoiceResult = await analyzeInvoice(
+                processed.base64,
+                'image/jpeg',
                 existingNames
             );
 
-            // Convert to DraftInventoryItem format
-            const draftItems: DraftInventoryItem[] = rawItems.map((item: any) => ({
+            if (!invoiceResult.items || invoiceResult.items.length === 0) {
+                throw new Error('No items found. Please try a clearer photo.');
+            }
+
+            // Log supplier if detected
+            if (invoiceResult.supplier) {
+                console.log(`[PhotoScanSection] Detected supplier: ${invoiceResult.supplier}`);
+            }
+
+            // Convert to DraftInventoryItem format with cost data
+            const draftItems: DraftInventoryItem[] = invoiceResult.items.map((item) => ({
                 id: crypto.randomUUID(),
                 name: item.name || '',
-                category: item.category || '',
+                category: '',
                 quantityUnit: item.unit || 'pcs',
+                unitCost: item.unitCost,
                 minStockLevel: 0,
+                supplier: invoiceResult.supplier,  // Attach detected supplier
                 issues: [],
             }));
 
