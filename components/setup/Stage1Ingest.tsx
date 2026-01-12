@@ -5,7 +5,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Stage1IngestProps, DraftInventoryItem, InventoryTemplate, ImportPath, TemplateSource } from './types';
 import { WIZARD_STRINGS } from './constants';
-import { getAvailableTemplates, incrementUsageCount } from '../../services/templateService';
+import { getAvailableTemplates, incrementUsageCount, deleteTemplate } from '../../services/templateService';
 import { TemplateCard } from './TemplateCard';
 import { TemplatePreviewModal } from './TemplatePreviewModal';
 import { ExcelPreview } from './ExcelPreview';
@@ -76,6 +76,25 @@ export const Stage1Ingest: React.FC<Stage1IngestProps> = ({
         setPhotoItems(items);
         setPhotoLoaded(true);
     }, []);
+
+    // 🆕 Handle template delete
+    const handleDeleteTemplate = useCallback(async (template: InventoryTemplate) => {
+        if (!window.confirm(`Are you sure you want to delete "${template.name}"?`)) {
+            return;
+        }
+        try {
+            await deleteTemplate(template.id, userId);
+            // Remove from local state
+            setTemplates(prev => prev.filter(t => t.id !== template.id));
+            // Clear selection if deleted
+            if (selectedTemplate?.id === template.id) {
+                setSelectedTemplate(null);
+            }
+        } catch (err) {
+            console.error('Delete template error:', err);
+            alert('Failed to delete template');
+        }
+    }, [selectedTemplate, userId]);
 
     // Handle Next
     const handleNext = useCallback(async () => {
@@ -227,6 +246,7 @@ export const Stage1Ingest: React.FC<Stage1IngestProps> = ({
                                         source="user"
                                         onSelect={handleSelectTemplate}
                                         onPreview={setPreviewTemplate}
+                                        onDelete={handleDeleteTemplate}
                                         isSelected={selectedTemplate?.id === template.id}
                                     />
                                 ))}

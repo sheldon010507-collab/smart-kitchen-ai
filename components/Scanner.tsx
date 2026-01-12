@@ -10,6 +10,8 @@ import { calculateRequirements, formatRequirements } from "../features/inventory
 import { saveScanCorrection } from "../features/inventory-scan/services/scanCorrectionService";
 import AddItemQuickForm from "../features/inventory-scan/components/AddItemQuickForm";
 import { normalizeNumber, normalizeDDMMYYYY, uniq, topMatches } from "../utils/formatters";
+import { predictExpiryDateBatch } from "../utils/predictExpiryDate";
+import { supabase } from "../lib/supabase";
 
 type ScanMode = "receipt" | "fridge" | "sales";
 
@@ -377,7 +379,33 @@ const Scanner: React.FC<Props> = ({
         throw new Error("No items found. Please try clearer photos from different angles.");
       }
 
-      setReviewItems(validateAndFlagItems(mapRawItems(allItems as any)));
+      // 🆕 Apply historical expiry date prediction
+      let mappedItems = mapRawItems(allItems as any);
+      try {
+        const itemsForPrediction = mappedItems.map(item => ({
+          name: item.name,
+          category: item.category || null
+        }));
+        const expiryPredictions = await predictExpiryDateBatch(
+          supabase,
+          businessId,
+          itemsForPrediction
+        );
+        // Apply predictions to items that don't have AI-detected expiry
+        mappedItems = mappedItems.map(item => {
+          const predicted = expiryPredictions.get(item.name);
+          // Only use prediction if current expiry is just the default
+          if (predicted && (!item.expiryDate || item.expiryDate === getDefaultExpiry(item.category))) {
+            return { ...item, expiryDate: predicted, expirySource: 'history' as const };
+          }
+          return item;
+        });
+        console.log(`[Scanner] Applied ${expiryPredictions.size} historical expiry predictions`);
+      } catch (e) {
+        console.warn('[Scanner] Expiry prediction failed, using defaults:', e);
+      }
+
+      setReviewItems(validateAndFlagItems(mappedItems));
       setStep("review");
 
     } catch (e: any) {

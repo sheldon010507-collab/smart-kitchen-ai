@@ -249,6 +249,10 @@ export function InventoryProvider({ children }: InventoryProviderProps) {
                         quantity_unit: matched.quantityUnit || newItem.quantityUnit || 'pcs',
                         unit_cost: Number(newItem.unitCost ?? matched.unitCost ?? 0),
                         expiry_date: toISODate(newItem.expiryDate) || toISODate(matched.expiryDate),
+                        // 🆕 Add min_stock_level to update payload
+                        min_stock_level: newItem.minStockLevel ?? matched.minStockLevel ?? null,
+                        supplier: newItem.supplier || matched.supplier || null,
+                        notes: newItem.notes || matched.notes || null,
                     };
 
                     await supabase
@@ -269,7 +273,8 @@ export function InventoryProvider({ children }: InventoryProviderProps) {
                         unit_cost: Number(newItem.unitCost || 0),
                         expiry_date: toISODate(newItem.expiryDate),
                         added_date: new Date().toISOString().split('T')[0],
-                        min_stock_level: newItem.minStockLevel || null,
+                        // 🐛 Fix: Use ?? instead of || to preserve 0 values
+                        min_stock_level: newItem.minStockLevel ?? null,
                         supplier: newItem.supplier || null,
                         notes: newItem.notes || null,
                     };

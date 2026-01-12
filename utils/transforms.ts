@@ -43,6 +43,10 @@ export const mapDbRowToInventoryItem = (r: any): {
     quantity: string;
     expiryDate: string;
     addedDate: string;
+    // 🆕 Add missing fields
+    minStockLevel: number | undefined;
+    supplier: string | undefined;
+    notes: string | undefined;
 } => {
     const qtyVal = Number(r.quantity_value ?? 0);
     const qtyUnit = (r.quantity_unit ?? 'pcs') as string;
@@ -59,6 +63,10 @@ export const mapDbRowToInventoryItem = (r: any): {
         quantity: `${qtyVal} ${qtyUnit}`,
         expiryDate: r.expiry_date || '',
         addedDate: r.added_date || '',
+        // 🆕 Map missing fields from database
+        minStockLevel: r.min_stock_level ?? undefined,
+        supplier: r.supplier || undefined,
+        notes: r.notes || undefined,
     };
 };
 

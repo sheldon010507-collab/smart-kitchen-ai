@@ -388,18 +388,25 @@ When you see packages, containers, or bottles:
 1. **Read the WEIGHT/VOLUME** from the label (e.g., "500g", "1L", "2kg")
 2. **Read the BRAND NAME** if visible
 3. **Read EXPIRY DATE** if visible (format: YYYY-MM-DD)
-4. Use label info to improve quantity accuracy:
-   - "3 bottles × 500ml each" → quantity: 1.5, unit: L
-   - "2 bags × 1kg each" → quantity: 2, unit: kg
+
+## ⚠️ UNIT SELECTION RULES (CRITICAL!)
+**For individually packaged items (cans, bottles, boxes):**
+- Use DISCRETE units: can, bottle, box, pcs
+- Count the NUMBER of items, NOT total volume
+- Example: "24 x 330ml cans" → quantity: 24, unit: can (NOT 7.92L)
+
+**For bulk items (bags, containers, liquids in large containers):**
+- Use WEIGHT/VOLUME units: kg, L, g, ml
+- Example: "2 bags × 1kg each" → quantity: 2, unit: kg
 
 ## Output JSON (strict format)
 {
   "found": [{
     "name": "exact name",
     "quantity": num,
-    "unit": "str",
+    "unit": "can/bottle/box/pcs/kg/L",
     "confidence": 0-1,
-    "label_weight": "500g (if read from label)",
+    "label_weight": "330ml per can (from label)",
     "brand": "Brand name (if visible)",
     "expiry": "YYYY-MM-DD (if visible)",
     "notes": "how counted"
@@ -408,7 +415,7 @@ When you see packages, containers, or bottles:
   "new_items": [{
     "name": "descriptive name with brand if visible",
     "quantity": num,
-    "unit": "str",
+    "unit": "can/bottle/box/pcs/kg/L",
     "confidence": 0-1,
     "label_weight": "from label if visible",
     "brand": "if visible"
@@ -417,11 +424,11 @@ When you see packages, containers, or bottles:
 }
 
 ## Examples
-Reading labels:
-{"found":[{"name":"Milk","quantity":2,"unit":"L","confidence":0.95,"label_weight":"1L each","brand":"Anchor","notes":"2 bottles × 1L"}],"scan_quality":"good"}
+Canned drinks (discrete counting):
+{"found":[{"name":"Coca-Cola Cans","quantity":24,"unit":"can","confidence":0.95,"label_weight":"330ml each","brand":"Coca-Cola","notes":"1 pack × 24 cans"}],"scan_quality":"good"}
 
-New item with brand:
-{"new_items":[{"name":"Orange Juice","quantity":1.5,"unit":"L","confidence":0.8,"brand":"Tropicana","label_weight":"1.5L"}],"scan_quality":"good"}
+Bulk item (weight):
+{"found":[{"name":"Rice","quantity":10,"unit":"kg","confidence":0.9,"label_weight":"5kg per bag","notes":"2 bags × 5kg"}],"scan_quality":"good"}
 
 ## Rules
 - found: items that ARE visible and match known list
