@@ -4,6 +4,9 @@ import { InventoryItem } from '../types';
 import { mapDbRowToInventoryItem } from '../utils/transforms';
 import { toISODate } from '../utils/dateUtils';
 
+// 🆕 Add mode type for inventory updates
+type InventoryUpdateMode = 'cumulative' | 'stocktake';
+
 // ============ Types ============
 interface InventoryContextType {
     // State
@@ -12,7 +15,8 @@ interface InventoryContextType {
 
     // Actions
     loadInventory: (businessId: string) => Promise<void>;
-    addItems: (items: InventoryItem[], businessId: string) => Promise<void>;
+    // 🆕 Added mode: 'cumulative' (receipt/add) or 'stocktake' (fridge/overwrite)
+    addItems: (items: InventoryItem[], businessId: string, mode?: InventoryUpdateMode) => Promise<void>;
     updateItem: (item: InventoryItem) => Promise<boolean>;
     deleteItem: (id: string, businessId: string) => Promise<boolean>;
     getFilteredInventory: (businessId: string | null, isMasterView: boolean) => InventoryItem[];
@@ -59,7 +63,7 @@ export function InventoryProvider({ children }: InventoryProviderProps) {
         }
     }, []);
 
-    const addItems = useCallback(async (items: InventoryItem[], businessId: string) => {
+    const addItems = useCallback(async (items: InventoryItem[], businessId: string, mode: InventoryUpdateMode = 'cumulative') => {
         const itemsWithBiz = items.map(i => ({ ...i, businessId }));
 
         try {
@@ -71,7 +75,10 @@ export function InventoryProvider({ children }: InventoryProviderProps) {
 
                 if (matched) {
                     // Update existing item
-                    const newQtyValue = Number(matched.quantityValue || 0) + Number(newItem.quantityValue || 0);
+                    // ✅ Logical Branch: Cumulative (Add) vs Stocktake (Overwrite)
+                    const newQtyValue = mode === 'stocktake'
+                        ? Number(newItem.quantityValue || 0) // Overwrite
+                        : Number(matched.quantityValue || 0) + Number(newItem.quantityValue || 0); // Accumulate
 
                     const payload = {
                         name: matched.name,

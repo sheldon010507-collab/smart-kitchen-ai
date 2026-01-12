@@ -28,7 +28,8 @@ type ReviewItem = InventoryItem & {
 interface Props {
   initialMode: ScanMode;
   onClose: () => void;
-  onItemsFound: (items: InventoryItem[]) => void;
+  // 🆕 pass mode for proper inventory update
+  onItemsFound: (items: InventoryItem[], mode?: 'cumulative' | 'stocktake') => void;
   onSalesProcessed: (receipt: SalesReceipt) => void;
   inventoryNameOptions?: string[]; // RAG: existing ingredient dictionary
 }
@@ -529,7 +530,8 @@ const Scanner: React.FC<Props> = ({
       ).catch(err => console.warn('[ScanCorrection] Save failed:', err));
 
       console.log(`[Scanner] Fridge confirm: ${cleaned.length} scanned, ${zeroItems.length} zeroed`);
-      onItemsFound(allUpdates);
+      // 🆕 Fridge scan = Stocktake (Overwrite quantity)
+      onItemsFound(allUpdates, 'stocktake');
       onClose();
       return;
     }
@@ -556,7 +558,8 @@ const Scanner: React.FC<Props> = ({
         } as InventoryItem;
       });
 
-    onItemsFound(cleaned);
+    // 🆕 Receipt scan = Cumulative (Add quantity)
+    onItemsFound(cleaned, 'cumulative');
     onClose();
   };
 

@@ -502,11 +502,12 @@ export default function App() {
 
   // --- Data Handlers ---
   // ✅ 使用 InventoryContext 處理掃描結果
-  const handleScanResult = async (items: InventoryItem[]) => {
+  // ✅ 使用 InventoryContext 處理掃描結果
+  const handleScanResult = async (items: InventoryItem[], mode: 'cumulative' | 'stocktake' = 'cumulative') => {
     if (!currentBusinessId) return;
 
     try {
-      await inventoryCtx.addItems(items, currentBusinessId);
+      await inventoryCtx.addItems(items, currentBusinessId, mode);
       setIsScannerOpen(false);
     } catch (err: any) {
       console.error('handleScanResult error:', err);
