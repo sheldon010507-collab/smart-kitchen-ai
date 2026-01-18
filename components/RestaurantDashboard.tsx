@@ -160,14 +160,16 @@ const RestaurantDashboard: React.FC<Props> = ({
   return (
     <div className="space-y-12 animate-in fade-in duration-500">
       {/* Header with Tabs */}
-      <div className="border-b border-border">
-        <h2 className="text-4xl font-bold text-primary mb-8 tracking-tight">Operations</h2>
-        <div className="flex space-x-8 pb-px overflow-x-auto">
+      <div className="border-b border-[#e9e9e7]">
+        <h2 className="text-2xl font-bold text-[#37352f] mb-6">Operations</h2>
+        <div className="flex space-x-6 pb-px overflow-x-auto">
           {['overview', 'sales', 'staff', 'menu', 'insights'].map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab as any)}
-              className={`pb-4 text-sm font-bold uppercase tracking-wider transition-colors border-b-2 ${activeTab === tab ? 'border-primary text-primary' : 'border-transparent text-secondary hover:text-primary'
+              className={`pb-3 text-sm font-semibold capitalize transition-colors border-b-2 ${activeTab === tab
+                  ? 'border-[#37352f] text-[#37352f]'
+                  : 'border-transparent text-[#9b9a97] hover:text-[#37352f]'
                 }`}
             >
               {tab}
@@ -186,19 +188,17 @@ const RestaurantDashboard: React.FC<Props> = ({
               { label: 'Est. COGS', value: `$${totalCOGS.toFixed(0)}` },
               { label: 'Prime Cost', value: `$${primeCost.toFixed(0)}`, sub: `${primePercent.toFixed(1)}%` },
             ].map((kpi, idx) => (
-              <div key={idx} className="bg-white p-6 rounded-xl border border-border flex flex-col justify-between h-32">
-                <p className="text-xs font-bold text-secondary uppercase tracking-widest">{kpi.label}</p>
-                <div>
-                  <p className="text-3xl font-bold text-primary tracking-tight">{kpi.value}</p>
-                  {kpi.sub && <p className="text-sm font-medium text-secondary mt-1">{kpi.sub}</p>}
-                </div>
+              <div key={idx} className="bg-white p-5 rounded-lg border border-[#e9e9e7] shadow-sm">
+                <p className="text-xs font-medium text-[#787774] mb-3">{kpi.label}</p>
+                <p className="text-2xl font-bold text-[#37352f]">{kpi.value}</p>
+                {kpi.sub && <p className="text-sm text-[#9b9a97] mt-1">{kpi.sub}</p>}
               </div>
             ))}
           </div>
 
-          <div className="bg-white p-8 rounded-xl border border-border h-96">
-            <h3 className="text-sm font-bold text-secondary uppercase tracking-widest mb-8">Financial Overview</h3>
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="bg-white p-6 rounded-lg border border-[#e9e9e7] shadow-sm h-80">
+            <h3 className="text-sm font-semibold text-[#787774] mb-6">Financial Overview</h3>
+            <ResponsiveContainer width="100%" height="85%">
               <BarChart
                 data={[
                   { name: 'Revenue', amount: totalRevenue },
@@ -207,20 +207,20 @@ const RestaurantDashboard: React.FC<Props> = ({
                   { name: 'Margin', amount: grossMargin },
                 ]}
               >
-                <XAxis dataKey="name" stroke="#6B7280" fontSize={12} tickLine={false} axisLine={false} fontWeight={600} />
+                <XAxis dataKey="name" stroke="#787774" fontSize={12} tickLine={false} axisLine={false} fontWeight={500} />
                 <YAxis
-                  stroke="#6B7280"
+                  stroke="#787774"
                   fontSize={12}
                   tickLine={false}
                   axisLine={false}
                   tickFormatter={val => `$${val}`}
-                  fontWeight={600}
+                  fontWeight={500}
                 />
                 <Tooltip
-                  cursor={{ fill: '#F5F5F5' }}
-                  contentStyle={{ border: '1px solid #E5E7EB', boxShadow: 'none', borderRadius: '8px' }}
+                  cursor={{ fill: '#f7f6f3' }}
+                  contentStyle={{ border: '1px solid #e9e9e7', boxShadow: 'none', borderRadius: '8px' }}
                 />
-                <Bar dataKey="amount" fill="#111827" radius={[4, 4, 0, 0]} barSize={50} />
+                <Bar dataKey="amount" fill="#37352f" radius={[4, 4, 0, 0]} barSize={40} />
               </BarChart>
             </ResponsiveContainer>
           </div>

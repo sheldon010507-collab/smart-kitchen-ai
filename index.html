@@ -1,64 +1,115 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="icon" type="image/png" href="/favicon.png" />
-    <title>Smart Kitchen AI - Workspace</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            colors: {
-              background: '#F5F5F5', // Cool light gray
-              surface: '#FFFFFF',
-              primary: '#111827', // Gray 900
-              secondary: '#6B7280', // Gray 500
-              border: '#E5E7EB', // Gray 200
-              accent: '#475569', // Slate 600 - Cold Accent
-              accentHover: '#334155', // Slate 700
-            },
-            fontFamily: {
-              sans: ['Inter', 'system-ui', 'sans-serif'],
-              mono: ['JetBrains Mono', 'monospace'],
-            }
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/png" href="/favicon.png" />
+  <title>Smart Kitchen AI - Workspace</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="/globals.css">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            // Core colors from CSS variables
+            background: 'var(--background)',
+            foreground: 'var(--foreground)',
+
+            surface: 'var(--card)',
+            card: 'var(--card)',
+            'card-foreground': 'var(--card-foreground)',
+
+            // TEXT COLORS - use foreground variants for text-* classes
+            primary: 'var(--foreground)',           // text-primary = #37352f
+            secondary: 'var(--foreground-secondary)', // text-secondary = #787774
+            muted: 'var(--foreground-muted)',        // text-muted = #9b9a97
+
+            // BACKGROUND COLORS - use background variants for bg-* classes
+            'primary-bg': 'var(--primary)',
+            'secondary-bg': 'var(--secondary)',      // bg-secondary-bg = #f7f6f3
+            'muted-bg': 'var(--muted)',
+
+            accent: 'var(--accent)',
+            'accent-foreground': 'var(--accent-foreground)',
+            accentHover: 'var(--primary)',
+
+            destructive: 'var(--destructive)',
+            success: 'var(--success)',
+            warning: 'var(--warning)',
+
+            border: 'var(--border)',
+            input: 'var(--input-background)',
+            ring: 'var(--ring)',
+
+            // Food category colors
+            'category-dairy': 'var(--category-dairy)',
+            'category-dairy-fg': 'var(--category-dairy-fg)',
+            'category-produce': 'var(--category-produce)',
+            'category-produce-fg': 'var(--category-produce-fg)',
+            'category-meat': 'var(--category-meat)',
+            'category-meat-fg': 'var(--category-meat-fg)',
+            'category-seafood': 'var(--category-seafood)',
+            'category-seafood-fg': 'var(--category-seafood-fg)',
+            'category-beverages': 'var(--category-beverages)',
+            'category-beverages-fg': 'var(--category-beverages-fg)',
+            'category-frozen': 'var(--category-frozen)',
+            'category-frozen-fg': 'var(--category-frozen-fg)',
+
+            // Status colors
+            'status-critical': 'var(--status-critical-bg)',
+            'status-low': 'var(--status-low-bg)',
+            'status-ok': 'var(--status-ok-bg)',
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          borderRadius: {
+            DEFAULT: 'var(--radius)',
           }
         }
       }
-    </script>
-    <style>
-      body {
-        font-family: 'Inter', sans-serif;
-        background-color: #F5F5F5;
-        color: #111827;
-        -webkit-font-smoothing: antialiased;
-      }
-      /* Minimal Scrollbar */
-      ::-webkit-scrollbar {
-        width: 6px;
-        height: 6px;
-      }
-      ::-webkit-scrollbar-track {
-        background: transparent; 
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #CBD5E1; 
-        border-radius: 3px;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #94A3B8; 
-      }
-      
-      input, select, textarea {
-        transition: all 0.2s ease;
-      }
-      input:focus, select:focus, textarea:focus {
-        border-color: #475569 !important;
-        box-shadow: 0 0 0 1px #475569 !important;
-      }
-    </style>
+    }
+  </script>
+  <style>
+    /* Minimal Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 3px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--foreground-muted);
+    }
+
+    input,
+    select,
+    textarea {
+      transition: all 0.2s ease;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      border-color: var(--primary) !important;
+      box-shadow: 0 0 0 1px var(--primary) !important;
+    }
+  </style>
   <script type="importmap">
 {
   "imports": {
@@ -73,10 +124,12 @@
   }
 }
 </script>
-<link rel="stylesheet" href="/index.css">
+  <link rel="stylesheet" href="/index.css">
 </head>
-  <body>
-    <div id="root"></div>
+
+<body>
+  <div id="root"></div>
   <script type="module" src="/index.tsx"></script>
 </body>
+
 </html>

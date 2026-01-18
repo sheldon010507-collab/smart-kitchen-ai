@@ -64,7 +64,7 @@ const ExportButton: React.FC<ExportButtonProps> = ({ items, businessName, disabl
             </button>
 
             {isOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-[#E9E9E7] py-1 z-20">
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-[#E9E9E7] py-1 z-50">
                     <button
                         onClick={handleExportCsv}
                         className="w-full flex items-center space-x-3 px-4 py-2.5 text-sm text-[#37352F] hover:bg-[#F7F6F3] transition-colors"

@@ -62,6 +62,7 @@ import { normMemberStatus, mapDbRowToInventoryItem } from './utils/transforms';
 import { sanitizeStorage } from './utils/storageUtils';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { JoinStoreModal } from './components/modals/JoinStoreModal';
+import TemplateOnboardingModal from './components/modals/TemplateOnboardingModal';
 import { MetaManagerModal } from './components/modals/MetaManagerModal';
 import { MasterDashboard } from './features/dashboard/MasterDashboard';
 import { StoreDashboard } from './features/dashboard/StoreDashboard';
@@ -142,6 +143,9 @@ export default function App() {
 
   // 🆕 Setup Wizard State
   const [isSetupWizardOpen, setIsSetupWizardOpen] = useState(false);
+
+  // 🆕 Template Onboarding State
+  const [showTemplateOnboarding, setShowTemplateOnboarding] = useState(false);
 
   // ✅ P1 優化：使用 useRef 避免 popstate 監聽器頻繁重新註冊
   const modalStatesRef = useRef({
@@ -744,7 +748,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-primary font-sans flex flex-col md:flex-row">
+    <div className="min-h-screen bg-background dark:bg-gray-900 text-primary dark:text-white font-sans flex flex-col md:flex-row">
       {/* Sidebar (Desktop) */}
       <DesktopSidebar
         user={user}
@@ -761,7 +765,7 @@ export default function App() {
         onLogout={handleLogout}
       />
       {/* Main Content */}
-      <main className="flex-1 md:ml-72 pb-20 md:pb-12 bg-gray-50 md:bg-white min-h-screen md:rounded-tl-2xl md:border-l md:border-border overflow-hidden relative">
+      <main className="flex-1 md:ml-72 pb-20 md:pb-12 bg-gray-50 dark:bg-gray-900 md:bg-white md:dark:bg-gray-900 min-h-screen md:rounded-tl-2xl md:border-l md:border-border dark:border-gray-700 overflow-hidden relative">
         {/* Mobile Header - Redesigned */}
         <MobileHeader
           user={user}
@@ -777,7 +781,7 @@ export default function App() {
           onUpgrade={() => setView(ViewState.SUBSCRIPTION)}
         />
 
-        <div className="p-4 md:p-16 max-w-6xl mx-auto min-h-screen">
+        <div className="p-4 md:p-16 max-w-6xl mx-auto min-h-screen bg-white dark:bg-gray-900">
           {/* MASTER DASHBOARD VIEW (Managers Only) */}
           {isMasterView && view === ViewState.DASHBOARD && (
             <MasterDashboard
@@ -1024,7 +1028,22 @@ export default function App() {
         onDelete={handleDeleteStore}
         initialBusiness={editingBusiness}
         ownerId={user.id}
+        isFirstStore={businesses.length === 0}
+        onFirstStoreCreated={() => setShowTemplateOnboarding(true)}
       />
+
+      {/* TEMPLATE ONBOARDING MODAL */}
+      {showTemplateOnboarding && (
+        <TemplateOnboardingModal
+          onBrowseTemplates={() => {
+            setShowTemplateOnboarding(false);
+            setView(ViewState.INVENTORY); // Navigate to inventory
+            setIsSetupWizardOpen(true); // Open the setup wizard which has templates
+          }}
+          onStartFresh={() => setShowTemplateOnboarding(false)}
+          onClose={() => setShowTemplateOnboarding(false)}
+        />
+      )}
 
       {/* JOIN STORE MODAL (Staff) */}
       <JoinStoreModal

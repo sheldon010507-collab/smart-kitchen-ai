@@ -21,11 +21,11 @@ interface WastageModalProps {
 }
 
 const REASON_OPTIONS: { value: WastageReason; label: string; icon: string }[] = [
-    { value: 'expired', label: '已過期', icon: '📅' },
-    { value: 'spoiled', label: '變質腐爛', icon: '🦠' },
-    { value: 'damaged', label: '損壞', icon: '💔' },
-    { value: 'preparation', label: '備餐損耗', icon: '🔪' },
-    { value: 'other', label: '其他', icon: '📝' },
+    { value: 'expired', label: 'Expired', icon: '📅' },
+    { value: 'spoiled', label: 'Spoiled', icon: '🦠' },
+    { value: 'damaged', label: 'Damaged', icon: '💔' },
+    { value: 'preparation', label: 'Prep Loss', icon: '🔪' },
+    { value: 'other', label: 'Other', icon: '📝' },
 ];
 
 export default function WastageModal({ item, onClose, onConfirm }: WastageModalProps) {
@@ -47,11 +47,11 @@ export default function WastageModal({ item, onClose, onConfirm }: WastageModalP
 
     const handleSubmit = async () => {
         if (quantity <= 0) {
-            setError('請輸入有效數量');
+            setError('Please enter a valid quantity');
             return;
         }
         if (quantity > maxQuantity) {
-            setError('數量不能超過庫存');
+            setError('Quantity cannot exceed stock');
             return;
         }
 
@@ -66,7 +66,7 @@ export default function WastageModal({ item, onClose, onConfirm }: WastageModalP
             });
             onClose();
         } catch (err: any) {
-            setError(err.message || '記錄失敗');
+            setError(err.message || 'Failed to record');
         } finally {
             setIsSubmitting(false);
         }
@@ -79,7 +79,7 @@ export default function WastageModal({ item, onClose, onConfirm }: WastageModalP
                 <div className="p-4 border-b border-border flex items-center justify-between">
                     <div className="flex items-center gap-2 text-red-600">
                         <Trash2 className="w-5 h-5" />
-                        <h3 className="font-bold">記錄浪費</h3>
+                        <h3 className="font-bold">Record Wastage</h3>
                     </div>
                     <button
                         onClick={onClose}
@@ -95,14 +95,14 @@ export default function WastageModal({ item, onClose, onConfirm }: WastageModalP
                     <div className="p-3 bg-gray-50 rounded-lg">
                         <div className="font-medium text-primary">{item.name}</div>
                         <div className="text-sm text-secondary">
-                            當前庫存: {item.quantityValue} {item.quantityUnit}
-                            {(item.unitCost || 0) > 0 && ` · 單價: £${item.unitCost?.toFixed(2)}`}
+                            Current Stock: {item.quantityValue} {item.quantityUnit}
+                            {(item.unitCost || 0) > 0 && ` · Unit Price: £${item.unitCost?.toFixed(2)}`}
                         </div>
                     </div>
 
                     {/* Quantity Input */}
                     <div>
-                        <label className="block text-sm font-medium mb-1">浪費數量</label>
+                        <label className="block text-sm font-medium mb-1">Wastage Quantity</label>
                         <div className="flex items-center gap-2">
                             <input
                                 type="number"
@@ -119,14 +119,14 @@ export default function WastageModal({ item, onClose, onConfirm }: WastageModalP
                                 onClick={() => setQuantity(maxQuantity)}
                                 className="text-xs text-accent hover:underline"
                             >
-                                全部
+                                All
                             </button>
                         </div>
                     </div>
 
                     {/* Reason Selection */}
                     <div>
-                        <label className="block text-sm font-medium mb-2">浪費原因</label>
+                        <label className="block text-sm font-medium mb-2">Wastage Reason</label>
                         <div className="grid grid-cols-2 gap-2">
                             {REASON_OPTIONS.map((opt) => (
                                 <button
@@ -134,8 +134,8 @@ export default function WastageModal({ item, onClose, onConfirm }: WastageModalP
                                     type="button"
                                     onClick={() => setReason(opt.value)}
                                     className={`p-2 rounded-lg border text-sm flex items-center gap-2 transition-colors ${reason === opt.value
-                                            ? 'border-red-500 bg-red-50 text-red-700'
-                                            : 'border-gray-200 hover:border-gray-300'
+                                        ? 'border-red-500 bg-red-50 text-red-700'
+                                        : 'border-gray-200 hover:border-gray-300'
                                         }`}
                                 >
                                     <span>{opt.icon}</span>
@@ -147,13 +147,13 @@ export default function WastageModal({ item, onClose, onConfirm }: WastageModalP
 
                     {/* Notes */}
                     <div>
-                        <label className="block text-sm font-medium mb-1">備註 (可選)</label>
+                        <label className="block text-sm font-medium mb-1">Notes (Optional)</label>
                         <textarea
                             value={notes}
                             onChange={(e) => setNotes(e.target.value)}
                             className="w-full px-3 py-2 border border-border rounded-lg text-sm focus:outline-none focus:border-accent"
                             rows={2}
-                            placeholder="例如：發現時已經發霉..."
+                            placeholder="e.g., Found moldy when checking..."
                         />
                     </div>
 
@@ -162,7 +162,7 @@ export default function WastageModal({ item, onClose, onConfirm }: WastageModalP
                         <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2">
                             <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0" />
                             <span className="text-sm text-red-700">
-                                預計損失: <strong>£{estimatedLoss.toFixed(2)}</strong>
+                                Estimated Loss: <strong>£{estimatedLoss.toFixed(2)}</strong>
                             </span>
                         </div>
                     )}
@@ -182,7 +182,7 @@ export default function WastageModal({ item, onClose, onConfirm }: WastageModalP
                         onClick={onClose}
                         className="flex-1 py-2 border border-border rounded-lg hover:bg-gray-50 transition-colors"
                     >
-                        取消
+                        Cancel
                     </button>
                     <button
                         type="button"
@@ -190,7 +190,7 @@ export default function WastageModal({ item, onClose, onConfirm }: WastageModalP
                         disabled={quantity <= 0 || isSubmitting}
                         className="flex-1 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
-                        {isSubmitting ? '處理中...' : '確認記錄'}
+                        {isSubmitting ? 'Processing...' : 'Confirm'}
                     </button>
                 </div>
             </div>

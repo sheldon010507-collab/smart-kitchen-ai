@@ -44,19 +44,28 @@ const AREA_DESCRIPTIONS: Record<ScanAreaType, string> = {
 
 const ALLOWED_UNITS = ['kg', 'g', 'L', 'ml', 'pcs', 'box', 'bag', 'bottle', 'pack', 'bunch'];
 
-// Reduced to 4 key examples
+// Standard food categories for AI to choose from (synced with categoryColors.ts)
+export const ALLOWED_CATEGORIES = [
+  'Dairy', 'Eggs', 'Produce', 'Vegetables', 'Fruits',
+  'Meat', 'Poultry', 'Seafood', 'Fish',
+  'Frozen', 'Dry Goods', 'Pantry',
+  'Beverages', 'Drinks',
+  'Condiments', 'Sauces', 'Bakery', 'Other'
+];
+
+// Reduced to 4 key examples - now with category
 const FEW_SHOT_EXAMPLES = `
 [Direct count]
-{"items":[{"name":"Tofu","quantity":3,"unit":"box","confidence":0.95,"notes":"3 boxes visible"}],"scan_quality":"good"}
+{"items":[{"name":"Tofu","quantity":3,"unit":"box","category":"Produce","confidence":0.95,"notes":"3 boxes visible"}],"scan_quality":"good"}
 
 [Package calculation]
-{"items":[{"name":"Rice","quantity":10,"unit":"kg","confidence":0.9,"notes":"2 bags × 5kg"}],"scan_quality":"good"}
+{"items":[{"name":"Rice","quantity":10,"unit":"kg","category":"Dry Goods","confidence":0.9,"notes":"2 bags × 5kg"}],"scan_quality":"good"}
 
 [Partial visibility]
-{"items":[{"name":"Eggs","quantity":30,"unit":"pcs","confidence":0.6,"notes":"1 tray visible, depth unknown"}],"scan_quality":"medium"}
+{"items":[{"name":"Eggs","quantity":30,"unit":"pcs","category":"Dairy","confidence":0.6,"notes":"1 tray visible, depth unknown"}],"scan_quality":"medium"}
 
 [Multiple items]
-{"items":[{"name":"Oil","quantity":5,"unit":"bottle","confidence":0.9},{"name":"Cans","quantity":6,"unit":"pcs","confidence":0.7,"notes":"front row only"}],"scan_quality":"medium"}
+{"items":[{"name":"Olive Oil","quantity":5,"unit":"bottle","category":"Condiments","confidence":0.9},{"name":"Canned Tomatoes","quantity":6,"unit":"pcs","category":"Dry Goods","confidence":0.7,"notes":"front row only"}],"scan_quality":"medium"}
 `;
 
 /**
@@ -86,9 +95,10 @@ ${knownItemsList}
 2. READ labels for weight/volume when visible
 3. For stacks: count front row, note uncertainty
 4. Confidence: 0.9+=clear, 0.7-0.9=partial, <0.7=uncertain
+5. CATEGORY: assign one of: ${ALLOWED_CATEGORIES.join('/')}
 
 ## Output (JSON only, no other text)
-{"items":[{"name":"str","quantity":num,"unit":"${ALLOWED_UNITS.join('/')}","confidence":0-1,"notes":"how counted"}],"scan_quality":"good/medium/poor"}
+{"items":[{"name":"str","quantity":num,"unit":"${ALLOWED_UNITS.join('/')}","category":"${ALLOWED_CATEGORIES.join('/')}","confidence":0-1,"notes":"how counted"}],"scan_quality":"good/medium/poor"}
 
 ## Examples
 ${FEW_SHOT_EXAMPLES}
@@ -157,7 +167,7 @@ ${knownItemsList}
 \`\`\`json
 {
   "items": [
-    {"name": "Item name", "quantity": number, "unit": "${ALLOWED_UNITS.join('/')}", "confidence": 0.0-1.0, "notes": "counting method"}
+    {"name": "Item name", "quantity": number, "unit": "${ALLOWED_UNITS.join('/')}", "category": "${ALLOWED_CATEGORIES.join('/')}", "confidence": 0.0-1.0, "notes": "counting method"}
   ],
   "scan_quality": "good/medium/poor",
   "suggestions": ["optional improvements"]
@@ -249,6 +259,7 @@ export interface ScanResultItem {
   name: string;
   quantity: number;
   unit: string;
+  category?: string;  // Food category (Dairy, Produce, Meat, etc.)
   confidence: number;
   estimation_method?: string;
   notes?: string;
@@ -297,6 +308,7 @@ export function validateAndParseScanResult(raw: string): ScanResult | null {
         name: item.name.trim(),
         quantity: Math.round(item.quantity * 100) / 100,
         unit: item.unit.trim().toLowerCase(),
+        category: typeof item.category === 'string' ? item.category.trim() : 'Other',
         confidence: typeof item.confidence === 'number'
           ? Math.min(1, Math.max(0, Math.round(item.confidence * 100) / 100))
           : 0.7,

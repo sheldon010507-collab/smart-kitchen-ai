@@ -48,15 +48,26 @@ const EditItemModal: React.FC<Props> = ({ isOpen, onClose, onSave, item, categor
           setTotalPrice('');
         }
       } else {
+        // When creating new item, check if categories/locations are empty
+        const hasCategories = categories.length > 0;
+        const hasLocations = locations.length > 0;
+
         setFormData({
           ...DEFAULT_ITEM,
-          category: categories[0] || 'Produce',
-          location: locations[0] || 'Fridge'
+          category: hasCategories ? categories[0] : '',
+          location: hasLocations ? locations[0] : ''
         });
         setTotalPrice('');
+
+        // Auto-enable custom input if no existing options
+        setIsCustomCategory(!hasCategories);
+        setIsCustomLocation(!hasLocations);
+        setCustomCategory(!hasCategories ? 'Produce' : '');
+        setCustomLocation(!hasLocations ? 'Fridge' : '');
       }
     }
   }, [isOpen, item, categories, locations]);
+
 
   if (!isOpen) return null;
 
@@ -69,11 +80,13 @@ const EditItemModal: React.FC<Props> = ({ isOpen, onClose, onSave, item, categor
 
   const handleNumericChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    const numVal = parseFloat(value);
-    setFormData(prev => ({ ...prev, [name]: numVal }));
-    if (name === 'quantityValue' && totalPrice && numVal > 0) {
+    // Handle empty input - default to 0 for minStockLevel, otherwise use NaN handling
+    const numVal = value === '' ? 0 : parseFloat(value);
+    const finalVal = isNaN(numVal) ? 0 : numVal;
+    setFormData(prev => ({ ...prev, [name]: finalVal }));
+    if (name === 'quantityValue' && totalPrice && finalVal > 0) {
       const tp = parseFloat(totalPrice);
-      setFormData(prev => ({ ...prev, unitCost: tp / numVal }));
+      setFormData(prev => ({ ...prev, unitCost: tp / finalVal }));
     }
   };
 
@@ -192,7 +205,7 @@ const EditItemModal: React.FC<Props> = ({ isOpen, onClose, onSave, item, categor
             <input
               type="number"
               name="minStockLevel"
-              value={formData.minStockLevel || 0}
+              value={formData.minStockLevel ?? ''}
               onChange={handleNumericChange}
               className="w-full px-4 py-2.5 rounded-lg border border-border focus:outline-none focus:border-accent text-sm"
               min="0"

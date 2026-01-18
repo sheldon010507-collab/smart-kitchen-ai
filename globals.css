@@ -1,0 +1,182 @@
+/* 
+ * Smart Kitchen AI - Global Design System
+ * Notion-inspired warm color palette
+ */
+
+:root {
+  /* Base font size */
+  --font-size: 16px;
+  
+  /* ========================================
+   * LIGHT MODE (Default)
+   * ======================================== */
+  
+  /* Primary colors */
+  --background: #ffffff;
+  --foreground: #37352f;
+  --foreground-secondary: #787774;
+  --foreground-muted: #9b9a97;
+  
+  /* Surface colors */
+  --card: #ffffff;
+  --card-foreground: #37352f;
+  
+  --popover: #ffffff;
+  --popover-foreground: #37352f;
+  
+  /* Button colors */
+  --primary: #37352f;
+  --primary-foreground: #ffffff;
+  
+  --secondary: #f7f6f3;
+  --secondary-foreground: #37352f;
+  
+  --muted: #f7f6f3;
+  --muted-foreground: #9b9a97;
+  
+  --accent: #f1f0ed;
+  --accent-foreground: #37352f;
+  
+  /* Semantic colors */
+  --destructive: #eb5757;
+  --destructive-foreground: #ffffff;
+  
+  --success: #27ae60;
+  --success-foreground: #ffffff;
+  
+  --warning: #f2994a;
+  --warning-foreground: #ffffff;
+  
+  /* Border & Input */
+  --border: #e9e9e7;
+  --input: transparent;
+  --input-background: #f7f6f3;
+  --ring: #e9e9e7;
+  
+  /* Layout */
+  --radius: 0.5rem;
+  
+  /* ========================================
+   * FOOD CATEGORY COLORS
+   * ======================================== */
+  
+  /* Dairy */
+  --category-dairy: #f7f3ef;
+  --category-dairy-fg: #8b7355;
+  --category-dairy-border: #e8dfd5;
+  
+  /* Produce */
+  --category-produce: #d3e5d0;
+  --category-produce-fg: #2d5f2e;
+  --category-produce-border: #b8d4b5;
+  
+  /* Meat */
+  --category-meat: #ffe5e5;
+  --category-meat-fg: #8b3a3a;
+  --category-meat-border: #ffc9c9;
+  
+  /* Seafood */
+  --category-seafood: #e3f2fd;
+  --category-seafood-fg: #1565c0;
+  --category-seafood-border: #bbdefb;
+  
+  /* Beverages */
+  --category-beverages: #f5ebe0;
+  --category-beverages-fg: #6b4423;
+  --category-beverages-border: #e8d4bf;
+  
+  /* Dry Goods */
+  --category-dry-goods: #f9f5e8;
+  --category-dry-goods-fg: #796b4a;
+  --category-dry-goods-border: #ede6d0;
+  
+  /* Frozen */
+  --category-frozen: #e8f4f8;
+  --category-frozen-fg: #0d5f7f;
+  --category-frozen-border: #c8e6f0;
+  
+  /* Condiments */
+  --category-condiments: #fff3e0;
+  --category-condiments-fg: #9a6324;
+  --category-condiments-border: #ffe0b2;
+  
+  /* ========================================
+   * STATUS COLORS
+   * ======================================== */
+  
+  --status-critical-bg: #ffe5e5;
+  --status-critical-fg: #8b3a3a;
+  --status-critical-border: #ffc9c9;
+  
+  --status-low-bg: #fff3e0;
+  --status-low-fg: #9a6324;
+  --status-low-border: #ffe0b2;
+  
+  --status-ok-bg: #d3e5d0;
+  --status-ok-fg: #2d5f2e;
+  --status-ok-border: #b8d4b5;
+}
+
+/* ========================================
+ * DARK MODE
+ * ======================================== */
+.dark {
+  --background: #191919;
+  --foreground: #e9e9e7;
+  --foreground-secondary: #9b9a97;
+  --foreground-muted: #787774;
+  
+  --card: #1e1e1e;
+  --card-foreground: #e9e9e7;
+  
+  --popover: #1e1e1e;
+  --popover-foreground: #e9e9e7;
+  
+  --primary: #e9e9e7;
+  --primary-foreground: #191919;
+  
+  --secondary: #2f2f2f;
+  --secondary-foreground: #e9e9e7;
+  
+  --muted: #2f2f2f;
+  --muted-foreground: #787774;
+  
+  --accent: #2f2f2f;
+  --accent-foreground: #e9e9e7;
+  
+  --border: #2f2f2f;
+  --input: #2f2f2f;
+  --input-background: #2f2f2f;
+  --ring: #555555;
+}
+
+/* ========================================
+ * BASE STYLES
+ * ======================================== */
+html {
+  font-size: var(--font-size);
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Border default */
+* {
+  border-color: var(--border);
+}
+
+/* ========================================
+ * UTILITY CLASSES
+ * ======================================== */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}

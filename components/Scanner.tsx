@@ -5,7 +5,7 @@ import { analyzeInventoryImage, analyzePOSReceipt, analyzeMultiAngleImages, anal
 import { getSmartDictionary } from "../features/inventory-scan/services/dictionaryService";
 import type { DictionaryItem, FridgeAuditResult } from "../features/inventory-scan/types";
 import { preprocessImage } from "../features/inventory-scan/utils/imagePreprocessing";
-import { generateScanPrompt } from "../features/inventory-scan/services/promptTemplates";
+import { generateScanPrompt, ALLOWED_CATEGORIES } from "../features/inventory-scan/services/promptTemplates";
 import { calculateRequirements, formatRequirements } from "../features/inventory-scan/utils/calculateRequirements";
 import { saveScanCorrection } from "../features/inventory-scan/services/scanCorrectionService";
 import AddItemQuickForm from "../features/inventory-scan/components/AddItemQuickForm";
@@ -474,6 +474,7 @@ const Scanner: React.FC<Props> = ({
             unitCost: 0, // Fridge scan typically doesn't have cost info
             totalPrice: 0,
             expiryDate: normalizeDDMMYYYY((x as any).expiryDate),
+            category: String((x as any).category || 'Other'), // 🆕 Explicitly include category
           } as InventoryItem;
         });
 
@@ -555,6 +556,7 @@ const Scanner: React.FC<Props> = ({
           unitCost,
           totalPrice,
           expiryDate: normalizeDDMMYYYY((x as any).expiryDate),
+          category: String((x as any).category || 'Other'), // 🆕 Explicitly include category
         } as InventoryItem;
       });
 
@@ -926,6 +928,22 @@ const Scanner: React.FC<Props> = ({
                                     />
                                   </div>
 
+                                  {/* Category */}
+                                  <div>
+                                    <div className="text-xs font-bold text-secondary uppercase tracking-widest mb-1">
+                                      Category
+                                    </div>
+                                    <select
+                                      value={String((it as any).category || "Other")}
+                                      onChange={(e) => updateItem(it.id, { category: e.target.value } as any)}
+                                      className="w-full px-3 py-2 rounded-lg border border-border text-sm bg-white"
+                                    >
+                                      {ALLOWED_CATEGORIES.map((cat) => (
+                                        <option key={cat} value={cat}>{cat}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+
                                   {/* Cost */}
                                   <div className={mode === "fridge" ? "hidden" : ""}>
                                     <div className="text-xs font-bold text-secondary uppercase tracking-widest mb-1">
@@ -978,11 +996,11 @@ const Scanner: React.FC<Props> = ({
                       <div className="flex items-center gap-2 mb-3">
                         <AlertTriangle className="w-5 h-5 text-yellow-600" />
                         <h4 className="font-bold text-yellow-800">
-                          未掃描到 ({auditResult.notFound.length})
+                          Not Found ({auditResult.notFound.length})
                         </h4>
                       </div>
                       <p className="text-xs text-yellow-700 mb-3">
-                        這些物品在系統中有記錄，但本次掃描未發現。請選擇處理方式：
+                        These items exist in your inventory but were not detected in this scan. Choose how to handle them:
                       </p>
                       {auditResult.notFound.map((name, idx) => {
                         const dictItem = dictionaryItems.find(d => d.name === name);
@@ -994,7 +1012,7 @@ const Scanner: React.FC<Props> = ({
                             <div>
                               <span className="font-medium">{name}</span>
                               <span className="text-xs text-yellow-600 ml-2">
-                                當前: {dictItem?.currentQty || 0} {dictItem?.unit}
+                                Current: {dictItem?.currentQty || 0} {dictItem?.unit}
                               </span>
                             </div>
                             <select
@@ -1005,8 +1023,8 @@ const Scanner: React.FC<Props> = ({
                               })}
                               className="text-sm border border-yellow-300 rounded px-2 py-1 bg-white"
                             >
-                              <option value="keep">保持不變</option>
-                              <option value="zero">歸零 (用完了)</option>
+                              <option value="keep">Keep Unchanged</option>
+                              <option value="zero">Set to Zero (Used Up)</option>
                             </select>
                           </div>
                         );

@@ -10,72 +10,44 @@ interface Props {
 }
 
 const MobileNav: React.FC<Props> = ({ view, setView, isManager }) => {
+  const navItems = [
+    { id: ViewState.DASHBOARD, label: 'Home', icon: LayoutDashboard },
+    { id: ViewState.INVENTORY, label: 'Items', icon: Refrigerator },
+    { id: ViewState.SHOPPING, label: 'Shop', icon: ShoppingCart },
+    { id: ViewState.CHEF, label: 'Chef', icon: ChefHat },
+    ...(isManager ? [{ id: ViewState.RESTAURANT, label: 'Ops', icon: Store }] : []),
+  ];
+
   return (
-    <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 pb-safe z-50 shadow-[0_-4px_12px_rgba(0,0,0,0.08)]">
-      <div className="flex justify-around items-center h-16 max-w-lg mx-auto">
-        <button
-          onClick={() => setView(ViewState.DASHBOARD)}
-          className={`flex flex-col items-center justify-center flex-1 h-full py-2 transition-colors ${view === ViewState.DASHBOARD
-              ? 'text-slate-800'
-              : 'text-gray-400 active:text-gray-600'
-            }`}
-        >
-          <LayoutDashboard className={`w-5 h-5 ${view === ViewState.DASHBOARD ? 'stroke-[2.5px]' : ''}`} />
-          <span className="text-[10px] font-semibold mt-1">Home</span>
-          {view === ViewState.DASHBOARD && <div className="absolute bottom-1 w-1 h-1 bg-slate-800 rounded-full" />}
-        </button>
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-[#e9e9e7] px-2 py-2 shadow-sm z-50">
+      <div className="max-w-lg mx-auto flex items-center justify-around">
+        {navItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = view === item.id;
 
-        <button
-          onClick={() => setView(ViewState.INVENTORY)}
-          className={`flex flex-col items-center justify-center flex-1 h-full py-2 transition-colors ${view === ViewState.INVENTORY
-              ? 'text-slate-800'
-              : 'text-gray-400 active:text-gray-600'
-            }`}
-        >
-          <Refrigerator className={`w-5 h-5 ${view === ViewState.INVENTORY ? 'stroke-[2.5px]' : ''}`} />
-          <span className="text-[10px] font-semibold mt-1">Items</span>
-          {view === ViewState.INVENTORY && <div className="absolute bottom-1 w-1 h-1 bg-slate-800 rounded-full" />}
-        </button>
-
-        <button
-          onClick={() => setView(ViewState.SHOPPING)}
-          className={`flex flex-col items-center justify-center flex-1 h-full py-2 transition-colors ${view === ViewState.SHOPPING
-              ? 'text-slate-800'
-              : 'text-gray-400 active:text-gray-600'
-            }`}
-        >
-          <ShoppingCart className={`w-5 h-5 ${view === ViewState.SHOPPING ? 'stroke-[2.5px]' : ''}`} />
-          <span className="text-[10px] font-semibold mt-1">Shop</span>
-          {view === ViewState.SHOPPING && <div className="absolute bottom-1 w-1 h-1 bg-slate-800 rounded-full" />}
-        </button>
-
-        <button
-          onClick={() => setView(ViewState.CHEF)}
-          className={`flex flex-col items-center justify-center flex-1 h-full py-2 transition-colors ${view === ViewState.CHEF
-              ? 'text-slate-800'
-              : 'text-gray-400 active:text-gray-600'
-            }`}
-        >
-          <ChefHat className={`w-5 h-5 ${view === ViewState.CHEF ? 'stroke-[2.5px]' : ''}`} />
-          <span className="text-[10px] font-semibold mt-1">Chef</span>
-          {view === ViewState.CHEF && <div className="absolute bottom-1 w-1 h-1 bg-slate-800 rounded-full" />}
-        </button>
-
-        {isManager && (
-          <button
-            onClick={() => setView(ViewState.RESTAURANT)}
-            className={`flex flex-col items-center justify-center flex-1 h-full py-2 transition-colors ${view === ViewState.RESTAURANT
-                ? 'text-slate-800'
-                : 'text-gray-400 active:text-gray-600'
-              }`}
-          >
-            <Store className={`w-5 h-5 ${view === ViewState.RESTAURANT ? 'stroke-[2.5px]' : ''}`} />
-            <span className="text-[10px] font-semibold mt-1">Ops</span>
-            {view === ViewState.RESTAURANT && <div className="absolute bottom-1 w-1 h-1 bg-slate-800 rounded-full" />}
-          </button>
-        )}
+          return (
+            <button
+              key={item.id}
+              onClick={() => setView(item.id)}
+              className={`flex flex-col items-center justify-center flex-1 py-2 px-3 rounded-lg transition-all ${isActive
+                  ? 'text-[#37352f]'
+                  : 'text-[#9b9a97] hover:text-[#37352f]'
+                }`}
+            >
+              <div className={`relative ${isActive ? 'scale-110' : ''} transition-transform`}>
+                <Icon className={`w-6 h-6 ${isActive ? 'stroke-2' : ''}`} />
+                {isActive && (
+                  <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-[#37352f] rounded-full" />
+                )}
+              </div>
+              <span className={`text-xs mt-1 font-medium ${isActive ? 'font-semibold' : ''}`}>
+                {item.label}
+              </span>
+            </button>
+          );
+        })}
       </div>
-    </div>
+    </nav>
   );
 };
 

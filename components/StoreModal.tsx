@@ -7,11 +7,13 @@ interface Props {
   onClose: () => void;
   onSave: (business: Partial<Business>) => void;
   onDelete?: (businessId: string) => void;
+  onFirstStoreCreated?: () => void;  // Callback for template onboarding after first store
   initialBusiness: Business | null;
   ownerId: string;
+  isFirstStore?: boolean;  // Flag to indicate this is the user's first store
 }
 
-const StoreModal: React.FC<Props> = ({ isOpen, onClose, onSave, onDelete, initialBusiness, ownerId }) => {
+const StoreModal: React.FC<Props> = ({ isOpen, onClose, onSave, onDelete, onFirstStoreCreated, initialBusiness, ownerId, isFirstStore }) => {
   const [formData, setFormData] = useState<Partial<Business>>({
     name: '',
     address: '',
@@ -53,6 +55,14 @@ const StoreModal: React.FC<Props> = ({ isOpen, onClose, onSave, onDelete, initia
 
     onSave(newBusiness);
     onClose();
+
+    // Trigger template onboarding if this is the first store
+    if (!initialBusiness && isFirstStore && onFirstStoreCreated) {
+      // Check if user has dismissed the onboarding before
+      if (localStorage.getItem('skip_template_onboarding') !== 'true') {
+        setTimeout(() => onFirstStoreCreated(), 300); // Small delay for UX
+      }
+    }
   };
 
   const handleDelete = () => {

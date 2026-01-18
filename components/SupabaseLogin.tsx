@@ -213,7 +213,7 @@ export default function SupabaseLogin({ onLoginSuccess }: Props) {
       // ✅ 檢查是否有 session（開啟郵箱驗證時通常沒有）
       if (!data.session) {
         // 沒有 session，需要郵件確認
-        setError('已發送確認郵件，請確認後再登入，登入後會自動建立餐廳');
+        setError('Confirmation email sent. Please verify your email and log in again. Your restaurant will be created automatically after login.');
         return;
       }
 
@@ -271,45 +271,45 @@ export default function SupabaseLogin({ onLoginSuccess }: Props) {
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="max-w-md w-full">
           <div className="text-center mb-12">
-            <div className="inline-flex items-center justify-center p-4 bg-white rounded-2xl border border-border shadow-sm mb-6">
-              <ChefHat className="w-12 h-12 text-primary" />
+            <div className="inline-flex items-center justify-center p-4 bg-white rounded-2xl border border-[#e9e9e7] shadow-sm mb-6">
+              <ChefHat className="w-12 h-12 text-[#37352f]" />
             </div>
-            <h1 className="text-3xl font-bold text-primary tracking-tight mb-2">SmartKitchen</h1>
-            <p className="text-secondary text-lg font-light">AI Workspace</p>
+            <h1 className="text-3xl font-bold text-[#37352f] tracking-tight mb-2">SmartKitchen</h1>
+            <p className="text-[#787774] text-lg">AI Workspace</p>
           </div>
 
           <div className="space-y-4">
-            <p className="text-center text-secondary text-sm font-medium uppercase tracking-widest mb-6">Select Your Role</p>
+            <p className="text-center text-[#787774] text-sm font-semibold uppercase tracking-widest mb-6">Select Your Role</p>
 
             <button
               onClick={() => handleRoleSelect('Manager')}
-              className="w-full bg-white p-6 rounded-xl border border-border hover:border-accent hover:shadow-md transition-all group text-left"
+              className="w-full bg-white p-6 rounded-xl border border-[#e9e9e7] hover:border-[#37352f] hover:shadow-md transition-all group text-left"
             >
               <div className="flex items-center space-x-4">
-                <div className="p-3 bg-background rounded-xl group-hover:bg-accent/10 transition-colors border border-border">
-                  <Building2 className="w-8 h-8 text-primary group-hover:text-accent transition-colors" />
+                <div className="p-3 bg-[#f7f6f3] rounded-xl group-hover:bg-[#e9e9e7] transition-colors border border-[#e9e9e7]">
+                  <Building2 className="w-8 h-8 text-[#37352f]" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="font-bold text-primary text-lg">Restaurant Manager</h3>
-                  <p className="text-secondary text-sm mt-1">Manage stores, inventory, staff & menu</p>
+                  <h3 className="font-bold text-[#37352f] text-lg">Restaurant Manager</h3>
+                  <p className="text-[#787774] text-sm mt-1">Manage stores, inventory, staff & menu</p>
                 </div>
-                <ArrowRight className="w-5 h-5 text-border group-hover:text-accent transition-colors" />
+                <ArrowRight className="w-5 h-5 text-[#9b9a97] group-hover:text-[#37352f] transition-colors" />
               </div>
             </button>
 
             <button
               onClick={() => handleRoleSelect('Staff')}
-              className="w-full bg-white p-6 rounded-xl border border-border hover:border-accent hover:shadow-md transition-all group text-left"
+              className="w-full bg-white p-6 rounded-xl border border-[#e9e9e7] hover:border-[#37352f] hover:shadow-md transition-all group text-left"
             >
               <div className="flex items-center space-x-4">
-                <div className="p-3 bg-background rounded-xl group-hover:bg-accent/10 transition-colors border border-border">
-                  <Users className="w-8 h-8 text-primary group-hover:text-accent transition-colors" />
+                <div className="p-3 bg-[#f7f6f3] rounded-xl group-hover:bg-[#e9e9e7] transition-colors border border-[#e9e9e7]">
+                  <Users className="w-8 h-8 text-[#37352f]" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="font-bold text-primary text-lg">Staff Member</h3>
-                  <p className="text-secondary text-sm mt-1">Sign in with email & password</p>
+                  <h3 className="font-bold text-[#37352f] text-lg">Staff Member</h3>
+                  <p className="text-[#787774] text-sm mt-1">Sign in with email & password</p>
                 </div>
-                <ArrowRight className="w-5 h-5 text-border group-hover:text-accent transition-colors" />
+                <ArrowRight className="w-5 h-5 text-[#9b9a97] group-hover:text-[#37352f] transition-colors" />
               </div>
             </button>
           </div>
