@@ -483,16 +483,19 @@ export const Stage3Cleanse: React.FC<Stage3CleanseProps> = ({
                 <div className="flex flex-wrap gap-3">
                     {/* Set Category */}
                     <div className="flex items-center gap-2">
-                        <select
+                        <input
+                            type="text"
+                            list="batch-category-list"
                             value={batchCategory}
                             onChange={e => setBatchCategory(e.target.value)}
-                            className="px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-sm"
-                        >
-                            <option value="">{WIZARD_STRINGS.setCategory}</option>
+                            placeholder={WIZARD_STRINGS.setCategory}
+                            className="px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-sm w-32"
+                        />
+                        <datalist id="batch-category-list">
                             {allCategories.map(cat => (
-                                <option key={cat} value={cat}>{cat}</option>
+                                <option key={cat} value={cat} />
                             ))}
-                        </select>
+                        </datalist>
                         <button
                             onClick={handleBatchSetCategory}
                             disabled={!batchCategory || selectedIds.size === 0}
@@ -504,16 +507,19 @@ export const Stage3Cleanse: React.FC<Stage3CleanseProps> = ({
 
                     {/* Set Location */}
                     <div className="flex items-center gap-2">
-                        <select
+                        <input
+                            type="text"
+                            list="batch-location-list"
                             value={batchLocation}
                             onChange={e => setBatchLocation(e.target.value)}
-                            className="px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-sm"
-                        >
-                            <option value="">{WIZARD_STRINGS.setLocation}</option>
+                            placeholder={WIZARD_STRINGS.setLocation}
+                            className="px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-sm w-32"
+                        />
+                        <datalist id="batch-location-list">
                             {allLocations.map(loc => (
-                                <option key={loc} value={loc}>{loc}</option>
+                                <option key={loc} value={loc} />
                             ))}
-                        </select>
+                        </datalist>
                         <button
                             onClick={handleBatchSetLocation}
                             disabled={!batchLocation || selectedIds.size === 0}
