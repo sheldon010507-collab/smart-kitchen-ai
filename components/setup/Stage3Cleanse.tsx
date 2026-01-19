@@ -659,16 +659,19 @@ export const Stage3Cleanse: React.FC<Stage3CleanseProps> = ({
                                                         )}
                                                     </td>
                                                     <td className="px-4 py-2">
-                                                        <select
+                                                        <input
+                                                            type="text"
+                                                            list={`category-list-${item.id}`}
                                                             value={item.category || ''}
                                                             onChange={e => handleUpdateItem(item.id, { category: e.target.value })}
-                                                            className="px-2 py-1 border border-gray-200 dark:border-gray-600 rounded bg-transparent text-sm"
-                                                        >
-                                                            <option value="">--</option>
+                                                            className="w-24 px-2 py-1 border border-gray-200 dark:border-gray-600 rounded bg-transparent text-sm"
+                                                            placeholder="--"
+                                                        />
+                                                        <datalist id={`category-list-${item.id}`}>
                                                             {allCategories.map(cat => (
-                                                                <option key={cat} value={cat}>{cat}</option>
+                                                                <option key={cat} value={cat} />
                                                             ))}
-                                                        </select>
+                                                        </datalist>
                                                     </td>
                                                     <td className="px-4 py-2">
                                                         <select
@@ -683,16 +686,19 @@ export const Stage3Cleanse: React.FC<Stage3CleanseProps> = ({
                                                     </td>
                                                     <td className="px-4 py-2">
                                                         <div className="flex flex-col gap-1">
-                                                            <select
+                                                            <input
+                                                                type="text"
+                                                                list={`location-list-${item.id}`}
                                                                 value={item.location || ''}
                                                                 onChange={e => handleUpdateItem(item.id, { location: e.target.value })}
-                                                                className="px-2 py-1 border border-gray-200 dark:border-gray-600 rounded bg-transparent text-sm w-full"
-                                                            >
-                                                                <option value="">-- Location --</option>
+                                                                className="w-24 px-2 py-1 border border-gray-200 dark:border-gray-600 rounded bg-transparent text-sm"
+                                                                placeholder="--"
+                                                            />
+                                                            <datalist id={`location-list-${item.id}`}>
                                                                 {allLocations.map(loc => (
-                                                                    <option key={loc} value={loc}>{loc}</option>
+                                                                    <option key={loc} value={loc} />
                                                                 ))}
-                                                            </select>
+                                                            </datalist>
                                                             {item.location && (
                                                                 <select
                                                                     value={item.locationType || inferLocationType(item.location)}
@@ -766,7 +772,7 @@ export const Stage3Cleanse: React.FC<Stage3CleanseProps> = ({
                     {WIZARD_STRINGS.next}: {WIZARD_STRINGS.step4} →
                 </button>
             </div>
-        </div>
+        </div >
     );
 };
 
