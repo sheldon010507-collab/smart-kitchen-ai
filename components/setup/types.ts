@@ -92,6 +92,7 @@ export interface DraftInventoryItem {
     name: string;
     category: string;
     location?: string;
+    locationType?: 'Fridge' | 'Freezer' | 'Dry' | 'Walk-in' | 'Other';  // 🆕 Auto-inferred or user-set
 
     // 新字段 (與 InventoryItem 對齊)
     quantityUnit?: string;
@@ -99,11 +100,6 @@ export interface DraftInventoryItem {
     minStockLevel?: number;        // Par Level
     supplier?: string;
     notes?: string;
-
-    // @deprecated - 向後兼容，將在遷移後移除
-    unit?: string;
-    cost?: number;
-    suggestedPar?: number;
 
     // Validation state
     issues?: ValidationIssue[];
@@ -129,15 +125,13 @@ export interface DraftCategory {
 /** Import method */
 export type ImportPath = 'excel' | 'template' | 'photo';
 
-/** Wizard stage
- * 1: Ingest (Import/Photo)
- * 2: Locations (Setup storage areas)
- * 3: Categories (Setup taxonomy)
- * 4: Cleanse (Review items)
- * 5: Commit (Final check)
- * 6: Success
+/** Wizard stage (Simplified to 4 steps)
+ * 1: Import (Excel/Template/Photo)
+ * 2: Clean (Review & edit items, add categories/locations inline)
+ * 3: Confirm (Final review & commit)
+ * 4: Success
  */
-export type WizardStage = 1 | 2 | 3 | 4 | 5 | 6;
+export type WizardStage = 1 | 2 | 3 | 4;
 
 /** Merge strategy for importing to existing inventory */
 export type MergeStrategy = 'smart-merge' | 'add-new-only' | 'overwrite';

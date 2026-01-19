@@ -34,17 +34,23 @@ export const SaveAsTemplateModal: React.FC<SaveAsTemplateModalProps> = ({
         new Set(activeItems.map(i => i.category).filter((c): c is string => Boolean(c)))
     ).map((name: string) => ({ name }));
 
-    const locations: TemplateLocation[] = [
-        ...new Set(activeItems.map(i => i.location).filter(Boolean) as string[])
-    ].map(name => ({ name, type: 'Dry' as const }));
+    // 🆕 Use item's locationType instead of hardcoded 'Dry'
+    const locationMap = new Map<string, 'Fridge' | 'Freezer' | 'Dry' | 'Walk-in' | 'Other'>();
+    activeItems.forEach(i => {
+        if (i.location && !locationMap.has(i.location)) {
+            locationMap.set(i.location, i.locationType || 'Dry');
+        }
+    });
+    const locations: TemplateLocation[] = Array.from(locationMap.entries())
+        .map(([name, type]) => ({ name, type }));
 
     // Convert to template items
     const templateItems: TemplateItem[] = activeItems.map(i => ({
         name: i.name,
         category: i.category || 'Other',
-        unit: i.quantityUnit || i.unit || 'pcs',
-        cost: i.unitCost ?? i.cost,
-        suggestedPar: i.minStockLevel ?? i.suggestedPar,
+        unit: i.quantityUnit || 'pcs',
+        cost: i.unitCost,
+        suggestedPar: i.minStockLevel,
     }));
 
     const handleSave = useCallback(async () => {

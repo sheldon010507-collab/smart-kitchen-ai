@@ -9,8 +9,16 @@ import { WIZARD_STRINGS, UNIT_NORMALIZATION, UNIT_OPTIONS } from './constants';
 import { DataHealthBar } from './DataHealthBar';
 import { migrateLegacyDraftItems } from '../../utils/draftMigration';
 
-// Levenshtein distance for similarity detection
+// Levenshtein distance for similarity detection (with memoization for performance)
+const levenshteinCache = new Map<string, number>();
+
 const levenshtein = (a: string, b: string): number => {
+    // Check cache first (symmetrical)
+    const key = a < b ? `${a}|${b}` : `${b}|${a}`;
+    if (levenshteinCache.has(key)) {
+        return levenshteinCache.get(key)!;
+    }
+
     const matrix: number[][] = [];
 
     for (let i = 0; i <= b.length; i++) {
@@ -34,7 +42,14 @@ const levenshtein = (a: string, b: string): number => {
         }
     }
 
-    return matrix[b.length][a.length];
+    const result = matrix[b.length][a.length];
+
+    // Cache result (limit cache size to prevent memory issues)
+    if (levenshteinCache.size < 1000) {
+        levenshteinCache.set(key, result);
+    }
+
+    return result;
 };
 
 // Check if two names are similar
@@ -57,6 +72,67 @@ const normalizeUnit = (unit: string): string => {
     return normalized || unit;
 };
 
+// ============================================================
+// 🆕 Location Type Auto-Inference with Self-Learning
+// ============================================================
+
+type LocationType = 'Fridge' | 'Freezer' | 'Dry' | 'Walk-in' | 'Other';
+
+// Keywords for auto-inference
+const LOCATION_TYPE_KEYWORDS: Record<LocationType, string[]> = {
+    'Fridge': ['fridge', 'refrigerator', 'cold', 'chiller', '冰箱', '冷藏', 'cooler'],
+    'Freezer': ['freezer', 'frozen', 'freeze', '冷冻', '冷凍'],
+    'Walk-in': ['walk-in', 'walkin', 'walk in', '步入式'],
+    'Dry': ['dry', 'shelf', 'pantry', 'storage', '干货', '乾貨', '货架', '储藏'],
+    'Other': [],
+};
+
+// LocalStorage key for learned location types
+const LEARNED_LOCATION_TYPES_KEY = 'smart-kitchen-learned-location-types';
+
+// Load learned types from localStorage
+const loadLearnedLocationTypes = (): Record<string, LocationType> => {
+    try {
+        const stored = localStorage.getItem(LEARNED_LOCATION_TYPES_KEY);
+        return stored ? JSON.parse(stored) : {};
+    } catch {
+        return {};
+    }
+};
+
+// Save learned type to localStorage
+const saveLearnedLocationType = (locationName: string, type: LocationType): void => {
+    try {
+        const learned = loadLearnedLocationTypes();
+        learned[locationName.toLowerCase().trim()] = type;
+        localStorage.setItem(LEARNED_LOCATION_TYPES_KEY, JSON.stringify(learned));
+    } catch (e) {
+        console.warn('Failed to save learned location type:', e);
+    }
+};
+
+// Infer location type from name (with self-learning)
+const inferLocationType = (locationName: string): LocationType => {
+    if (!locationName) return 'Other';
+
+    const normalized = locationName.toLowerCase().trim();
+
+    // Check learned types first (self-learning)
+    const learned = loadLearnedLocationTypes();
+    if (learned[normalized]) {
+        return learned[normalized];
+    }
+
+    // Keyword-based inference
+    for (const [type, keywords] of Object.entries(LOCATION_TYPE_KEYWORDS) as [LocationType, string[]][]) {
+        if (keywords.some(kw => normalized.includes(kw))) {
+            return type;
+        }
+    }
+
+    return 'Dry'; // Default to Dry storage
+};
+
 // Tab types
 type TabType = 'action' | 'review' | 'ready' | 'all';
 
@@ -71,9 +147,11 @@ export const Stage3Cleanse: React.FC<Stage3CleanseProps> = ({
     onBack,
 }) => {
     const [draftItems, setDraftItems] = useState<DraftInventoryItem[]>(() => {
-        // Initial processing: detect issues
+        // Initial processing: detect issues and auto-infer location types
         return items.map(item => ({
             ...item,
+            // 🆕 Auto-infer location type if not already set
+            locationType: item.locationType || (item.location ? inferLocationType(item.location) : undefined),
             issues: [],
             isDuplicate: false,
         }));
@@ -133,11 +211,11 @@ export const Stage3Cleanse: React.FC<Stage3CleanseProps> = ({
             }
 
             // Check for invalid unit
-            const normalized = normalizeUnit(item.unit || '');
-            if (item.unit && normalized !== item.unit) {
+            const normalized = normalizeUnit(item.quantityUnit || '');
+            if (item.quantityUnit && normalized !== item.quantityUnit) {
                 issues.push({
                     field: 'unit',
-                    message: `${WIZARD_STRINGS.invalidUnit}: "${item.unit}" → "${normalized}"`,
+                    message: `${WIZARD_STRINGS.invalidUnit}: "${item.quantityUnit}" → "${normalized}"`,
                     severity: 'warning',
                 });
             }
@@ -150,7 +228,7 @@ export const Stage3Cleanse: React.FC<Stage3CleanseProps> = ({
 
     // Classify item status
     const getItemStatus = (item: DraftInventoryItem): ItemStatus => {
-        const hasCritical = !item.name || !item.unit || !item.category || !item.location;
+        const hasCritical = !item.name || !item.quantityUnit || !item.category || !item.location;
         if (hasCritical) return 'critical';
         if (item.isDuplicate || (item.issues?.length || 0) > 0) return 'warning';
         return 'ready';
@@ -190,9 +268,23 @@ export const Stage3Cleanse: React.FC<Stage3CleanseProps> = ({
 
     // Handlers
     const handleUpdateItem = useCallback((id: string, updates: Partial<DraftInventoryItem>) => {
-        setDraftItems(prev => prev.map(item =>
-            item.id === id ? { ...item, ...updates } : item
-        ));
+        setDraftItems(prev => prev.map(item => {
+            if (item.id !== id) return item;
+
+            const updated = { ...item, ...updates };
+
+            // 🆕 Self-learning: save user's location type preference
+            if (updates.locationType && updated.location) {
+                saveLearnedLocationType(updated.location, updates.locationType);
+            }
+
+            // 🆕 Auto-infer type when location changes
+            if (updates.location && !updates.locationType) {
+                updated.locationType = inferLocationType(updates.location);
+            }
+
+            return updated;
+        }));
     }, []);
 
     const handleDeleteItem = useCallback((id: string) => {
@@ -217,7 +309,7 @@ export const Stage3Cleanse: React.FC<Stage3CleanseProps> = ({
             if (item.id !== id) return item;
             return {
                 ...item,
-                unit: normalizeUnit(item.unit || 'pcs'),
+                quantityUnit: normalizeUnit(item.quantityUnit || 'pcs'),
             };
         }));
     }, []);
@@ -580,7 +672,7 @@ export const Stage3Cleanse: React.FC<Stage3CleanseProps> = ({
                                                     </td>
                                                     <td className="px-4 py-2">
                                                         <select
-                                                            value={item.quantityUnit || item.unit || 'pcs'}
+                                                            value={item.quantityUnit || 'pcs'}
                                                             onChange={e => handleUpdateItem(item.id, { quantityUnit: e.target.value })}
                                                             className="px-2 py-1 border border-gray-200 dark:border-gray-600 rounded bg-transparent text-sm"
                                                         >
@@ -590,21 +682,36 @@ export const Stage3Cleanse: React.FC<Stage3CleanseProps> = ({
                                                         </select>
                                                     </td>
                                                     <td className="px-4 py-2">
-                                                        <select
-                                                            value={item.location || ''}
-                                                            onChange={e => handleUpdateItem(item.id, { location: e.target.value })}
-                                                            className="px-2 py-1 border border-gray-200 dark:border-gray-600 rounded bg-transparent text-sm"
-                                                        >
-                                                            <option value="">--</option>
-                                                            {allLocations.map(loc => (
-                                                                <option key={loc} value={loc}>{loc}</option>
-                                                            ))}
-                                                        </select>
+                                                        <div className="flex flex-col gap-1">
+                                                            <select
+                                                                value={item.location || ''}
+                                                                onChange={e => handleUpdateItem(item.id, { location: e.target.value })}
+                                                                className="px-2 py-1 border border-gray-200 dark:border-gray-600 rounded bg-transparent text-sm w-full"
+                                                            >
+                                                                <option value="">-- Location --</option>
+                                                                {allLocations.map(loc => (
+                                                                    <option key={loc} value={loc}>{loc}</option>
+                                                                ))}
+                                                            </select>
+                                                            {item.location && (
+                                                                <select
+                                                                    value={item.locationType || inferLocationType(item.location)}
+                                                                    onChange={e => handleUpdateItem(item.id, { locationType: e.target.value as any })}
+                                                                    className="px-2 py-1 border border-gray-200 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-800 text-xs text-gray-500 w-full"
+                                                                >
+                                                                    <option value="Dry">Dry Storage</option>
+                                                                    <option value="Fridge">Fridge</option>
+                                                                    <option value="Freezer">Freezer</option>
+                                                                    <option value="Walk-in">Walk-in</option>
+                                                                    <option value="Other">Other</option>
+                                                                </select>
+                                                            )}
+                                                        </div>
                                                     </td>
                                                     <td className="px-4 py-2">
                                                         <input
                                                             type="number"
-                                                            value={item.minStockLevel ?? item.suggestedPar ?? ''}
+                                                            value={item.minStockLevel ?? ''}
                                                             onChange={e => handleUpdateItem(item.id, { minStockLevel: e.target.value ? Number(e.target.value) : undefined })}
                                                             className="w-16 px-2 py-1 border border-gray-200 dark:border-gray-600 rounded bg-transparent text-sm text-center"
                                                             placeholder="--"

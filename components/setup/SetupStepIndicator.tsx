@@ -12,8 +12,8 @@ interface SetupStepIndicatorProps {
 
 const STAGES: { stage: WizardStage; label: string }[] = [
     { stage: 1, label: WIZARD_STRINGS.step1 },
-    { stage: 3, label: WIZARD_STRINGS.step3 },
-    { stage: 4, label: WIZARD_STRINGS.step4 },
+    { stage: 2, label: WIZARD_STRINGS.step3 },  // Clean step
+    { stage: 3, label: WIZARD_STRINGS.step4 },  // Confirm step
 ];
 
 export const SetupStepIndicator: React.FC<SetupStepIndicatorProps> = ({ currentStage }) => {

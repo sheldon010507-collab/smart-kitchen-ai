@@ -1,8 +1,10 @@
 /**
  * Excel Preview Component
  * Handles file upload and displays inline preview of Excel/CSV data
+ * 🆕 Now with real xlsx support using SheetJS library
  */
 import React, { useState, useCallback, useRef } from 'react';
+import * as XLSX from 'xlsx';
 import { DraftInventoryItem } from './types';
 import { UNIT_NORMALIZATION } from './constants';
 
@@ -84,16 +86,25 @@ export const ExcelPreview: React.FC<ExcelPreviewProps> = ({ onLoad }) => {
         setError(null);
 
         try {
-            const text = await file.text();
             let rows: string[][] = [];
 
-            // Check file type
+            // Check file type and parse accordingly
             if (file.name.endsWith('.csv') || file.type === 'text/csv') {
+                // CSV: parse as text
+                const text = await file.text();
                 rows = parseCSV(text);
             } else {
-                // For Excel files, we'd need xlsx library
-                // For now, try parsing as CSV
-                rows = parseCSV(text);
+                // 🆕 Excel files: use xlsx library for real parsing
+                const arrayBuffer = await file.arrayBuffer();
+                const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                // Convert to 2D array, all values as strings
+                rows = XLSX.utils.sheet_to_json<string[]>(worksheet, {
+                    header: 1,
+                    defval: '',
+                    raw: false  // Convert numbers to strings
+                });
             }
 
             if (rows.length < 2) {

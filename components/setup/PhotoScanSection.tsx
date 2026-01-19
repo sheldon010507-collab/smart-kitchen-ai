@@ -1,12 +1,12 @@
 /**
  * Photo Scan Section
  * Multi-photo upload with AI recognition for inventory items
- * 🆕 Uses Invoice OCR for accurate supplier/cost extraction
+ * 🆕 Uses Multi-Invoice OCR for accurate supplier/cost extraction from ALL photos
  */
 import React, { useState, useRef, useCallback } from 'react';
 import { DraftInventoryItem } from './types';
 import { WIZARD_STRINGS } from './constants';
-import { analyzeInvoice } from '../../services/geminiService';
+import { analyzeMultipleInvoices } from '../../services/geminiService';
 import { preprocessImage } from '../../features/inventory-scan/utils/imagePreprocessing';
 
 interface PhotoScanSectionProps {
@@ -68,7 +68,7 @@ export const PhotoScanSection: React.FC<PhotoScanSectionProps> = ({
         fileInputRef.current?.click();
     }, []);
 
-    // Run AI analysis - 🆕 Use Invoice OCR for accurate cost/supplier
+    // Run AI analysis - 🆕 Analyze ALL photos using multi-image API
     const handleAnalyze = useCallback(async () => {
         if (photos.length === 0) return;
 
@@ -76,23 +76,31 @@ export const PhotoScanSection: React.FC<PhotoScanSectionProps> = ({
         setError(null);
 
         try {
-            // Process first photo for invoice analysis (single image OCR)
-            const firstPhoto = photos[0];
-            const processed = await preprocessImage(firstPhoto.file, {
-                targetSizeKB: 300,  // Higher quality for OCR
-                maxWidth: 1500,
-                autoEnhance: true
-            });
+            // 🆕 Process ALL photos, not just the first one
+            const processedImages = await Promise.all(
+                photos.map(async (photo) => {
+                    const processed = await preprocessImage(photo.file, {
+                        targetSizeKB: 300,  // Higher quality for OCR
+                        maxWidth: 1500,
+                        autoEnhance: true
+                    });
+                    return {
+                        base64: processed.base64,
+                        mimeType: 'image/jpeg'
+                    };
+                })
+            );
 
-            // 🆕 Use invoice analyzer with supplier/cost extraction
-            const invoiceResult = await analyzeInvoice(
-                processed.base64,
-                'image/jpeg',
+            console.log(`[PhotoScanSection] Analyzing ${processedImages.length} photos`);
+
+            // 🆕 Use multi-invoice analyzer with all images
+            const invoiceResult = await analyzeMultipleInvoices(
+                processedImages,
                 existingNames
             );
 
             if (!invoiceResult.items || invoiceResult.items.length === 0) {
-                throw new Error('No items found. Please try a clearer photo.');
+                throw new Error('No items found. Please try clearer photos.');
             }
 
             // Log supplier if detected
@@ -228,7 +236,7 @@ export const PhotoScanSection: React.FC<PhotoScanSectionProps> = ({
                                     {index + 1}. {item.name}
                                 </span>
                                 <span className="text-gray-500 dark:text-gray-400">
-                                    {item.unit}
+                                    {item.quantityUnit}
                                 </span>
                             </div>
                         ))}

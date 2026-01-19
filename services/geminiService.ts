@@ -444,6 +444,97 @@ export const analyzeInvoice = async (
   return { items: [] };
 };
 
+/**
+ * 🆕 FEATURE: Analyze MULTIPLE Invoice/Receipt Photos (Setup Wizard)
+ * Combines results from multiple photos for more accurate item extraction
+ * Uses multi-image API for better context across photos
+ */
+export const analyzeMultipleInvoices = async (
+  images: Array<{ base64: string; mimeType: string }>,
+  knownItems: string[] = []
+): Promise<{
+  supplier?: string;
+  items: Array<{
+    name: string;
+    quantity?: number;
+    unit: string;
+    unitCost?: number;
+    confidence: number;
+  }>;
+}> => {
+  if (images.length === 0) {
+    return { items: [] };
+  }
+
+  // For single image, just use regular invoice scan
+  if (images.length === 1) {
+    const result = await analyzeInvoice(images[0].base64, images[0].mimeType, knownItems);
+    return {
+      supplier: result.supplier,
+      items: result.items.map(i => ({
+        name: i.name,
+        quantity: i.quantity,
+        unit: i.unit,
+        unitCost: i.unitCost,
+        confidence: i.confidence,
+      })),
+    };
+  }
+
+  // Multi-image analysis
+  const { generateInvoiceScanPrompt, validateInvoiceScanResult } = await import(
+    '../features/inventory-scan/services/promptTemplates'
+  );
+
+  // Sanitize known items
+  const sanitizedItems = knownItems
+    .map(name => name.replace(/[<>{}[\]\\|`~!@#$%^&*()=+;:'"]/g, '').slice(0, 50).trim())
+    .filter(name => name.length > 0)
+    .slice(0, 20);
+
+  // Enhanced prompt for multi-image
+  const basePrompt = generateInvoiceScanPrompt(sanitizedItems);
+  const multiImagePrompt = `
+${basePrompt}
+
+⚠️ IMPORTANT: You are analyzing ${images.length} photos of receipts/invoices.
+- These may be DIFFERENT receipts or DIFFERENT pages of the same receipt
+- Combine ALL items from ALL photos into ONE unified list
+- If same item appears in multiple photos, count them ONCE with total quantity
+- Extract supplier from whichever photo shows it most clearly
+`;
+
+  console.log(`[Gemini] Multi-invoice scan: ${images.length} images, ${sanitizedItems.length} known items`);
+
+  const text = await callGeminiMultiImageApi({
+    prompt: multiImagePrompt,
+    images,
+    config: {
+      temperature: 0,
+      topK: 1,
+      topP: 0.1,
+    }
+  });
+
+  if (text) {
+    const result = validateInvoiceScanResult(text);
+    if (result) {
+      return {
+        supplier: result.supplier,
+        items: result.items.map(i => ({
+          name: i.name,
+          quantity: i.quantity,
+          unit: i.unit,
+          unitCost: i.unitCost,
+          confidence: i.confidence,
+        })),
+      };
+    }
+  }
+
+  return { items: [] };
+};
+
 // ... Rest of the file (Menu Photo, Costs, Recipes, Tips, Insights) ...
 // Reuse previous implementations for those
 export const analyzeMenuPhoto = async (base64Image: string, mimeType: string): Promise<MenuItem[]> => {

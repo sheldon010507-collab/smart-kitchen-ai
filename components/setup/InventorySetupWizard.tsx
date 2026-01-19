@@ -106,7 +106,7 @@ export const InventorySetupWizard: React.FC<InventorySetupWizardProps> = ({
     }, [businessId]);
 
     // ============================================================
-    // Stage Handlers
+    // Stage Handlers (Simplified: 4 stages instead of 6)
     // ============================================================
 
     const handleStage1Next = useCallback((
@@ -117,38 +117,20 @@ export const InventorySetupWizard: React.FC<InventorySetupWizardProps> = ({
         setDraftItems(items);
         setImportPath(path);
         setSelectedTemplateId(templateId);
-        setCurrentStage(2); // Go to Locations
-    }, []);
-
-    const handleStage2Next = useCallback(() => {
-        // Go to Categories
-        setCurrentStage(3);
+        setCurrentStage(2); // Go directly to Clean (skip Locations/Categories)
     }, []);
 
     const handleStage2Back = useCallback(() => {
-        setCurrentStage(1);
+        setCurrentStage(1);  // Back to Import
     }, []);
 
-    const handleStage3Next = useCallback(() => {
-        // Go to Cleanse (Stage 4)
-        setCurrentStage(4);
+    const handleStage2Next = useCallback((cleanedItems: DraftInventoryItem[]) => {
+        setDraftItems(cleanedItems);
+        setCurrentStage(3); // Go to Confirm
     }, []);
 
     const handleStage3Back = useCallback(() => {
-        setCurrentStage(2); // Back to Locations
-    }, []);
-
-    const handleStage4Next = useCallback((cleanedItems: DraftInventoryItem[]) => {
-        setDraftItems(cleanedItems);
-        setCurrentStage(5); // Go to Commit
-    }, []);
-
-    const handleStage4Back = useCallback(() => {
-        setCurrentStage(3); // Back to Categories
-    }, []);
-
-    const handleStage5Back = useCallback(() => {
-        setCurrentStage(4); // Back to Cleanse
+        setCurrentStage(2); // Back to Clean
     }, []);
 
     const handleCommit = useCallback(async (strategy: MergeStrategy) => {
@@ -156,7 +138,7 @@ export const InventorySetupWizard: React.FC<InventorySetupWizardProps> = ({
         await onComplete(draftItems.filter(i => !i.isDeleted), strategy);
         clearDraft();
         setIsComplete(true);
-        setCurrentStage(6);  // Success stage
+        setCurrentStage(4);  // Success stage (was 6, now 4)
     }, [draftItems, onComplete, clearDraft]);
 
     const handleSaveAsTemplate = useCallback(() => {
@@ -227,26 +209,8 @@ export const InventorySetupWizard: React.FC<InventorySetupWizardProps> = ({
                         />
                     )}
 
+                    {/* Stage 2: Clean (was Stage 4) - now includes inline category/location adding */}
                     {currentStage === 2 && (
-                        <Stage3Locations
-                            businessId={businessId}
-                            locations={draftLocations}
-                            onChange={setDraftLocations}
-                            onNext={handleStage2Next}
-                            onBack={handleStage2Back}
-                        />
-                    )}
-
-                    {currentStage === 3 && (
-                        <Stage3Categories
-                            categories={draftCategories}
-                            onChange={setDraftCategories}
-                            onNext={handleStage3Next}
-                            onBack={handleStage3Back}
-                        />
-                    )}
-
-                    {currentStage === 4 && (
                         <Stage3Cleanse
                             items={draftItems}
                             existingCategories={[
@@ -257,24 +221,26 @@ export const InventorySetupWizard: React.FC<InventorySetupWizardProps> = ({
                                 ...existingLocations,
                                 ...draftLocations.map(l => l.name)
                             ]}
-                            onNext={handleStage4Next}
-                            onBack={handleStage4Back}
+                            onNext={handleStage2Next}
+                            onBack={handleStage2Back}
                         />
                     )}
 
-                    {currentStage === 5 && (
+                    {/* Stage 3: Confirm (was Stage 5) */}
+                    {currentStage === 3 && (
                         <Stage4Commit
                             items={draftItems}
                             existingItemCount={existingItemCount}
                             businessId={businessId}
                             userId={userId}
                             onCommit={handleCommit}
-                            onBack={handleStage5Back}
+                            onBack={handleStage3Back}
                             onSaveAsTemplate={handleSaveAsTemplate}
                         />
                     )}
 
-                    {currentStage === 6 && isComplete && (
+                    {/* Stage 4: Success (was Stage 6) */}
+                    {currentStage === 4 && isComplete && (
                         <SuccessPage
                             itemCount={successStats.itemCount}
                             categoryCount={successStats.categoryCount}
