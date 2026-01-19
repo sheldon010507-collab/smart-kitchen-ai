@@ -139,9 +139,9 @@ export interface ScanResult {
 }
 
 /**
- * Scan history record
+ * Scan session record (renamed from ScanHistory to avoid conflict with types.ts)
  */
-export interface ScanHistory {
+export interface ScanSession {
     id: string;
     business_id: string;
     scan_type: ScanAreaType;
@@ -156,9 +156,9 @@ export interface ScanHistory {
 // ===================
 
 /**
- * Prep task - items to prepare today
+ * Prep requirement - items to prepare today (renamed from PrepTask to avoid conflict with types.ts)
  */
-export interface PrepTask {
+export interface PrepRequirement {
     action: 'PREP';
     sku_id: string;
     item_name: string;
@@ -185,7 +185,7 @@ export interface ShoppingTask {
  * Requirement calculation result
  */
 export interface RequirementCalculation {
-    prep_list: PrepTask[];
+    prep_list: PrepRequirement[];
     shopping_list: ShoppingTask[];
     summary: {
         total_prep_items: number;

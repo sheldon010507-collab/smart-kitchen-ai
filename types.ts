@@ -212,15 +212,6 @@ export interface PrepTask {
   createdAt: string;
 }
 
-// Legacy alias
-export interface PrepTaskLegacy {
-  id: string;
-  businessId: string;
-  text: string;
-  completed: boolean;
-  addedBy: string;
-  date: string;
-}
 
 /** Shift - staff scheduling and clock-in/out */
 export interface Shift {
@@ -272,12 +263,6 @@ export interface SalesItem {
   notes?: string;
 }
 
-// Legacy type for backwards compatibility
-export interface SalesItemLegacy {
-  name: string;
-  quantity: number;
-  price: number;
-}
 
 // ============================================================
 // STAFF MODULE
@@ -325,7 +310,8 @@ export interface ShoppingListItem {
 // AI & SCANNING
 // ============================================================
 
-export interface ScanHistory {
+/** Scan History Record - persisted scan records (renamed from ScanHistory for clarity) */
+export interface ScanHistoryRecord {
   id: string;
   businessId: string;
   scanType: 'front' | 'back' | 'storage';

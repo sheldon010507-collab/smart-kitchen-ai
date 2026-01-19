@@ -7,7 +7,7 @@
  * 3. Calculate raw material shopping gaps
  */
 
-import { SKUWithState, PrepTask, ShoppingTask, RequirementCalculation } from '../types';
+import { SKUWithState, PrepRequirement, ShoppingTask, RequirementCalculation } from '../types';
 
 /**
  * Calculate prep and shopping requirements from inventory state
@@ -16,7 +16,7 @@ export function calculateRequirements(
     rawItems: SKUWithState[],
     prepItems: SKUWithState[]
 ): RequirementCalculation {
-    const prepList: PrepTask[] = [];
+    const prepList: PrepRequirement[] = [];
     const shoppingList: ShoppingTask[] = [];
 
     // Temporary map: accumulate raw material demand
@@ -162,6 +162,6 @@ export function sortShoppingListByPriority(tasks: ShoppingTask[]): ShoppingTask[
 /**
  * Sort prep list by raw consumption (highest first for efficiency)
  */
-export function sortPrepListByConsumption(tasks: PrepTask[]): PrepTask[] {
+export function sortPrepListByConsumption(tasks: PrepRequirement[]): PrepRequirement[] {
     return [...tasks].sort((a, b) => (b.raw_consumption || 0) - (a.raw_consumption || 0));
 }

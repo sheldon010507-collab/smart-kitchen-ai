@@ -5,7 +5,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChefHat, ShoppingCart, Clock, RefreshCw, Check } from 'lucide-react';
-import { RequirementCalculation, PrepTask, ShoppingTask } from '../types';
+import { RequirementCalculation, PrepRequirement, ShoppingTask } from '../types';
 
 interface CalculationResultsProps {
     calculation: RequirementCalculation;
@@ -126,7 +126,7 @@ export default function CalculationResults({ calculation, onReset, onConfirm }: 
 }
 
 // Prep Task List Component
-function PrepTaskList({ tasks }: { tasks: PrepTask[] }) {
+function PrepTaskList({ tasks }: { tasks: PrepRequirement[] }) {
     if (tasks.length === 0) {
         return (
             <div className="bg-white rounded-xl border border-slate-200 p-8 text-center">
