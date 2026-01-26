@@ -231,37 +231,7 @@ export interface Shift {
   createdAt: string;
 }
 
-// ============================================================
-// SALES MODULE (NEW - matches database)
-// ============================================================
 
-/** Sales Receipt - transaction record */
-export interface SalesReceipt {
-  id: string;
-  businessId: string;
-  receiptNumber?: string;
-  tableNumber?: string;
-  totalAmount: number;
-  taxAmount?: number;
-  discountAmount?: number;
-  paymentMethod?: 'cash' | 'card' | 'online' | 'mixed';
-  status: 'pending' | 'completed' | 'refunded' | 'cancelled';
-  servedBy?: string;
-  notes?: string;
-  createdAt: string;
-}
-
-/** Sales Item - line item in a receipt */
-export interface SalesItem {
-  id: string;
-  receiptId: string;
-  menuItemId?: string;
-  itemName: string;
-  quantity: number;
-  unitPrice: number;
-  subtotal: number;
-  notes?: string;
-}
 
 
 // ============================================================
@@ -407,29 +377,5 @@ export namespace Database {
     created_at: string;
   }
 
-  export interface SalesReceiptRow {
-    id: string;
-    business_id: string;
-    receipt_number: string | null;
-    table_number: string | null;
-    total_amount: number;
-    tax_amount: number | null;
-    discount_amount: number | null;
-    payment_method: 'cash' | 'card' | 'online' | 'mixed' | null;
-    status: 'pending' | 'completed' | 'refunded' | 'cancelled';
-    served_by: string | null;
-    notes: string | null;
-    created_at: string;
-  }
 
-  export interface SalesItemRow {
-    id: string;
-    receipt_id: string;
-    menu_item_id: string | null;
-    item_name: string;
-    quantity: number;
-    unit_price: number;
-    subtotal: number;
-    notes: string | null;
-  }
 }

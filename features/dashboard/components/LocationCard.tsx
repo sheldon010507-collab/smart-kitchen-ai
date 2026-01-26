@@ -7,12 +7,11 @@
 
 import React from 'react';
 import { MapPin, Edit } from 'lucide-react';
-import { Business, InventoryItem, SalesReceipt } from '../../../types';
+import { Business, InventoryItem } from '../../../types';
 
 interface LocationCardProps {
     business: Business;
     inventory: InventoryItem[];
-    sales: SalesReceipt[];
     onClick: () => void;
     onEdit: (e: React.MouseEvent) => void;
 }
@@ -20,12 +19,9 @@ interface LocationCardProps {
 export function LocationCard({
     business,
     inventory,
-    sales,
     onClick,
     onEdit,
 }: LocationCardProps) {
-    const totalRev = sales.reduce((acc, s) => acc + s.totalAmount, 0);
-
     // Count items expiring within 3 days
     const alertCount = inventory.filter(i => {
         if (!i.expiryDate) return false;
@@ -67,10 +63,7 @@ export function LocationCard({
 
             {/* Stats */}
             <div className="space-y-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                <div className="flex justify-between text-base items-center">
-                    <span className="text-gray-500 dark:text-gray-400 font-medium">Revenue</span>
-                    <span className="font-bold text-gray-900 dark:text-white">${totalRev.toFixed(0)}</span>
-                </div>
+                {/* Removed sales revenue display */}
                 <div className="flex justify-between text-base items-center">
                     <span className="text-gray-500 dark:text-gray-400 font-medium">Alerts</span>
                     <span className={`font-semibold ${alertCount > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>

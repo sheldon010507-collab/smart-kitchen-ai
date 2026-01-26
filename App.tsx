@@ -24,7 +24,6 @@ import {
 import {
   InventoryItem,
   ViewState,
-  SalesReceipt,
   Staff,
   Shift,
   MenuItem,
@@ -109,7 +108,6 @@ export default function App() {
   };
 
   // Data State（其他狀態保持本地管理）
-  const [sales, setSales] = useState<SalesReceipt[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [menu, setMenu] = useState<MenuItem[]>([]);
@@ -117,7 +115,7 @@ export default function App() {
 
   // UI State
   const [isScannerOpen, setIsScannerOpen] = useState(false);
-  const [scannerMode, setScannerMode] = useState<'receipt' | 'fridge' | 'sales'>('receipt');
+  const [scannerMode, setScannerMode] = useState<'receipt' | 'fridge'>('receipt');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [isBusinessDropdownOpen, setIsBusinessDropdownOpen] = useState(false);
@@ -184,8 +182,7 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []); // 空依賴 - 只註冊一次
 
-  // ✅ 新增：打开 Scanner 的辅助函数
-  const openScanner = (mode: 'receipt' | 'fridge' | 'sales') => {
+  const openScanner = (mode: 'receipt' | 'fridge') => {
     setScannerMode(mode);
     window.history.pushState({ modal: 'scanner' }, '');
     setIsScannerOpen(true);
@@ -362,7 +359,6 @@ export default function App() {
     setIsStoreModalOpen,
     setEditingBusiness,
     setIsJoinStoreModalOpen,
-    setSales,
     setStaff,
     setShifts,
     setMenu,
@@ -386,7 +382,7 @@ export default function App() {
     () => (isMasterView ? inventory : inventory.filter(i => i.businessId === currentBusinessId)),
     [inventory, currentBusinessId, isMasterView]
   );
-  const filteredSales = useMemo(() => sales.filter(s => s.businessId === currentBusinessId), [sales, currentBusinessId]);
+
   const filteredStaff = useMemo(
     () => (isMasterView ? staff : staff.filter(s => s.businessId === currentBusinessId)),
     [staff, currentBusinessId, isMasterView]
@@ -519,11 +515,7 @@ export default function App() {
     }
   };
 
-  const handleSalesProcessed = (receipt: SalesReceipt) => {
-    if (!currentBusinessId) return;
-    setSales(prev => [{ ...receipt, businessId: currentBusinessId }, ...prev]);
-    setIsScannerOpen(false);
-  };
+
 
   const handleSaveItem = async (item: InventoryItem, newCategory?: string, newLocation?: string) => {
     if (!currentBusinessId) return;
@@ -787,7 +779,6 @@ export default function App() {
             <MasterDashboard
               businesses={accessibleBusinesses}
               inventory={inventory}
-              sales={sales}
               shoppingListSummaries={shoppingListSummaries}
               shoppingListLoading={shoppingListLoading}
               onSelectBusiness={setCurrentBusinessId}
@@ -915,7 +906,6 @@ export default function App() {
             <div className="animate-in fade-in duration-500">
               {user.role === 'Manager' && currentBusinessId ? (
                 <RestaurantDashboard
-                  sales={filteredSales}
                   staff={filteredStaff}
                   shifts={filteredShifts}
                   menu={filteredMenu}
@@ -933,7 +923,7 @@ export default function App() {
                   onAddMenuItem={item => setMenu(prev => [...prev, { ...item, businessId: currentBusinessId }])}
                   onDeleteMenuItem={id => setMenu(prev => prev.filter(m => m.id !== id))}
                   onUpdateMenuItem={item => setMenu(prev => prev.map(m => (m.id === item.id ? item : m)))}
-                  onOpenScanner={() => openScanner('sales')}
+
                   onRefreshMembers={() => loadMembersForBusiness(currentBusinessId)}
                   onApproveStaffRequest={async (staffUserId: string) => {
                     // staffUserId 可能是 "uid_bizid" 或 "uid"
@@ -1006,7 +996,6 @@ export default function App() {
               inventoryNameOptions={filteredInventory.map((i) => i.name)}
               onClose={() => setIsScannerOpen(false)}
               onItemsFound={handleScanResult}
-              onSalesProcessed={handleSalesProcessed}
             />
           </ErrorBoundary>
         </div>

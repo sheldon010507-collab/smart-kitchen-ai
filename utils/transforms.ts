@@ -8,8 +8,6 @@ import {
     MenuItem,
     PrepTask,
     Shift,
-    SalesReceipt,
-    SalesItem,
     MenuIngredient,
     Database
 } from '../types';
@@ -183,40 +181,6 @@ export function toShiftRow(shift: Partial<Shift>): Partial<Database.ShiftRow> {
 }
 
 // ============================================================
-// SALES
-// ============================================================
-
-export function toSalesReceipt(row: Database.SalesReceiptRow): SalesReceipt {
-    return {
-        id: row.id,
-        businessId: row.business_id,
-        receiptNumber: row.receipt_number ?? undefined,
-        tableNumber: row.table_number ?? undefined,
-        totalAmount: row.total_amount,
-        taxAmount: row.tax_amount ?? undefined,
-        discountAmount: row.discount_amount ?? undefined,
-        paymentMethod: row.payment_method ?? undefined,
-        status: row.status,
-        servedBy: row.served_by ?? undefined,
-        notes: row.notes ?? undefined,
-        createdAt: row.created_at,
-    };
-}
-
-export function toSalesItem(row: Database.SalesItemRow): SalesItem {
-    return {
-        id: row.id,
-        receiptId: row.receipt_id,
-        menuItemId: row.menu_item_id ?? undefined,
-        itemName: row.item_name,
-        quantity: row.quantity,
-        unitPrice: row.unit_price,
-        subtotal: row.subtotal,
-        notes: row.notes ?? undefined,
-    };
-}
-
-// ============================================================
 // BATCH CONVERTERS
 // ============================================================
 
@@ -230,12 +194,4 @@ export function toPrepTasks(rows: Database.PrepTaskRow[]): PrepTask[] {
 
 export function toShifts(rows: Database.ShiftRow[]): Shift[] {
     return rows.map(toShift);
-}
-
-export function toSalesReceipts(rows: Database.SalesReceiptRow[]): SalesReceipt[] {
-    return rows.map(toSalesReceipt);
-}
-
-export function toSalesItems(rows: Database.SalesItemRow[]): SalesItem[] {
-    return rows.map(toSalesItem);
 }

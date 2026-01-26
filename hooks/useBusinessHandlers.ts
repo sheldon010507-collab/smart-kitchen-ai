@@ -28,7 +28,6 @@ interface UseBusinessHandlersProps {
     setIsJoinStoreModalOpen: (open: boolean) => void;
 
     // Data clearing for logout
-    setSales: React.Dispatch<React.SetStateAction<any[]>>;
     setStaff: React.Dispatch<React.SetStateAction<Staff[]>>;
     setShifts: React.Dispatch<React.SetStateAction<any[]>>;
     setMenu: React.Dispatch<React.SetStateAction<any[]>>;
@@ -56,7 +55,6 @@ export function useBusinessHandlers(props: UseBusinessHandlersProps) {
         setIsStoreModalOpen,
         setEditingBusiness,
         setIsJoinStoreModalOpen,
-        setSales,
         setStaff,
         setShifts,
         setMenu,
@@ -74,12 +72,11 @@ export function useBusinessHandlers(props: UseBusinessHandlersProps) {
         setBusinesses([]);
         setCurrentBusinessId(null);
         setView(ViewState.DASHBOARD);
-        setSales([]);
         setStaff([]);
         setShifts([]);
         setMenu([]);
         setPrepTasks([]);
-    }, [setUser, setBusinesses, setCurrentBusinessId, setView, setSales, setStaff, setShifts, setMenu, setPrepTasks]);
+    }, [setUser, setBusinesses, setCurrentBusinessId, setView, setStaff, setShifts, setMenu, setPrepTasks]);
 
     // --- Switch Business ---
     const handleSwitchBusiness = useCallback((bizId: string | null) => {
@@ -200,7 +197,6 @@ export function useBusinessHandlers(props: UseBusinessHandlersProps) {
                 setUser({ ...user, ownedBusinessIds: user.ownedBusinessIds?.filter(id => id !== businessId) });
             }
             clearInventoryForBusiness(businessId);
-            setSales(prev => prev.filter(s => s.businessId !== businessId));
             setStaff(prev => prev.filter(s => s.businessId !== businessId));
             setShifts(prev => prev.filter(s => s.businessId !== businessId));
             setMenu(prev => prev.filter(m => m.businessId !== businessId));
@@ -211,7 +207,7 @@ export function useBusinessHandlers(props: UseBusinessHandlersProps) {
             console.error('Delete store failed:', err);
             alert('Failed to delete store: ' + (err.message || 'Unknown error'));
         }
-    }, [user, currentBusinessId, setBusinesses, setUser, clearInventoryForBusiness, setSales, setStaff, setShifts, setMenu, setPrepTasks, setCurrentBusinessId]);
+    }, [user, currentBusinessId, setBusinesses, setUser, clearInventoryForBusiness, setStaff, setShifts, setMenu, setPrepTasks, setCurrentBusinessId]);
 
     // --- Staff Join Store ---
     const handleJoinStoreSubmit = useCallback(async (e: React.FormEvent) => {

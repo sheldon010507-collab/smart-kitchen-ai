@@ -1,6 +1,6 @@
 
 import React, { useMemo, useState } from 'react';
-import { SalesReceipt, Staff, Shift, MenuItem, InventoryItem } from '../types';
+import { Staff, Shift, MenuItem, InventoryItem } from '../types';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { Plus, Loader2, Lightbulb, CheckCircle2, XCircle, RefreshCcw, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -11,7 +11,6 @@ import { generateOperationalInsights } from '../services/geminiService';
 import { StaffCalendar } from './StaffCalendar';
 
 interface Props {
-  sales: SalesReceipt[];
   staff: Staff[];
   shifts: Shift[];
   menu: MenuItem[];
@@ -32,7 +31,6 @@ interface Props {
 }
 
 const RestaurantDashboard: React.FC<Props> = ({
-  sales,
   staff,
   shifts,
   menu,
@@ -47,7 +45,7 @@ const RestaurantDashboard: React.FC<Props> = ({
   onOpenScanner,
   onRefreshMembers,
 }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'sales' | 'staff' | 'menu' | 'insights'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'staff' | 'menu' | 'insights'>('overview');
   const [isShiftModalOpen, setIsShiftModalOpen] = useState(false);
   const [editingShift, setEditingShift] = useState<Shift | null>(null);
   const [insights, setInsights] = useState<string>('');
@@ -64,29 +62,12 @@ const RestaurantDashboard: React.FC<Props> = ({
   );
 
   // --- Calculations ---
-  const totalRevenue = sales.reduce((sum, s) => sum + s.totalAmount, 0);
-  const totalLaborCost = shifts.reduce((sum, s) => sum + s.totalCost, 0);
-
-  const totalCOGS = sales.reduce((sum, receipt) => {
-    return (
-      sum +
-      receipt.items.reduce((rSum, item) => {
-        const menuItem = menu.find(m => m.name.toLowerCase().includes(item.name.toLowerCase()));
-        const cost = menuItem ? menuItem.estimatedCost : item.price * 0.3;
-        return rSum + cost * item.quantity;
-      }, 0)
-    );
-  }, 0);
-
-  const primeCost = totalLaborCost + totalCOGS;
-  const grossMargin = totalRevenue - totalCOGS;
-  const laborPercent = totalRevenue > 0 ? (totalLaborCost / totalRevenue) * 100 : 0;
-  const primePercent = totalRevenue > 0 ? (primeCost / totalRevenue) * 100 : 0;
+  const totalLaborCost = shifts.reduce((sum, s) => sum + (s.totalCost || 0), 0);
 
   const handleGenerateInsights = async () => {
     setLoadingInsights(true);
     try {
-      const result = await generateOperationalInsights(sales, shifts, menu);
+      const result = await generateOperationalInsights(shifts, menu);
       setInsights(result);
     } catch (e) {
       console.error(e);
@@ -163,7 +144,7 @@ const RestaurantDashboard: React.FC<Props> = ({
       <div className="border-b border-[#e9e9e7]">
         <h2 className="text-2xl font-bold text-[#37352f] mb-6">Operations</h2>
         <div className="flex space-x-6 pb-px overflow-x-auto">
-          {['overview', 'sales', 'staff', 'menu', 'insights'].map(tab => (
+          {['overview', 'staff', 'menu', 'insights'].map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab as any)}
@@ -181,91 +162,34 @@ const RestaurantDashboard: React.FC<Props> = ({
       {/* OVERVIEW TAB */}
       {activeTab === 'overview' && (
         <div className="space-y-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            {[
-              { label: 'Total Revenue', value: `$${totalRevenue.toFixed(0)}` },
-              { label: 'Labor Cost', value: `$${totalLaborCost.toFixed(0)}`, sub: `${laborPercent.toFixed(1)}%` },
-              { label: 'Est. COGS', value: `$${totalCOGS.toFixed(0)}` },
-              { label: 'Prime Cost', value: `$${primeCost.toFixed(0)}`, sub: `${primePercent.toFixed(1)}%` },
-            ].map((kpi, idx) => (
-              <div key={idx} className="bg-white p-5 rounded-lg border border-[#e9e9e7] shadow-sm">
-                <p className="text-xs font-medium text-[#787774] mb-3">{kpi.label}</p>
-                <p className="text-2xl font-bold text-[#37352f]">{kpi.value}</p>
-                {kpi.sub && <p className="text-sm text-[#9b9a97] mt-1">{kpi.sub}</p>}
-              </div>
-            ))}
+          {/* KPI Card - Labor Cost only */}
+          <div className="bg-white p-6 rounded-lg border border-[#e9e9e7] shadow-sm">
+            <p className="text-xs font-medium text-[#787774] mb-3">Labor Cost</p>
+            <p className="text-3xl font-bold text-[#37352f]">${totalLaborCost.toFixed(0)}</p>
+            <p className="text-sm text-[#9b9a97] mt-2">Total labor cost from shifts</p>
           </div>
 
-          <div className="bg-white p-6 rounded-lg border border-[#e9e9e7] shadow-sm h-80">
-            <h3 className="text-sm font-semibold text-[#787774] mb-6">Financial Overview</h3>
-            <ResponsiveContainer width="100%" height="85%">
-              <BarChart
-                data={[
-                  { name: 'Revenue', amount: totalRevenue },
-                  { name: 'Labor', amount: totalLaborCost },
-                  { name: 'COGS', amount: totalCOGS },
-                  { name: 'Margin', amount: grossMargin },
-                ]}
-              >
-                <XAxis dataKey="name" stroke="#787774" fontSize={12} tickLine={false} axisLine={false} fontWeight={500} />
-                <YAxis
-                  stroke="#787774"
-                  fontSize={12}
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={val => `$${val}`}
-                  fontWeight={500}
-                />
-                <Tooltip
-                  cursor={{ fill: '#f7f6f3' }}
-                  contentStyle={{ border: '1px solid #e9e9e7', boxShadow: 'none', borderRadius: '8px' }}
-                />
-                <Bar dataKey="amount" fill="#37352f" radius={[4, 4, 0, 0]} barSize={40} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      )}
-
-      {/* SALES TAB */}
-      {activeTab === 'sales' && (
-        <div className="space-y-8">
-          <div className="flex justify-between items-center p-8 bg-background rounded-xl border border-border">
-            <div>
-              <h3 className="text-lg font-bold text-primary">Revenue Recognition</h3>
-              <p className="text-secondary text-sm mt-1">Scan POS receipts to record sales.</p>
+          {/* Quick Stats Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-white p-4 rounded-lg border border-[#e9e9e7]">
+              <p className="text-xs font-medium text-[#787774] mb-2">Staff Members</p>
+              <p className="text-2xl font-bold text-[#37352f]">{staff.length}</p>
             </div>
-            <button
-              onClick={onOpenScanner}
-              className="bg-primary text-white px-6 py-3 rounded-lg text-sm font-bold tracking-wide hover:bg-black transition-colors flex items-center shadow-sm"
-            >
-              <Plus className="w-5 h-5 mr-2" />
-              Scan Receipt
-            </button>
+            <div className="bg-white p-4 rounded-lg border border-[#e9e9e7]">
+              <p className="text-xs font-medium text-[#787774] mb-2">Active Shifts</p>
+              <p className="text-2xl font-bold text-[#37352f]">{shifts.filter(s => s.status === 'in_progress').length}</p>
+            </div>
+            <div className="bg-white p-4 rounded-lg border border-[#e9e9e7]">
+              <p className="text-xs font-medium text-[#787774] mb-2">Menu Items</p>
+              <p className="text-2xl font-bold text-[#37352f]">{menu.length}</p>
+            </div>
           </div>
 
-          <div className="border border-border rounded-xl overflow-hidden bg-white">
-            <table className="w-full text-left">
-              <thead className="bg-background text-secondary uppercase text-xs font-bold tracking-wider">
-                <tr>
-                  <th className="px-6 py-4">Date</th>
-                  <th className="px-6 py-4">Time</th>
-                  <th className="px-6 py-4">Items</th>
-                  <th className="px-6 py-4 text-right">Total</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {sales.map(receipt => (
-                  <tr key={receipt.id} className="hover:bg-background transition-colors">
-                    <td className="px-6 py-4 text-primary font-medium text-sm">{receipt.date}</td>
-                    <td className="px-6 py-4 text-secondary text-sm font-mono">{receipt.time}</td>
-                    <td className="px-6 py-4 text-secondary text-sm">{receipt.items.length} items</td>
-                    <td className="px-6 py-4 text-right font-bold text-primary text-sm">${receipt.totalAmount.toFixed(2)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {sales.length === 0 && <p className="p-12 text-center text-secondary text-sm">No sales recorded yet.</p>}
+          {/* Info Message */}
+          <div className="bg-[#f7f6f3] p-4 rounded-lg border border-[#e9e9e7]">
+            <p className="text-sm text-[#787774]">
+              💡 <strong>Store Operations Dashboard</strong> - Track labor costs, manage staff, and monitor operations.
+            </p>
           </div>
         </div>
       )}

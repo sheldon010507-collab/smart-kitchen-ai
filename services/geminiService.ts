@@ -1,5 +1,5 @@
 
-import { InventoryItem, Recipe, SalesReceipt, MenuItem, Shift } from "../types";
+import { InventoryItem, Recipe, MenuItem, Shift } from "../types";
 import { supabase } from "../lib/supabase";
 
 // Helper to encode file to base64
@@ -326,61 +326,6 @@ export const analyzeInventoryImage = async (
 };
 
 /**
- * FEATURE: Analyze POS Receipts (Revenue Recognition)
- */
-export const analyzePOSReceipt = async (base64Image: string, mimeType: string): Promise<Partial<SalesReceipt>> => {
-  const prompt = `
-    Analyze this restaurant POS receipt. 
-    Extract total amount, date (dd/mm/yyyy or yyyy-mm-dd), time, and items.
-    Return a JSON object.
-  `;
-
-  const receiptSchema = {
-    type: "OBJECT",
-    properties: {
-      date: { type: "STRING" },
-      time: { type: "STRING" },
-      total_amount: { type: "NUMBER" },
-      totalAmount: { type: "NUMBER" }, // Cover both cases
-      items: {
-        type: "ARRAY",
-        items: {
-          type: "OBJECT",
-          properties: {
-            name: { type: "STRING" },
-            quantity: { type: "NUMBER" },
-            price: { type: "NUMBER" }
-          }
-        }
-      }
-    },
-    required: ["items"]
-  };
-
-  const text = await callGeminiApi({
-    prompt,
-    imageBase64: base64Image,
-    mimeType,
-    config: {
-      responseMimeType: 'application/json',
-      responseSchema: receiptSchema
-    }
-  });
-
-  if (text) {
-    try {
-      const parsed = JSON.parse(text);
-      // Normalize keys
-      if (parsed.total_amount && !parsed.totalAmount) parsed.totalAmount = parsed.total_amount;
-      return parsed;
-    } catch (e) {
-      return {};
-    }
-  }
-  return {};
-};
-
-/**
  * 🆕 FEATURE: Analyze Supplier Invoices/Delivery Notes (Inventory + Costing)
  * Uses OCR-optimized prompt to extract Supplier, Items, and Costs
  */
@@ -659,10 +604,9 @@ export const getQuickKitchenTip = async (query: string): Promise<string> => {
   return await callGeminiApi({ prompt: `Kitchen hack for: ${query}` }) || "Keep your knives sharp!";
 };
 
-export const generateOperationalInsights = async (sales: SalesReceipt[], shifts: Shift[], menu: MenuItem[]): Promise<string> => {
-  const totalRevenue = sales.reduce((acc, s) => acc + s.totalAmount, 0);
-  const totalLabor = shifts.reduce((acc, s) => acc + s.totalCost, 0);
-  const prompt = `Analyze: Revenue $${totalRevenue}, Labor $${totalLabor}. 3 recommendations.`;
+export const generateOperationalInsights = async (shifts: Shift[], menu: MenuItem[]): Promise<string> => {
+  const totalLabor = shifts.reduce((acc, s) => acc + (s.totalCost || 0), 0);
+  const prompt = `Analyze: Labor Cost $${totalLabor}, ${menu.length} menu items. Provide 3 operational recommendations.`;
   try { return await callGeminiApi({ prompt }) || "No data."; } catch (e) { return "Error."; }
 };
 
@@ -697,7 +641,6 @@ export const askOperationsAdvisor = async (
   userQuery: string,
   context: {
     inventory?: InventoryItem[];
-    sales?: SalesReceipt[];
     shifts?: Shift[];
     menu?: MenuItem[];
   }
@@ -729,10 +672,6 @@ export const askOperationsAdvisor = async (
     contextParts.push(`庫存項目數: ${context.inventory.length}`);
   }
 
-  if (context.sales && context.sales.length > 0) {
-    const totalRevenue = context.sales.reduce((acc, s) => acc + s.totalAmount, 0);
-    contextParts.push(`近期營收: $${totalRevenue.toFixed(2)}`);
-  }
 
   if (context.shifts && context.shifts.length > 0) {
     const totalLabor = context.shifts.reduce((acc, s) => acc + s.totalCost, 0);

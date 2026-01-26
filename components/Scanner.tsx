@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { X, UploadCloud, Loader2, Wand2, Trash2, Camera, Plus, ShoppingCart, ChefHat, AlertTriangle, Minus } from "lucide-react";
-import type { InventoryItem, SalesReceipt } from "../types";
-import { analyzeInventoryImage, analyzePOSReceipt, analyzeMultiAngleImages, analyzeFridgeAudit, analyzeInvoice } from "../services/geminiService";
+import type { InventoryItem } from "../types";
+import { analyzeInventoryImage, analyzeMultiAngleImages, analyzeFridgeAudit, analyzeInvoice } from "../services/geminiService";
 import { getSmartDictionary } from "../features/inventory-scan/services/dictionaryService";
 import type { DictionaryItem, FridgeAuditResult } from "../features/inventory-scan/types";
 import { preprocessImage } from "../features/inventory-scan/utils/imagePreprocessing";
@@ -13,7 +13,7 @@ import { normalizeNumber, normalizeDDMMYYYY, uniq, topMatches } from "../utils/f
 import { predictExpiryDateBatch } from "../utils/predictExpiryDate";
 import { supabase } from "../lib/supabase";
 
-type ScanMode = "receipt" | "fridge" | "sales";
+type ScanMode = "receipt" | "fridge";
 
 type ReviewItem = InventoryItem & {
   confidence?: number; // 0~1
@@ -30,7 +30,6 @@ interface Props {
   onClose: () => void;
   // 🆕 pass mode for proper inventory update
   onItemsFound: (items: InventoryItem[], mode?: 'cumulative' | 'stocktake') => void;
-  onSalesProcessed: (receipt: SalesReceipt) => void;
   inventoryNameOptions?: string[]; // RAG: existing ingredient dictionary
 }
 
@@ -135,7 +134,6 @@ const Scanner: React.FC<Props> = ({
   initialMode,
   onClose,
   onItemsFound,
-  onSalesProcessed,
   inventoryNameOptions = [],
 }) => {
   const [mode, setMode] = useState<ScanMode>(initialMode);
@@ -146,7 +144,7 @@ const Scanner: React.FC<Props> = ({
   const [error, setError] = useState<string>("");
   const [rawOutput, setRawOutput] = useState<string>(""); // ✅ 保存原始输出用于调试
   const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
-  const [salesDraft, setSalesDraft] = useState<SalesReceipt | null>(null);
+
   const [showAddForm, setShowAddForm] = useState(false);  // For adding missed items
 
   // ✅ Multi-photo support for fridge mode
@@ -173,7 +171,6 @@ const Scanner: React.FC<Props> = ({
     setRawOutput("");
     setStep("upload");
     setReviewItems([]);
-    setSalesDraft(null);
     setFridgePhotos(prev => {
       // Cleanup photos
       prev.forEach(p => cleanupUrl(p.preview));
@@ -246,38 +243,6 @@ const Scanner: React.FC<Props> = ({
     setRawOutput("");
 
     try {
-      // Mode: Sales
-      // Mode: Sales
-      if (mode === "sales") {
-        const processed = await preprocessImage(file!, {
-          targetSizeKB: 500,
-          maxWidth: 1500, // Receipt needs good details
-          autoEnhance: true
-        });
-
-        const receipt = await analyzePOSReceipt(processed.base64, 'image/jpeg');
-        if (!receipt || !receipt.items || receipt.items.length === 0) {
-          // Fallback or error
-          if (!receipt) throw new Error("No sales data found.");
-        }
-
-        const draft: SalesReceipt = {
-          id: (crypto as any)?.randomUUID?.() ?? String(Date.now()),
-          date: receipt.date || "",
-          time: receipt.time || "",
-          items: (receipt.items || []).map((x: any) => ({
-            name: String(x.name),
-            quantity: normalizeNumber(x.quantity, 1),
-            price: normalizeNumber(x.price, 0),
-          })),
-          totalAmount: normalizeNumber(receipt.totalAmount, 0),
-        } as any;
-
-        setSalesDraft(draft);
-        setStep("review");
-        return;
-      }
-
       // Mode: Receipt - 🆕 Use Invoice OCR for accurate supplier/cost extraction
       if (mode === "receipt") {
         const processed = await preprocessImage(file!, {
@@ -448,15 +413,6 @@ const Scanner: React.FC<Props> = ({
   const confirm = () => {
     setError("");
 
-    if (mode === "sales") {
-      if (!salesDraft) {
-        setError("No sales data to confirm.");
-        return;
-      }
-      onSalesProcessed(salesDraft);
-      onClose();
-      return;
-    }
 
     if (mode === "fridge") {
       // ✅ Fridge mode now also updates inventory (same as receipt)
@@ -584,21 +540,18 @@ const Scanner: React.FC<Props> = ({
         {/* Tabs */}
         <div className="px-4 md:px-6 pt-3 md:pt-4 shrink-0 overflow-x-auto">
           <div className="inline-flex rounded-xl border border-border bg-white overflow-hidden">
-            {(["receipt", "fridge", "sales"] as ScanMode[]).map((m) => (
+            {(["receipt", "fridge"] as ScanMode[]).map((m) => (
               <button
                 key={m}
                 onClick={() => {
                   setMode(m);
-                  setError("");
-                  setRawOutput("");
                   setReviewItems([]);
-                  setSalesDraft(null);
                   setStep("upload");
                 }}
                 className={`px-3 md:px-4 py-2 text-xs md:text-sm font-bold whitespace-nowrap ${mode === m ? "bg-primary text-white" : "text-primary hover:bg-background"
                   }`}
               >
-                {m === "receipt" ? "Receipt" : m === "fridge" ? "Fridge" : "Sales"}
+                {m === "receipt" ? "Receipt" : "Fridge"}
               </button>
             ))}
           </div>
@@ -760,77 +713,6 @@ const Scanner: React.FC<Props> = ({
 
           {step === "review" && (
             <>
-              {mode === "sales" && salesDraft && (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-3 gap-4">
-                    <div>
-                      <div className="text-xs font-bold text-secondary uppercase tracking-widest mb-1">Date</div>
-                      <input
-                        value={salesDraft.date}
-                        onChange={(e) => setSalesDraft({ ...salesDraft, date: e.target.value })}
-                        className="w-full px-3 py-2 rounded-lg border border-border text-sm"
-                      />
-                    </div>
-                    <div>
-                      <div className="text-xs font-bold text-secondary uppercase tracking-widest mb-1">Time</div>
-                      <input
-                        value={salesDraft.time}
-                        onChange={(e) => setSalesDraft({ ...salesDraft, time: e.target.value })}
-                        className="w-full px-3 py-2 rounded-lg border border-border text-sm"
-                      />
-                    </div>
-                    <div>
-                      <div className="text-xs font-bold text-secondary uppercase tracking-widest mb-1">Total</div>
-                      <input
-                        type="number"
-                        value={salesDraft.totalAmount}
-                        onChange={(e) => setSalesDraft({ ...salesDraft, totalAmount: Number(e.target.value) })}
-                        className="w-full px-3 py-2 rounded-lg border border-border text-sm"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="text-sm font-bold text-secondary uppercase tracking-widest">
-                    Items ({salesDraft.items.length})
-                  </div>
-                  <div className="space-y-2">
-                    {salesDraft.items.map((it, idx) => (
-                      <div key={idx} className="flex items-center gap-3 p-3 rounded-lg border border-border bg-white">
-                        <input
-                          value={it.name}
-                          onChange={(e) => {
-                            const items = [...salesDraft.items];
-                            items[idx] = { ...it, name: e.target.value };
-                            setSalesDraft({ ...salesDraft, items });
-                          }}
-                          className="flex-1 px-3 py-2 rounded-lg border border-border text-sm"
-                        />
-                        <input
-                          type="number"
-                          value={it.quantity}
-                          onChange={(e) => {
-                            const items = [...salesDraft.items];
-                            items[idx] = { ...it, quantity: Number(e.target.value) };
-                            setSalesDraft({ ...salesDraft, items });
-                          }}
-                          className="w-20 px-3 py-2 rounded-lg border border-border text-sm"
-                        />
-                        <input
-                          type="number"
-                          value={it.price}
-                          onChange={(e) => {
-                            const items = [...salesDraft.items];
-                            items[idx] = { ...it, price: Number(e.target.value) };
-                            setSalesDraft({ ...salesDraft, items });
-                          }}
-                          className="w-24 px-3 py-2 rounded-lg border border-border text-sm"
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
               {isReceiptLike && (
                 <>
                   <div className="text-sm font-bold text-secondary uppercase tracking-widest mb-4">

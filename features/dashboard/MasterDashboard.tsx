@@ -9,7 +9,7 @@
 
 import React from 'react';
 import { Plus, AlertTriangle, ShoppingCart, ChevronRight } from 'lucide-react';
-import { Business, InventoryItem, SalesReceipt, ViewState } from '../../types';
+import { Business, InventoryItem, ViewState } from '../../types';
 import { EditableTitle } from '../../components/EditableTitle';
 import { LocationCard } from './components/LocationCard';
 import { FEATURE_SHOPPING_LIST_ENABLED, ShoppingListSummary as ShoppingListSummaryType } from '../../features/shopping-list';
@@ -17,7 +17,6 @@ import { FEATURE_SHOPPING_LIST_ENABLED, ShoppingListSummary as ShoppingListSumma
 interface MasterDashboardProps {
     businesses: Business[];
     inventory: InventoryItem[];
-    sales: SalesReceipt[];
     shoppingListSummaries: ShoppingListSummaryType[];
     shoppingListLoading: boolean;
     onSelectBusiness: (businessId: string) => void;
@@ -29,7 +28,6 @@ interface MasterDashboardProps {
 export function MasterDashboard({
     businesses,
     inventory,
-    sales,
     shoppingListSummaries,
     shoppingListLoading,
     onSelectBusiness,
@@ -73,7 +71,6 @@ export function MasterDashboard({
                             key={biz.id}
                             business={biz}
                             inventory={inventory.filter(i => i.businessId === biz.id)}
-                            sales={sales.filter(s => s.businessId === biz.id)}
                             onClick={() => onSelectBusiness(biz.id)}
                             onEdit={(e) => onEditStore(biz, e)}
                         />
