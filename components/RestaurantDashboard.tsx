@@ -168,8 +168,8 @@ const RestaurantDashboard: React.FC<Props> = ({
               key={tab}
               onClick={() => setActiveTab(tab as any)}
               className={`pb-3 text-sm font-semibold capitalize transition-colors border-b-2 ${activeTab === tab
-                  ? 'border-[#37352f] text-[#37352f]'
-                  : 'border-transparent text-[#9b9a97] hover:text-[#37352f]'
+                ? 'border-[#37352f] text-[#37352f]'
+                : 'border-transparent text-[#9b9a97] hover:text-[#37352f]'
                 }`}
             >
               {tab}

@@ -26,7 +26,7 @@ const PrepList: React.FC<Props> = ({ tasks, onAddTask, onToggleTask, onDeleteTas
       <div className="p-4 border-b border-[#E9E9E7] flex justify-between items-center">
         <h3 className="font-medium text-[#37352F]">Prep List</h3>
         <span className="text-xs text-[#787774] bg-[#F7F6F3] px-1.5 py-0.5 rounded">
-           {tasks.filter(t => !t.completed).length} left
+          {tasks.filter(t => !t.completed).length} left
         </span>
       </div>
 
@@ -40,17 +40,17 @@ const PrepList: React.FC<Props> = ({ tasks, onAddTask, onToggleTask, onDeleteTas
             {tasks.map(task => (
               <li key={task.id} className="group flex items-center justify-between p-2 hover:bg-[#F7F6F3] rounded transition-colors">
                 <div className="flex items-center space-x-3 overflow-hidden">
-                   <button 
-                     onClick={() => onToggleTask(task.id)}
-                     className={`flex-shrink-0 transition-colors ${task.completed ? 'text-[#2383E2]' : 'text-[#D3D1CB] hover:text-[#787774]'}`}
-                   >
-                     {task.completed ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
-                   </button>
-                   <div className={`truncate ${task.completed ? 'line-through text-[#D3D1CB]' : 'text-[#37352F]'}`}>
-                      <p className="text-sm truncate">{task.text}</p>
-                   </div>
+                  <button
+                    onClick={() => onToggleTask(task.id)}
+                    className={`flex-shrink-0 transition-colors ${task.completed ? 'text-[#2383E2]' : 'text-[#D3D1CB] hover:text-[#787774]'}`}
+                  >
+                    {task.completed ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+                  </button>
+                  <div className={`truncate ${task.completed ? 'line-through text-[#D3D1CB]' : 'text-[#37352F]'}`}>
+                    <p className="text-sm truncate">{task.text}</p>
+                  </div>
                 </div>
-                <button 
+                <button
                   onClick={() => onDeleteTask(task.id)}
                   className="opacity-0 group-hover:opacity-100 p-1 text-[#D3D1CB] hover:text-red-500 rounded transition-all"
                 >
