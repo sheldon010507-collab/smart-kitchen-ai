@@ -80,7 +80,7 @@ vi.mock('../../components/ChefView', () => ({
 describe('DashboardPage', () => {
     it('should render OperationsPage for Manager with Business', () => {
         (useAuthContext as any).mockReturnValue({
-            user: { id: 'u1', role: 'Manager' }
+            user: { id: 'u1', user_metadata: { role: 'Manager' } }
         });
 
         render(
@@ -94,7 +94,7 @@ describe('DashboardPage', () => {
 
     it('should render MasterDashboard for Manager without Business', () => {
         (useAuthContext as any).mockReturnValue({
-            user: { id: 'u1', role: 'Manager' }
+            user: { id: 'u1', user_metadata: { role: 'Manager' } }
         });
 
         // Override BusinessContext for this test
@@ -118,7 +118,7 @@ describe('DashboardPage', () => {
 
     it('should open JoinStoreModal when url has ?join=true', () => {
         (useAuthContext as any).mockReturnValue({
-            user: { id: 'u2', role: 'Staff' }
+            user: { id: 'u2', user_metadata: { role: 'Staff' } }
         });
         (useBusiness as any).mockReturnValue({
             activeBusiness: { id: 'biz_1' },
@@ -140,7 +140,7 @@ describe('DashboardPage', () => {
 
     it('should NOT open JoinStoreModal by default', () => {
         (useAuthContext as any).mockReturnValue({
-            user: { id: 'u2', role: 'Staff' }
+            user: { id: 'u2', user_metadata: { role: 'Staff' } }
         });
         (useBusiness as any).mockReturnValue({
             activeBusiness: { id: 'biz_1' },

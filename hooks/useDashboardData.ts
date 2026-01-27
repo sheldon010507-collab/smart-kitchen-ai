@@ -19,7 +19,7 @@ export function useDashboardData(businessId: string | null) {
                 .from('shifts')
                 .select('*')
                 .eq('business_id', businessId)
-                .order('start_time', { ascending: false });
+                .order('shift_date', { ascending: false });
 
             if (shiftErr) throw shiftErr;
 
@@ -98,24 +98,22 @@ export function useDashboardData(businessId: string | null) {
                 setPrepTasks(mappedTasks);
             }
 
-            // Load Staff
+
+            // Load Staff - directly from business_members (no FK to auth.users)
             const { data: memberData, error: memberErr } = await supabase
                 .from('business_members')
-                .select(`
-            *,
-            user:users ( id, name, email, role )
-        `)
+                .select('*')
                 .eq('business_id', businessId);
 
             if (memberErr) {
                 console.warn('Error fetching members:', memberErr);
             } else if (memberData) {
                 const mappedStaff = memberData.map((m: any) => ({
-                    id: m.user?.id || m.user_id,
+                    id: m.user_id,
                     businessId: m.business_id,
-                    name: m.user?.name || 'Unknown',
-                    email: m.user?.email,
-                    role: m.role || 'Staff',
+                    name: 'Staff Member',  // Name must be fetched separately if needed
+                    email: '',
+                    role: m.role || 'staff',
                     status: m.status,
                     hourlyRate: 0
                 }));

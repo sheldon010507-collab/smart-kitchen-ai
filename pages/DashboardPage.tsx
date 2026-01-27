@@ -158,8 +158,29 @@ export const DashboardPage = () => {
     const renderContent = () => {
         if (!user) return <div>Loading...</div>;
 
+        // --- CHEF VIEW (Routed) ---
+        // Check path FIRST to allow Managers to see Chef View
+        if (location.pathname.includes('/chef') || window.location.hash.includes('chef')) {
+            if (isMasterView && user.user_metadata?.role === 'Manager') {
+                return (
+                    <div className="flex flex-col items-center justify-center h-96 animate-in fade-in duration-500">
+                        <ChefHat className="w-16 h-16 text-border mb-6" />
+                        <h3 className="text-xl font-bold text-primary mb-2">AI Chef Needs a Kitchen</h3>
+                        <p className="text-secondary text-lg mb-6">Select a store to access the AI Chef.</p>
+                        <button
+                            onClick={() => navigate('/dashboard')}
+                            className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90"
+                        >
+                            Go to Dashboard
+                        </button>
+                    </div>
+                );
+            }
+            return <ChefView inventory={filteredInventory} menu={menu} />;
+        }
+
         // --- MANAGER VIEW ---
-        if (user.role === 'Manager') {
+        if (user.user_metadata?.role === 'Manager') {
             if (isMasterView) {
                 return (
                     <MasterDashboard
@@ -180,22 +201,8 @@ export const DashboardPage = () => {
             }
         }
 
-        // --- CHEF VIEW (when viewState is CHEF, rendered via Outlet) ---
-        // Check path to determine if this is chef view
-        if (location.pathname.includes('/chef') || window.location.hash.includes('chef')) {
-            if (isMasterView) {
-                return (
-                    <div className="flex flex-col items-center justify-center h-96 animate-in fade-in duration-500">
-                        <ChefHat className="w-16 h-16 text-border mb-6" />
-                        <p className="text-secondary text-lg">Select a store to access the AI Chef.</p>
-                    </div>
-                );
-            }
-            return <ChefView inventory={filteredInventory} menu={menu} />;
-        }
-
         // --- STAFF VIEW ---
-        if (user.role === 'Staff') {
+        if (user.user_metadata?.role === 'Staff') {
             return (
                 <StaffDashboard
                     user={user}

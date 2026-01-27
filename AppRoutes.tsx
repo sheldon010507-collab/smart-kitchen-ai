@@ -15,6 +15,9 @@ export const AppRoutes = () => {
                 <Route index element={<DashboardPage />} />
                 <Route path="dashboard" element={<DashboardPage />} />
                 <Route path="inventory" element={<InventoryPage />} />
+                <Route path="chef" element={<DashboardPage />} />
+                <Route path="shopping-list" element={<div />} /> {/* Content rendered by App based on view state */}
+                <Route path="operations" element={<DashboardPage />} />
             </Route>
             {/* Fallback for other paths handled by App's internal router for now */}
             <Route path="/*" element={<App />} />

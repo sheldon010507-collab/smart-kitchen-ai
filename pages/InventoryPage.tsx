@@ -3,6 +3,7 @@ import { useOutletContext, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useBusiness } from '../lib/BusinessContext';
 import { useInventoryContext } from '../lib/InventoryContext';
+import { useAuthContext } from '../lib/AuthContext';
 import { InventoryView } from '../features/inventory/InventoryView';
 import EditItemModal from '../components/EditItemModal';
 import WastageModal from '../components/WastageModal';
@@ -19,6 +20,7 @@ interface OutletContextType {
 export const InventoryPage = () => {
     const { activeBusiness, isMasterView, refreshBusinesses, currentBusinessId } = useBusiness();
     const inventoryCtx = useInventoryContext();
+    const { user } = useAuthContext();
     const { onOpenScanner } = useOutletContext<OutletContextType>() || { onOpenScanner: () => { console.warn('No scanner context'); } };
 
     // Local State
@@ -206,7 +208,7 @@ export const InventoryPage = () => {
                         notes: data.notes,
                         expiryDate: wastageItem.expiryDate,
                         category: wastageItem.category,
-                        userId: 'current-user-id' // Need User ID?
+                        userId: user?.id || ''
                     });
                     if (result.success) {
                         await inventoryCtx.loadInventory(activeBusiness.id);
@@ -235,7 +237,7 @@ export const InventoryPage = () => {
             {isSetupWizardOpen && activeBusiness && (
                 <InventorySetupWizard
                     businessId={activeBusiness.id}
-                    userId={'user-id-placeholder'} // Need userId
+                    userId={user?.id || ''}
                     existingCategories={derivedCategories}
                     existingLocations={derivedLocations}
                     existingItemCount={filteredInventory.length}

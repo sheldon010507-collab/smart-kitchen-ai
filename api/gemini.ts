@@ -130,9 +130,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // 3. Load Gemini API Key (server-side only, no VITE_ fallback)
         const apiKey = process.env.GEMINI_API_KEY;
 
+        // 🔍 Debug logging for environment variable diagnosis
+        console.log('[Gemini API] Environment check:', {
+            hasGeminiKey: !!apiKey,
+            nodeEnv: process.env.NODE_ENV,
+            availableKeys: Object.keys(process.env).filter(k => k.includes('GEMINI') || k.includes('SUPABASE')),
+        });
+
         if (!apiKey) {
             console.error('SERVER ERROR: GEMINI_API_KEY environment variable is required');
-            return res.status(500).json({ error: 'AI service not configured' });
+            console.error('Available env vars:', Object.keys(process.env).sort());
+            return res.status(500).json({
+                error: 'AI service not configured',
+                debug: process.env.NODE_ENV === 'development' ? 'GEMINI_API_KEY missing from environment' : undefined
+            });
         }
 
         // 4. Validate & Prepare Request

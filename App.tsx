@@ -33,6 +33,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { DesktopSidebar } from './components/layout/DesktopSidebar';
 import { MobileHeader } from './components/layout/MobileHeader';
 import { useBusinessHandlers } from './hooks/useBusinessHandlers';
+import { useManagerBusinessAutoRecovery } from './hooks/useManagerBusinessAutoRecovery';
 
 
 export default function App() {
@@ -48,6 +49,9 @@ export default function App() {
   } = useBusiness();
 
   const [view, setView] = useState<ViewState>(ViewState.DASHBOARD);
+
+  // ✅ Manager Business Auto-Recovery (防止Email确认中断创建流程)
+  const { isRecovering, recoveryError, recoveredBusinessId } = useManagerBusinessAutoRecovery(user);
 
   // ✅ 使用导入的 sanitizeStorage 函數清理舊緩存
   useEffect(() => {
@@ -96,12 +100,36 @@ export default function App() {
 
   // Sync URL to View
   useEffect(() => {
-    if (location.pathname === '/inventory') {
+    const path = location.pathname;
+    if (path === '/inventory') {
       if (view !== ViewState.INVENTORY) setView(ViewState.INVENTORY);
-    } else if (location.pathname === '/dashboard' || location.pathname === '/') {
+    } else if (path === '/chef') {
+      if (view !== ViewState.CHEF) setView(ViewState.CHEF);
+    } else if (path === '/shopping-list') {
+      if (view !== ViewState.SHOPPING) setView(ViewState.SHOPPING);
+    } else if (path === '/operations') {
+      if (view !== ViewState.RESTAURANT) setView(ViewState.RESTAURANT);
+    } else if (path === '/dashboard' || path === '/') {
       if (view !== ViewState.DASHBOARD) setView(ViewState.DASHBOARD);
     }
   }, [location.pathname]);
+
+  // Sync View to URL (navigate when view changes)
+  useEffect(() => {
+    const currentPath = location.pathname;
+
+    if (view === ViewState.INVENTORY && currentPath !== '/inventory') {
+      navigate('/inventory', { replace: true });
+    } else if (view === ViewState.CHEF && currentPath !== '/chef') {
+      navigate('/chef', { replace: true });
+    } else if (view === ViewState.SHOPPING && currentPath !== '/shopping-list') {
+      navigate('/shopping-list', { replace: true });
+    } else if (view === ViewState.RESTAURANT && currentPath !== '/operations') {
+      navigate('/operations', { replace: true });
+    } else if (view === ViewState.DASHBOARD && currentPath !== '/dashboard' && currentPath !== '/') {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [view, navigate, location.pathname]);
 
   const openScanner = (mode: 'receipt' | 'fridge') => {
     setScannerMode(mode);
@@ -120,6 +148,19 @@ export default function App() {
     setView,
     setIsBusinessDropdownOpen,
   });
+
+  // 🔄 Transform Supabase User to App User (types.ts User)
+  const appUser = useMemo(() => {
+    if (!user) return null;
+    return {
+      id: user.id,
+      name: user.user_metadata?.full_name || user.email || 'User',
+      email: user.email || '',
+      role: (user.user_metadata?.role || 'Staff') as 'Manager' | 'Staff',
+      ownedBusinessIds: [],
+      workingBusinessId: currentBusinessId || undefined,
+    };
+  }, [user, currentBusinessId]);
 
   const filteredInventory = useMemo(
     () => (isMasterView ? inventory : inventory.filter(i => i.businessId === currentBusinessId)),
@@ -163,7 +204,7 @@ export default function App() {
     <div className="min-h-screen bg-background dark:bg-gray-900 text-primary dark:text-white font-sans flex flex-col md:flex-row">
       {/* Sidebar (Desktop) */}
       <DesktopSidebar
-        user={user}
+        user={appUser!}
         view={view}
         setView={setView}
         activeBusiness={activeBusiness}
@@ -180,7 +221,7 @@ export default function App() {
       <main className="flex-1 md:ml-72 pb-20 md:pb-12 bg-gray-50 dark:bg-gray-900 md:bg-white md:dark:bg-gray-900 min-h-screen md:rounded-tl-2xl md:border-l md:border-border dark:border-gray-700 overflow-hidden relative">
         {/* Mobile Header */}
         <MobileHeader
-          user={user}
+          user={appUser!}
           activeBusiness={activeBusiness}
           accessibleBusinesses={accessibleBusinesses}
           currentBusinessId={currentBusinessId}
@@ -205,7 +246,7 @@ export default function App() {
           {view === ViewState.CHEF && <Outlet context={{ onOpenScanner: openScanner }} />}
 
           {/* RESTAURANT VIEW (Routed) */}
-          {/* Dashboard rendering removed - handled by DashboardPage */}
+          {view === ViewState.RESTAURANT && <Outlet context={{ onOpenScanner: openScanner }} />}
 
           {/* SHOPPING LIST VIEW */}
           {view === ViewState.SHOPPING && (
@@ -213,7 +254,7 @@ export default function App() {
               {currentBusinessId ? (
                 // Single Store View (Staff or Manager selected store)
                 <ShoppingListView businessId={currentBusinessId} />
-              ) : user.role === 'Manager' ? (
+              ) : appUser?.role === 'Manager' ? (
                 // Master Dashboard Summary
                 <ShoppingListSummary onSelectBusiness={setCurrentBusinessId} />
               ) : (

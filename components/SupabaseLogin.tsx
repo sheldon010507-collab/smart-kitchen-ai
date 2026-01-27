@@ -125,6 +125,20 @@ export default function SupabaseLogin({ onLoginSuccess }: Props) {
         return;
       }
 
+      // Force update role in metadata if it differs from selection
+      // This ensures that if I log in as "Staff", I become "Staff" (and see StaffDashboard), 
+      // even if I was previously a "Manager".
+      if (data.user.user_metadata?.role !== role) {
+        const { error: updateError } = await supabase.auth.updateUser({
+          data: { role: role }
+        });
+
+        if (updateError) {
+          console.error('Failed to update user role:', updateError);
+          // Don't block login, but role might be wrong
+        }
+      }
+
       let businessId: string | undefined;
 
       if (role === 'Staff') {
@@ -135,6 +149,9 @@ export default function SupabaseLogin({ onLoginSuccess }: Props) {
         businessId = await getManagerActiveBusinessId(data.user.id);
       }
 
+      // NOTE: data.user object might still have old metadata if we didn't refetch,
+      // but onAuthStateChange in AuthContext should catch the update event eventually.
+      // We pass the *correct* role explicitly to validatation.
       onLoginSuccess(data.user, role, businessId);
     } catch (err: any) {
       setError(err?.message || 'Login failed');
@@ -179,8 +196,12 @@ export default function SupabaseLogin({ onLoginSuccess }: Props) {
       }
 
       // ✅ 在 signUp 之前，先把店名存到 localStorage（用於郵件確認後自動建立）
+      // 🆕 双重保护：同时存储到 localStorage 和 sessionStorage
       if (role === 'Manager' && storeName.trim() && typeof window !== 'undefined' && window.localStorage) {
-        localStorage.setItem('pending_business_name', storeName.trim());
+        const trimmedName = storeName.trim();
+        localStorage.setItem('pending_business_name', trimmedName);
+        sessionStorage.setItem('pending_business_name', trimmedName);
+        console.log(`[Registration] Saved pending business: "${trimmedName}"`);
       }
 
       const { data, error: authError } = await supabase.auth.signUp({
@@ -213,7 +234,10 @@ export default function SupabaseLogin({ onLoginSuccess }: Props) {
       // ✅ 檢查是否有 session（開啟郵箱驗證時通常沒有）
       if (!data.session) {
         // 沒有 session，需要郵件確認
-        setError('Confirmation email sent. Please verify your email and log in again. Your restaurant will be created automatically after login.');
+        const businessMsg = role === 'Manager' && storeName.trim()
+          ? ` Your restaurant "${storeName.trim()}" will be created automatically after login.`
+          : '';
+        setError(`Confirmation email sent. Please verify your email and log in again.${businessMsg}`);
         return;
       }
 
