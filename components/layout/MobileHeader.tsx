@@ -31,7 +31,7 @@ interface MobileHeaderProps {
     setIsBusinessDropdownOpen: (open: boolean) => void;
     staffMemberships: Staff[];
     onSwitchBusiness: (bizId: string | null) => void;
-    onOpenJoinStore: () => void;
+    // onOpenJoinStore removed
     onLogout: () => void;
     onUpgrade: () => void;
 }
@@ -45,7 +45,6 @@ export function MobileHeader({
     setIsBusinessDropdownOpen,
     staffMemberships,
     onSwitchBusiness,
-    onOpenJoinStore,
     onLogout,
     onUpgrade,
 }: MobileHeaderProps) {
@@ -123,7 +122,7 @@ export function MobileHeader({
                                 <button
                                     onClick={() => {
                                         setIsBusinessDropdownOpen(false);
-                                        onOpenJoinStore();
+                                        window.location.href = '/dashboard?join=true';
                                     }}
                                     className="w-full text-left px-4 py-3 text-sm text-[#1565c0] font-semibold hover:bg-[#e3f2fd] border-t border-[#e9e9e7] dark:border-[#2f2f2f] mt-2 flex items-center space-x-3"
                                 >

@@ -37,7 +37,7 @@ interface DesktopSidebarProps {
     setIsBusinessDropdownOpen: (open: boolean) => void;
     staffMemberships: Staff[];
     onSwitchBusiness: (bizId: string | null) => void;
-    onOpenJoinStore: () => void;
+    // onOpenJoinStore removed - handled via route
     onLogout: () => void;
 }
 
@@ -52,7 +52,6 @@ export function DesktopSidebar({
     setIsBusinessDropdownOpen,
     staffMemberships,
     onSwitchBusiness,
-    onOpenJoinStore,
     onLogout,
 }: DesktopSidebarProps) {
     const { theme, toggleTheme } = useTheme();
@@ -140,7 +139,8 @@ export function DesktopSidebar({
                                     <button
                                         onClick={() => {
                                             setIsBusinessDropdownOpen(false);
-                                            onOpenJoinStore();
+                                            // Handle join navigation
+                                            window.location.href = '/dashboard?join=true';
                                         }}
                                         className="w-full flex items-center justify-between px-4 py-2.5 text-sm text-left hover:bg-[#f7f6f3] dark:hover:bg-[#3f3f3f] border-t border-[#e9e9e7] dark:border-[#2f2f2f] mt-1 text-[#37352f] dark:text-[#e9e9e7] font-bold"
                                     >

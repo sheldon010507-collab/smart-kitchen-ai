@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { supabase } from './supabase';
-import { Business, Staff, User } from '../types';
+import { Business, Staff, User as AppUser } from '../types';
 import { normMemberStatus } from '../utils/transforms';
+import { useAuthContext } from './AuthContext';
 
 // ============ Types ============
 interface BusinessContextType {
@@ -21,23 +22,20 @@ interface BusinessContextType {
     createBusiness: (name: string, userId: string) => Promise<Business | null>;
     updateBusiness: (business: Partial<Business>) => Promise<boolean>;
     deleteBusiness: (businessId: string) => Promise<boolean>;
-    joinBusinessByCode: (code: string, user: User) => Promise<{ success: boolean; businessId?: string; error?: string }>;
+    joinBusinessByCode: (code: string, user: AppUser) => Promise<{ success: boolean; businessId?: string; error?: string }>;
     refreshBusinesses: () => Promise<void>;
 }
 
 const BusinessContext = createContext<BusinessContextType | undefined>(undefined);
 
-// ✅ normMemberStatus 已統一至 utils/transforms.ts
-
 // ============ Provider ============
 interface BusinessProviderProps {
     children: ReactNode;
-    user: User | null;
-    staff: Staff[];
-    setStaff: React.Dispatch<React.SetStateAction<Staff[]>>;
 }
 
-export function BusinessProvider({ children, user, staff, setStaff }: BusinessProviderProps) {
+export function BusinessProvider({ children }: BusinessProviderProps) {
+    const { user } = useAuthContext();
+    const [staff, setStaff] = useState<Staff[]>([]);
     const [businesses, setBusinesses] = useState<Business[]>([]);
     const [currentBusinessId, setCurrentBusinessId] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
@@ -45,15 +43,15 @@ export function BusinessProvider({ children, user, staff, setStaff }: BusinessPr
     // Derived state
     const activeBusiness = businesses.find(b => b.id === currentBusinessId);
 
-    const staffMemberships = user?.role === 'Staff'
+    const staffMemberships = user?.user_metadata?.role === 'Staff'
         ? staff.filter(s => s.email === user.email && (s.status === 'Active' || s.status === 'Pending'))
         : [];
 
-    const accessibleBusinesses = user?.role === 'Manager'
-        ? businesses.filter(b => user?.ownedBusinessIds?.includes(b.id))
+    const accessibleBusinesses = user?.user_metadata?.role === 'Manager'
+        ? businesses.filter(b => b.ownerId === user.id)
         : businesses.filter(b => staffMemberships.some(m => m.businessId === b.id));
 
-    const isMasterView = user?.role === 'Manager' && !currentBusinessId;
+    const isMasterView = user?.user_metadata?.role === 'Manager' && !currentBusinessId;
 
     // ============ Load Functions ============
     const loadBusinessesForManager = useCallback(async (userId: string) => {
@@ -138,14 +136,38 @@ export function BusinessProvider({ children, user, staff, setStaff }: BusinessPr
         } finally {
             setLoading(false);
         }
-    }, [setStaff]);
+    }, []);
+
+    // Effect: Load initial data when user changes
+    useEffect(() => {
+        if (!user) {
+            setBusinesses([]);
+            setStaff([]);
+            setCurrentBusinessId(null);
+            return;
+        }
+
+        const role = user.user_metadata?.role;
+        const userId = user.id;
+
+        if (role === 'Manager') {
+            loadBusinessesForManager(userId);
+        } else if (role === 'Staff') {
+            const email = user.email || '';
+            const name = user.user_metadata?.full_name || '';
+            loadBusinessesForStaff(userId, email, name);
+        }
+    }, [user, loadBusinessesForManager, loadBusinessesForStaff]);
 
     const refreshBusinesses = useCallback(async () => {
         if (!user) return;
-        if (user.role === 'Manager') {
+        const role = user.user_metadata?.role;
+        if (role === 'Manager') {
             await loadBusinessesForManager(user.id);
         } else {
-            await loadBusinessesForStaff(user.id, user.email, user.name);
+            const email = user.email || '';
+            const name = user.user_metadata?.full_name || '';
+            await loadBusinessesForStaff(user.id, email, name);
         }
     }, [user, loadBusinessesForManager, loadBusinessesForStaff]);
 
@@ -161,7 +183,6 @@ export function BusinessProvider({ children, user, staff, setStaff }: BusinessPr
             if (error) throw error;
             if (!biz) throw new Error('Failed to create business');
 
-            // Insert owner as member
             await supabase.from('business_members').insert({
                 business_id: biz.id,
                 user_id: userId,
@@ -210,10 +231,6 @@ export function BusinessProvider({ children, user, staff, setStaff }: BusinessPr
 
     const deleteBusiness = useCallback(async (businessId: string): Promise<boolean> => {
         try {
-            // Delete from database - this will cascade delete:
-            // - shopping_list items (ON DELETE CASCADE)
-            // - inventory_items (ON DELETE CASCADE)  
-            // - business_members (ON DELETE CASCADE)
             const { error } = await supabase
                 .from('businesses')
                 .delete()
@@ -224,7 +241,6 @@ export function BusinessProvider({ children, user, staff, setStaff }: BusinessPr
                 return false;
             }
 
-            // Update local state
             setBusinesses(prev => prev.filter(b => b.id !== businessId));
             if (currentBusinessId === businessId) {
                 setCurrentBusinessId(null);
@@ -239,7 +255,7 @@ export function BusinessProvider({ children, user, staff, setStaff }: BusinessPr
 
     const joinBusinessByCode = useCallback(async (
         code: string,
-        user: User
+        userParam: AppUser
     ): Promise<{ success: boolean; businessId?: string; error?: string }> => {
         try {
             const { data: business, error: findErr } = await supabase
@@ -256,7 +272,7 @@ export function BusinessProvider({ children, user, staff, setStaff }: BusinessPr
                 .from('business_members')
                 .insert({
                     business_id: business.id,
-                    user_id: user.id,
+                    user_id: userParam.id,
                     role: 'staff',
                     status: 'active'
                 });
@@ -268,7 +284,6 @@ export function BusinessProvider({ children, user, staff, setStaff }: BusinessPr
                 return { success: false, error: joinErr.message };
             }
 
-            // Add to local state
             setBusinesses(prev => {
                 if (prev.some(b => b.id === business.id)) return prev;
                 return [...prev, {
@@ -283,10 +298,10 @@ export function BusinessProvider({ children, user, staff, setStaff }: BusinessPr
             });
 
             setStaff(prev => [...prev, {
-                id: `${user.id}_${business.id}`,
+                id: `${userParam.id}_${business.id}`,
                 businessId: business.id,
-                name: user.name,
-                email: user.email,
+                name: userParam.name,
+                email: userParam.email,
                 role: 'Server',
                 hourlyRate: 0,
                 status: 'Active',
@@ -296,9 +311,8 @@ export function BusinessProvider({ children, user, staff, setStaff }: BusinessPr
         } catch (e: any) {
             return { success: false, error: e.message };
         }
-    }, [setStaff]);
+    }, []);
 
-    // ============ Context Value ============
     const value: BusinessContextType = {
         businesses,
         currentBusinessId,
