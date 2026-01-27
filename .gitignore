@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 .env*
+!.env.example
+
+# Security: Prevent test scripts with potential secrets
+scripts/test-*.js
+scripts/*-diagnostic.js
+scripts/*-test.js
 
 # Editor directories and files
 .vscode/*
