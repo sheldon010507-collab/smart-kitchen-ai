@@ -1,11 +1,22 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import App from './App';
+import { LoginPage } from './pages/LoginPage';
+import { InventoryPage } from './pages/InventoryPage';
+
+import { DashboardPage } from './pages/DashboardPage';
 
 export const AppRoutes = () => {
     return (
         <Routes>
-            {/* Legacy App Route - Catches all for now */}
+            <Route path="/login" element={<LoginPage />} />
+            {/* Legacy App Route as Layout */}
+            <Route path="/" element={<App />}>
+                <Route index element={<DashboardPage />} />
+                <Route path="dashboard" element={<DashboardPage />} />
+                <Route path="inventory" element={<InventoryPage />} />
+            </Route>
+            {/* Fallback for other paths handled by App's internal router for now */}
             <Route path="/*" element={<App />} />
         </Routes>
     );

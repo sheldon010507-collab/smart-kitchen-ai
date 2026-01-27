@@ -212,6 +212,16 @@ export interface PrepTask {
   createdAt: string;
 }
 
+/** Prep Task Inventory Impact - tracks inventory deductions when prep tasks are completed */
+export interface PrepTaskInventoryImpact {
+  id: string;
+  prepTaskId: string;
+  inventoryItemId: string;
+  quantityUsed: number;
+  unit: string;
+  recordedAt: string;
+}
+
 
 /** Shift - staff scheduling and clock-in/out */
 export interface Shift {
