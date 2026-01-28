@@ -162,13 +162,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             // Limit to 4 images max to control token usage
             const limitedImages = images.slice(0, 4);
 
-            console.log(`[Gemini API] Processing ${limitedImages.length} images`);
+            console.log(`[Gemini API] Multi-image mode: Processing ${limitedImages.length} images`);
 
-            for (const img of limitedImages) {
+            for (let i = 0; i < limitedImages.length; i++) {
+                const img = limitedImages[i];
+
+                // 🔍 Debug: Log image details
+                console.log(`[Gemini API] Image ${i + 1}:`, {
+                    hasBase64: !!img.base64,
+                    base64Length: img.base64?.length || 0,
+                    mimeType: img.mimeType,
+                });
+
                 // Validate each image
                 const imgError = validateImage(img.base64, img.mimeType);
                 if (imgError) {
-                    return res.status(400).json({ error: `Image validation error: ${imgError}` });
+                    console.error(`[Gemini API] Image ${i + 1} validation failed:`, imgError);
+                    return res.status(400).json({ error: `Image ${i + 1} validation error: ${imgError}` });
                 }
 
                 parts.push({
@@ -178,6 +188,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     }
                 });
             }
+
+            console.log(`[Gemini API] Added ${parts.length} image parts to request`);
         }
         // Backward compatible: single image format
         else if (imageBase64 && mimeType) {
@@ -209,9 +221,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         if (!googleRes.ok) {
             const errText = await googleRes.text();
-            console.error('Gemini API Error:', errText);
-            // ✅ P3 Fix: Hide detailed error from client
-            return res.status(502).json({ error: 'AI service temporarily unavailable. Please try again.' });
+            console.error('[Gemini API] Google API Error:', {
+                status: googleRes.status,
+                statusText: googleRes.statusText,
+                error: errText,
+                model: modelName,
+                imageCount: parts.filter((p: any) => p.inlineData).length,
+                hasPrompt: parts.some((p: any) => p.text),
+            });
+
+            // Parse error for better debugging
+            try {
+                const errJson = JSON.parse(errText);
+                console.error('[Gemini API] Parsed error:', errJson);
+            } catch { }
+
+            // ✅ P3 Fix: Hide detailed error from client but log it
+            return res.status(502).json({
+                error: 'AI service temporarily unavailable. Please try again.',
+                // Include debug info in development
+                ...(process.env.NODE_ENV === 'development' && {
+                    debug: errText.substring(0, 200)
+                })
+            });
         }
 
         const data = await googleRes.json();

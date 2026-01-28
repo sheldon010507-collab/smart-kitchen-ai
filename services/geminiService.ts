@@ -128,28 +128,57 @@ export const analyzeFridgeAudit = async (
     '../features/inventory-scan/services/promptTemplates'
   );
 
+  // 🔍 Debug: Log image info
+  console.log(`[Gemini] Fridge Audit starting:`, {
+    imageCount: images.length,
+    dictionaryCount: dictionary.length,
+    imageSizes: images.map((img, i) => ({
+      index: i + 1,
+      base64Length: img.base64?.length || 0,
+      mimeType: img.mimeType,
+    })),
+  });
+
   // Generate Fridge Audit specific prompt
   const prompt = generateFridgeAuditPrompt({
     imageCount: images.length,
     dictionary,
   });
 
-  console.log(`[Gemini] Fridge Audit: ${images.length} images, ${dictionary.length} known items`);
+  console.log(`[Gemini] Fridge Audit prompt generated, length: ${prompt.length}`);
 
-  const text = await callGeminiMultiImageApi({
-    prompt,
-    images,
-    config: {
-      temperature: 0,
-      topK: 1,
-      topP: 0.1,
+  try {
+    const text = await callGeminiMultiImageApi({
+      prompt,
+      images,
+      config: {
+        temperature: 0,
+        topK: 1,
+        topP: 0.1,
+      }
+    });
+
+    console.log(`[Gemini] Fridge Audit response received, length: ${text?.length || 0}`);
+
+    if (text) {
+      const result = validateFridgeAuditResult(text);
+      console.log(`[Gemini] Fridge Audit parsed:`, {
+        foundCount: result?.found?.length || 0,
+        notFoundCount: result?.notFound?.length || 0,
+        newItemsCount: result?.newItems?.length || 0,
+      });
+      return result;
     }
-  });
 
-  if (text) {
-    return validateFridgeAuditResult(text);
+    console.warn('[Gemini] Fridge Audit: Empty response from API');
+    return null;
+  } catch (error: any) {
+    console.error('[Gemini] Fridge Audit failed:', {
+      message: error?.message,
+      stack: error?.stack?.substring(0, 500),
+    });
+    throw error;  // Re-throw to let Scanner.tsx handle it
   }
-  return null;
 };
 
 /**
