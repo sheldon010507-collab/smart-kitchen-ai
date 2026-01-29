@@ -12,11 +12,21 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
 const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-// Helper: CORS
+// Helper: CORS - Strict origin validation
 const getAllowedOrigin = (origin: string | undefined): string | null => {
-    // ... Reuse logic from gemini.ts or simplify
-    if (!origin) return null;
-    if (origin.includes('localhost') || origin.includes('guka.co.uk') || origin.includes('vercel.app')) {
+    const allowedOrigins = [
+        'https://guka.co.uk',
+        'https://www.guka.co.uk',
+        'https://smart-kitchen-ai.vercel.app',
+        // Allow localhost in development
+        ...(process.env.NODE_ENV === 'development' ? ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:5173'] : [])
+    ];
+
+    if (origin && allowedOrigins.includes(origin)) {
+        return origin;
+    }
+    // Only allow vercel.app from specific project prefixes
+    if (origin && (origin.includes('smart-kitchen') || origin.includes('guka')) && origin.endsWith('.vercel.app')) {
         return origin;
     }
     return null;
