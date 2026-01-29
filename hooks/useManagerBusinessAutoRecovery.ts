@@ -120,6 +120,9 @@ export function useManagerBusinessAutoRecovery(user: User | null): AutoRecoveryR
                 setCurrentBusinessId(newBusiness.id);
                 setRecoveredBusinessId(newBusiness.id);
 
+                // 🆕 Mark for Setup Wizard
+                localStorage.setItem(`newBusinessSetupRequired_${newBusiness.id}`, 'true');
+
                 console.log(`[Auto Recovery] ✅ Success! Business "${pendingName}" created and activated.`);
 
                 // 8. 通知用户

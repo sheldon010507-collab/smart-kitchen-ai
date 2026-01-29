@@ -146,7 +146,11 @@ export default function SupabaseLogin({ onLoginSuccess }: Props) {
         businessId = await getStaffActiveBusinessId(data.user.id);
       } else {
         // ✅ Manager 没 active business 也允许登录（App 里会显示 Master Dashboard 0 locations）
-        businessId = await getManagerActiveBusinessId(data.user.id);
+        // businessId = await getManagerActiveBusinessId(data.user.id);
+
+        // 🆕 Fix: Always land on Master Dashboard for Manager (User Request)
+        // User reported "Login directly is shop not dashboard", so we disable auto-select.
+        businessId = undefined;
       }
 
       // NOTE: data.user object might still have old metadata if we didn't refetch,
