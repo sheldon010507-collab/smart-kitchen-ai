@@ -21,6 +21,12 @@ export async function getSmartDictionary(
     businessId: string,
     maxItems: number = 30
 ): Promise<DictionaryItem[]> {
+    // 🆕 Early return if no businessId (avoid invalid query)
+    if (!businessId || businessId.trim() === '') {
+        console.warn('[DictionaryService] No businessId provided, returning empty dictionary');
+        return [];
+    }
+
     try {
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);

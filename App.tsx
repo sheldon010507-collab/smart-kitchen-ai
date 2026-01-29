@@ -290,6 +290,7 @@ export default function App() {
             <Scanner
               initialMode={scannerMode}
               inventoryNameOptions={filteredInventory.map((i) => i.name)}
+              businessId={currentBusinessId || ''}
               onClose={() => setIsScannerOpen(false)}
               onItemsFound={handleScanResult}
             />

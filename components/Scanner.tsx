@@ -31,6 +31,7 @@ interface Props {
   // 🆕 pass mode for proper inventory update
   onItemsFound: (items: InventoryItem[], mode?: 'cumulative' | 'stocktake') => void;
   inventoryNameOptions?: string[]; // RAG: existing ingredient dictionary
+  businessId?: string; // 🆕 Required for dictionary loading
 }
 
 
@@ -135,6 +136,7 @@ const Scanner: React.FC<Props> = ({
   onClose,
   onItemsFound,
   inventoryNameOptions = [],
+  businessId: propBusinessId,
 }) => {
   const [mode, setMode] = useState<ScanMode>(initialMode);
   const [file, setFile] = useState<File | null>(null);
@@ -294,7 +296,7 @@ const Scanner: React.FC<Props> = ({
       const photosToProcess = fridgePhotos.length > 0 ? fridgePhotos : [{ file: file!, preview: previewUrl }];
 
       // 🆕 Load smart dictionary for matching
-      const businessId = (window as any).__currentBusinessId || '';
+      const businessId = propBusinessId || '';
       const loadedDict = await getSmartDictionary(businessId, 30);
       setDictionaryItems(loadedDict);
       console.log(`[Scanner] Loaded ${loadedDict.length} dictionary items`);
