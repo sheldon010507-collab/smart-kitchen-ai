@@ -208,8 +208,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             parts.push({ text: prompt });
         }
 
-        const payload: any = { contents: [{ parts }] };
-        if (config) payload.generationConfig = config;
+        // 🆕 Default generation config for deterministic output
+        const defaultConfig = {
+            temperature: 0.1,        // 极低随机性，提高一致性
+            topP: 0.95,
+            topK: 40,
+            maxOutputTokens: 4096,
+            responseMimeType: "application/json"  // 强制 JSON 输出
+        };
+
+        // Merge user config with defaults (user config takes precedence)
+        const finalConfig = { ...defaultConfig, ...config };
+
+        const payload: any = {
+            contents: [{ parts }],
+            generationConfig: finalConfig
+        };
 
         // 5. Call Google API
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;

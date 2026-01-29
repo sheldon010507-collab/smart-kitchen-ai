@@ -189,6 +189,7 @@ Analyze the image(s) now:`.trim();
 /**
  * Generate prompt for multi-angle image scanning
  * Optimized for analyzing multiple photos of the same area from different angles
+ * 🆕 v2.1: Streamlined for faster processing (~500 chars vs ~1000)
  */
 export function generateMultiAngleScanPrompt(options: PromptOptions): string {
   const { imageCount, scanArea, knownItems } = options;
@@ -197,59 +198,24 @@ export function generateMultiAngleScanPrompt(options: PromptOptions): string {
     ? knownItems.slice(0, 15).map(i => `${i.name}(${i.unit})`).join(', ')
     : 'identify all food items';
 
-  return `
-# Multi-Angle Inventory Scanner
+  return `${imageCount} photos = SAME ${AREA_DESCRIPTIONS[scanArea]}, DIFFERENT angles.
 
-You are analyzing ${imageCount} photos of the SAME ${AREA_DESCRIPTIONS[scanArea]} from DIFFERENT ANGLES.
+TASK: Count items ONCE using all views.
+- Front view → identify items
+- Side view → determine depth
+- Count = visible × depth
 
-## CRITICAL: Multi-Angle Fusion Rules
-- Image 1 might be FRONT view (labels, brands visible)
-- Image 2 might be SIDE view (see depth, stacking)
-- Image 3 might be TOP/OTHER view (see hidden items)
+KNOWN ITEMS: ${knownItemsList}
 
-Your task: COMBINE information from ALL angles to get ACCURATE count.
+RULES:
+1. Count each item ONCE (no duplicates across images)
+2. Confidence: 0.9+=clear, 0.7-0.9=partial, <0.7=uncertain
+3. Category: ${ALLOWED_CATEGORIES.slice(0, 10).join('/')}
 
-### Counting Strategy:
-1. First, identify items visible in EACH image
-2. Match same items across images by position/appearance
-3. Use SIDE view to determine depth (e.g., "3 bottles deep")
-4. Use FRONT view for labels and identification
-5. Final count = visible front × depth (if side view confirms)
+JSON OUTPUT:
+{"items":[{"name":"str","quantity":n,"unit":"${ALLOWED_UNITS.slice(0, 6).join('/')}","category":"str","confidence":0.0-1.0,"notes":"how counted"}],"scan_quality":"good/medium/poor"}
 
-### Handling Partial Visibility:
-- If item is partially hidden, estimate based on visible portion
-- Mark hidden/estimated items with lower confidence (0.5-0.7)
-- If all images show same angle, note "depth unknown" in notes
-
-### Example:
-- Front view: 4 milk bottles visible
-- Side view: bottles are 2 deep
-- Correct count: 4 × 2 = 8 bottles
-
-## Known Items (prefer matching)
-${knownItemsList}
-
-## Output (JSON only)
-{
-  "items": [
-    {
-      "name": "Item name",
-      "quantity": number,
-      "unit": "${ALLOWED_UNITS.join('/')}",
-      "confidence": 0.0-1.0,
-      "notes": "front:X × depth:Y = total"
-    }
-  ],
-  "scan_quality": "good/medium/poor"
-}
-
-## DON'T
-- Don't count same item multiple times across angles
-- Don't guess depth without side view evidence
-- Don't ignore any image
-- Don't return quantity 0 (skip item instead)
-
-Analyze all ${imageCount} images now:`.trim();
+Analyze now:`.trim();
 }
 
 /**
