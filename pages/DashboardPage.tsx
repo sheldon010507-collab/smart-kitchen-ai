@@ -258,6 +258,8 @@ export const DashboardPage = () => {
                     }}
                     onStartFresh={() => {
                         setShowTemplateOnboarding(false);
+                        // 🆕 Navigate to Inventory page where Setup Wizard will auto-open
+                        navigate('/inventory');
                     }}
                 />
             )}

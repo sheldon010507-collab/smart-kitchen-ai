@@ -35,6 +35,18 @@ export const InventoryPage = () => {
     const [metaTab, setMetaTab] = useState<'categories' | 'locations' | 'containers'>('categories');
     const [metaNewValue, setMetaNewValue] = useState('');
 
+    // 🆕 Auto-open Setup Wizard for newly created businesses
+    React.useEffect(() => {
+        if (activeBusiness?.id) {
+            const setupKey = `newBusinessSetupRequired_${activeBusiness.id}`;
+            if (localStorage.getItem(setupKey) === 'true') {
+                console.log('[InventoryPage] New business detected, opening Setup Wizard');
+                setIsSetupWizardOpen(true);
+                localStorage.removeItem(setupKey);
+            }
+        }
+    }, [activeBusiness?.id]);
+
     // Derived State
     const filteredInventory = React.useMemo(() => {
         let items = inventoryCtx.inventory;

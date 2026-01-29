@@ -201,6 +201,10 @@ export function BusinessProvider({ children }: BusinessProviderProps) {
             };
 
             setBusinesses(prev => [...prev, newBusiness]);
+
+            // 🆕 Mark this business as needing initial setup
+            localStorage.setItem(`newBusinessSetupRequired_${biz.id}`, 'true');
+
             return newBusiness;
         } catch (e: any) {
             console.error('Create business failed:', e);
