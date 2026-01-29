@@ -235,14 +235,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             try {
                 const errJson = JSON.parse(errText);
                 console.error('[Gemini API] Parsed error:', errJson);
+
+                // Check for specific error types
+                if (errJson.error?.message?.includes('API key')) {
+                    console.error('[Gemini API] API Key issue detected!');
+                }
+                if (errJson.error?.message?.includes('model')) {
+                    console.error('[Gemini API] Model issue detected! Try different model.');
+                }
             } catch { }
 
             // ✅ P3 Fix: Hide detailed error from client but log it
+            // 🔧 Enhanced: Include more debug info in development
             return res.status(502).json({
                 error: 'AI service temporarily unavailable. Please try again.',
-                // Include debug info in development
-                ...(process.env.NODE_ENV === 'development' && {
-                    debug: errText.substring(0, 200)
+                // Include debug info in development OR if specifically a 400 error
+                ...((process.env.NODE_ENV === 'development' || googleRes.status === 400) && {
+                    debug: {
+                        status: googleRes.status,
+                        model: modelName,
+                        imageCount: parts.filter((p: any) => p.inlineData).length,
+                        hasPrompt: parts.some((p: any) => p.text),
+                        errorPreview: errText.substring(0, 300)
+                    }
                 })
             });
         }
