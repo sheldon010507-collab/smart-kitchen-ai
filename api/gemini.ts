@@ -149,9 +149,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // 4. Validate & Prepare Request
         const { prompt, imageBase64, mimeType, images, model, config } = req.body;
 
-        // Model Selection - Use gemini-1.5-flash for multi-image support
-        // Note: gemini-3-flash-preview may not support multi-image input
-        const modelName = 'gemini-1.5-flash';
+        // Model Selection - Use environment variable or default to gemini-2.0-flash-001
+        // Note: gemini-1.5-flash was deprecated, gemini-2.0-flash-001 supports multi-image
+        const modelName = process.env.GEMINI_MODEL || 'gemini-2.0-flash-001';
 
         // 🔍 Debug: Log which model is being used
         console.log(`[Gemini API] Using model: ${modelName}, images: ${images?.length || (imageBase64 ? 1 : 0)}`);
