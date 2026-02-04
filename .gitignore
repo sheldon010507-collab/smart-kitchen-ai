@@ -31,3 +31,6 @@ scripts/*-test.js
 *.sw?
 
 .vercel
+
+# Git worktrees
+.worktrees
