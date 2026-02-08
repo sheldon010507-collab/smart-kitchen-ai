@@ -2,6 +2,21 @@
 import { InventoryItem, Recipe, MenuItem, Shift } from "../types";
 import { supabase } from "../lib/supabase";
 
+// Shared schema for invoice scan (used by analyzeInvoice and analyzeMultipleInvoices)
+const INVOICE_ITEM_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    name: { type: "STRING" },
+    quantity: { type: "NUMBER" },
+    unit: { type: "STRING" },
+    unitCost: { type: "NUMBER" },
+    totalPrice: { type: "NUMBER" },
+    confidence: { type: "NUMBER" },
+    notes: { type: "STRING" }
+  },
+  required: ["name", "quantity", "unit"]
+};
+
 // Helper to encode file to base64
 export const fileToGenerativePart = async (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -391,20 +406,6 @@ export const analyzeInvoice = async (
 
   console.log(`[Gemini] Invoice scan: ${sanitizedItems.length} known items`);
 
-  const invoiceItemSchema = {
-    type: "OBJECT",
-    properties: {
-      name: { type: "STRING" },
-      quantity: { type: "NUMBER" },
-      unit: { type: "STRING" },
-      unitCost: { type: "NUMBER" },
-      totalPrice: { type: "NUMBER" },
-      confidence: { type: "NUMBER" },
-      notes: { type: "STRING" }
-    },
-    required: ["name", "quantity", "unit"]
-  };
-
   const text = await callGeminiApi({
     prompt,
     imageBase64: base64Image,
@@ -421,7 +422,7 @@ export const analyzeInvoice = async (
           supplier: { type: "STRING" },
           invoiceNumber: { type: "STRING" },
           date: { type: "STRING" },
-          items: { type: "ARRAY", items: invoiceItemSchema },
+          items: { type: "ARRAY", items: INVOICE_ITEM_SCHEMA },
           subtotal: { type: "NUMBER" },
           tax: { type: "NUMBER" },
           grandTotal: { type: "NUMBER" },
@@ -509,20 +510,6 @@ ${basePrompt}
 
   console.log(`[Gemini] Multi-invoice scan: ${images.length} images, ${sanitizedItems.length} known items`);
 
-  const invoiceItemSchema = {
-    type: "OBJECT",
-    properties: {
-      name: { type: "STRING" },
-      quantity: { type: "NUMBER" },
-      unit: { type: "STRING" },
-      unitCost: { type: "NUMBER" },
-      totalPrice: { type: "NUMBER" },
-      confidence: { type: "NUMBER" },
-      notes: { type: "STRING" }
-    },
-    required: ["name", "quantity", "unit"]
-  };
-
   const text = await callGeminiMultiImageApi({
     prompt: multiImagePrompt,
     images,
@@ -538,7 +525,7 @@ ${basePrompt}
           supplier: { type: "STRING" },
           invoiceNumber: { type: "STRING" },
           date: { type: "STRING" },
-          items: { type: "ARRAY", items: invoiceItemSchema },
+          items: { type: "ARRAY", items: INVOICE_ITEM_SCHEMA },
           subtotal: { type: "NUMBER" },
           tax: { type: "NUMBER" },
           grandTotal: { type: "NUMBER" },
@@ -549,13 +536,7 @@ ${basePrompt}
   });
 
   if (text) {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/6586675c-9966-46a3-ac5d-1d79fea93820',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'geminiService.ts:analyzeMultipleInvoices',message:'Multi-invoice API returned text',data:{textLen:text?.length,imageCount:images.length},timestamp:Date.now(),hypothesisId:'E'})}).catch(()=>{});
-    // #endregion
     const result = validateInvoiceScanResult(text);
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/6586675c-9966-46a3-ac5d-1d79fea93820',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'geminiService.ts:analyzeMultipleInvoices',message:'validateInvoiceScanResult result',data:{hasResult:!!result,itemCount:result?.items?.length??0},timestamp:Date.now(),hypothesisId:'E'})}).catch(()=>{});
-    // #endregion
     if (result) {
       return {
         supplier: result.supplier,

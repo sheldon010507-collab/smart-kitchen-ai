@@ -720,33 +720,19 @@ export function validateInvoiceScanResult(raw: string): InvoiceScanResult | null
     };
   } catch (e) {
     console.error('Failed to parse invoice scan result:', e);
-    // Log preview for debugging
-    if (raw) console.error('Raw content preview:', raw.substring(0, 100) + '...' + raw.substring(raw.length - 100));
-    // #region agent log
+
+    // Truncation repair: when error at/near end, Gemini may have truncated JSON
     const errMsg = String((e as Error)?.message || e);
     const posMatch = errMsg.match(/position\s+(\d+)/);
     const pos = posMatch ? parseInt(posMatch[1], 10) : -1;
-    const ctxStart = Math.max(0, pos - 100);
-    const ctxEnd = Math.min(cleaned?.length ?? 0, pos + 100);
-    const ctxSnippet = cleaned ? cleaned.substring(ctxStart, ctxEnd) : '';
-    const charAtPos = cleaned && pos >= 0 && pos < cleaned.length ? JSON.stringify(cleaned[pos]) : '';
-    const line113Approx = cleaned?.split('\n')[112];
-    const payload = {location:'promptTemplates.ts:validateInvoiceScanResult',message:'Invoice JSON parse failed',data:{rawLen:raw?.length,cleanedLen:cleaned?.length,errMsg,pos,ctxSnippet,charAtPos,line113Approx},timestamp:Date.now(),hypothesisId:'A'};
-    fetch('http://127.0.0.1:7242/ingest/6586675c-9966-46a3-ac5d-1d79fea93820',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).catch(()=>{});
-    if (typeof window !== 'undefined') (window as any).__DEBUG_INVOICE_PARSE = payload;
-    console.error('[DEBUG_INVOICE_PARSE]', JSON.stringify(payload, null, 2));
-    // #endregion
-
-    // Truncation repair: when error at/near end and string ends with "}", Gemini may have truncated before "]}" 
     const len = cleaned?.length ?? 0;
     const endsWithBrace = /\}\s*$/.test(cleaned);
-    const endsWithValue = /[\d"]\s*$/.test(cleaned); // number or end of string
+    const endsWithValue = /[\d"]\s*$/.test(cleaned);
     const looksTruncated = pos >= len - 50 && len > 0 && (endsWithBrace || endsWithValue);
     if (looksTruncated) {
-      console.warn('[Invoice] Attempting truncation repair, pos=', pos, 'len=', len, 'endsWithBrace=', endsWithBrace, 'endsWithValue=', endsWithValue);
       try {
         let repaired = cleaned.replace(/\s*$/, '');
-        repaired += endsWithBrace ? ']}' : '}'; // endsWith } => need ]; endsWith value => need }
+        repaired += endsWithBrace ? ']}' : '}';
         const data = JSON.parse(repaired);
         // Relaxed filter for recovery: accept items with name (quantity can be null/0 - treat as 1)
         const items: InvoiceItem[] = (data.items || [])
@@ -776,12 +762,7 @@ export function validateInvoiceScanResult(raw: string): InvoiceScanResult | null
             scanQuality: ['good', 'medium', 'poor'].includes(data.scanQuality) ? data.scanQuality : 'medium',
           };
         }
-        console.warn('[Invoice] Repair parse OK but items.length=', items.length, 'data.items=', (data.items || []).length);
-      } catch (repairErr) {
-        console.warn('[Invoice] Repair failed:', repairErr);
-      }
-    } else {
-      console.warn('[Invoice] Truncation repair skipped: looksTruncated=', looksTruncated, 'pos=', pos, 'len=', len);
+      } catch { /* repair failed */ }
     }
     return null;
   }
