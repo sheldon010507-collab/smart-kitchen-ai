@@ -668,20 +668,23 @@ export function validateInvoiceScanResult(raw: string): InvoiceScanResult | null
     // 1. Remove Markdown code blocks and clean trimming
     cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
 
-    // 2. Extract JSON object (find first { and last } to handle surrounding text)
+    // 2. Sanitize FIRST: Gemini returns numbers with hundreds of decimal places (e.g. tax: 0.00000...)
+    // which breaks JSON.parse. Must run before extraction since truncated JSON may have no closing "}"
+    cleaned = cleaned.replace(/(\d+)\.(\d{5,})/g, (_, intPart, decPart) => {
+      const n = parseFloat(intPart + '.' + decPart);
+      return isNaN(n) ? intPart + '.0' : String(Number(n.toFixed(4)));
+    });
+
+    // 3. Extract JSON object (find first { and last } to handle surrounding text)
     const firstOpen = cleaned.indexOf('{');
     const lastClose = cleaned.lastIndexOf('}');
 
     if (firstOpen !== -1 && lastClose !== -1 && lastClose > firstOpen) {
       cleaned = cleaned.substring(firstOpen, lastClose + 1);
+    } else if (firstOpen !== -1 && lastClose === -1) {
+      // Truncated: no closing }. Try appending one.
+      cleaned = cleaned.substring(firstOpen) + '}';
     }
-
-    // Sanitize: Gemini sometimes returns numbers with hundreds of decimal places (e.g. tax: 0.00000...)
-    // which can break JSON.parse or cause "Expected ',' or '}' after property value"
-    cleaned = cleaned.replace(/(\d+\.\d{10,})(?=[,\]\}\s]|$)/g, (match) => {
-      const n = parseFloat(match);
-      return isNaN(n) ? match : String(Number(n.toFixed(4)));
-    });
 
     const data = JSON.parse(cleaned);
 
