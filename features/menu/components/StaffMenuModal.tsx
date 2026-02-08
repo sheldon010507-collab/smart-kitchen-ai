@@ -42,10 +42,26 @@ export function StaffMenuModal({
             // but for now assuming they match or are adaptable.
             // If editingItem is Partial<MenuItem>, check if it has ingredients
             if (editingItem.ingredients) {
-                // Ensure type compatibility. IngredientUsage usually has { id, qty, unit, cost }
-                // MenuItem ingredients might be distinct.
-                // Let's assume broad compatibility or map it.
-                setIngredients(editingItem.ingredients as any[] || []);
+                // Ensure type compatibility. Map DB ingredients (MenuIngredient) to UI ingredients (IngredientUsage)
+                const mappedIngredients = (editingItem.ingredients as any[]).map(ing => {
+                    // Check if it's from DB (has inventoryItemId)
+                    if (ing.inventoryItemId) {
+                        return {
+                            id: ing.inventoryItemId,
+                            qty: ing.quantityUsed || 0,
+                            unit: ing.unitUsed || 'g',
+                            cost: ing.costSnapshot || 0
+                        };
+                    }
+                    // Otherwise assume it's already in UI shape or fallback
+                    return {
+                        id: ing.id || '',
+                        qty: ing.qty || 0,
+                        unit: ing.unit || 'g',
+                        cost: ing.cost || 0
+                    };
+                });
+                setIngredients(mappedIngredients);
             } else {
                 setIngredients([]);
             }
