@@ -391,6 +391,20 @@ export const analyzeInvoice = async (
 
   console.log(`[Gemini] Invoice scan: ${sanitizedItems.length} known items`);
 
+  const invoiceItemSchema = {
+    type: "OBJECT",
+    properties: {
+      name: { type: "STRING" },
+      quantity: { type: "NUMBER" },
+      unit: { type: "STRING" },
+      unitCost: { type: "NUMBER" },
+      totalPrice: { type: "NUMBER" },
+      confidence: { type: "NUMBER" },
+      notes: { type: "STRING" }
+    },
+    required: ["name", "quantity", "unit"]
+  };
+
   const text = await callGeminiApi({
     prompt,
     imageBase64: base64Image,
@@ -399,6 +413,21 @@ export const analyzeInvoice = async (
       temperature: 0,
       topK: 1,
       topP: 0.1,
+      maxOutputTokens: 8192,
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: "OBJECT",
+        properties: {
+          supplier: { type: "STRING" },
+          invoiceNumber: { type: "STRING" },
+          date: { type: "STRING" },
+          items: { type: "ARRAY", items: invoiceItemSchema },
+          subtotal: { type: "NUMBER" },
+          tax: { type: "NUMBER" },
+          grandTotal: { type: "NUMBER" },
+          scanQuality: { type: "STRING" }
+        }
+      }
     }
   });
 
@@ -480,6 +509,20 @@ ${basePrompt}
 
   console.log(`[Gemini] Multi-invoice scan: ${images.length} images, ${sanitizedItems.length} known items`);
 
+  const invoiceItemSchema = {
+    type: "OBJECT",
+    properties: {
+      name: { type: "STRING" },
+      quantity: { type: "NUMBER" },
+      unit: { type: "STRING" },
+      unitCost: { type: "NUMBER" },
+      totalPrice: { type: "NUMBER" },
+      confidence: { type: "NUMBER" },
+      notes: { type: "STRING" }
+    },
+    required: ["name", "quantity", "unit"]
+  };
+
   const text = await callGeminiMultiImageApi({
     prompt: multiImagePrompt,
     images,
@@ -487,6 +530,21 @@ ${basePrompt}
       temperature: 0,
       topK: 1,
       topP: 0.1,
+      maxOutputTokens: 8192,
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: "OBJECT",
+        properties: {
+          supplier: { type: "STRING" },
+          invoiceNumber: { type: "STRING" },
+          date: { type: "STRING" },
+          items: { type: "ARRAY", items: invoiceItemSchema },
+          subtotal: { type: "NUMBER" },
+          tax: { type: "NUMBER" },
+          grandTotal: { type: "NUMBER" },
+          scanQuality: { type: "STRING" }
+        }
+      }
     }
   });
 

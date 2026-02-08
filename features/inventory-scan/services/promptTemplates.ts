@@ -726,6 +726,50 @@ export function validateInvoiceScanResult(raw: string): InvoiceScanResult | null
     if (typeof window !== 'undefined') (window as any).__DEBUG_INVOICE_PARSE = payload;
     console.error('[DEBUG_INVOICE_PARSE]', JSON.stringify(payload, null, 2));
     // #endregion
+
+    // Truncation repair: when error at/near end and string ends with "}", Gemini may have truncated before "]}" 
+    const len = cleaned?.length ?? 0;
+    const looksTruncated = pos >= len - 20 && len > 0 && /\}\s*$/.test(cleaned);
+    if (looksTruncated) {
+      console.warn('[Invoice] Attempting truncation repair, pos=', pos, 'len=', len, 'endsWithBrace=', /\}\s*$/.test(cleaned));
+      try {
+        const repaired = cleaned.replace(/\s*$/, '') + ']}';
+        const data = JSON.parse(repaired);
+        // Relaxed filter for recovery: accept items with name (quantity can be null/0 - treat as 1)
+        const items: InvoiceItem[] = (data.items || [])
+          .filter((i: any) => typeof i.name === 'string' && i.name.length > 0)
+          .map((i: any) => {
+            const qty = typeof i.quantity === 'number' ? i.quantity : (i.quantity == null ? 1 : 0);
+            return {
+              name: i.name.trim(),
+              quantity: Math.round(qty * 100) / 100,
+              unit: (i.unit || 'pcs').trim(),
+              unitCost: typeof i.unitCost === 'number' ? Math.round(i.unitCost * 100) / 100 : 0,
+              totalPrice: typeof i.totalPrice === 'number' ? Math.round(i.totalPrice * 100) / 100 : 0,
+              confidence: typeof i.confidence === 'number' ? Math.min(1, Math.max(0, i.confidence)) : 0.7,
+              notes: i.notes,
+            };
+          });
+        if (items.length > 0) {
+          console.warn('[Invoice] Recovered', items.length, 'items from truncated JSON');
+          return {
+            supplier: typeof data.supplier === 'string' ? data.supplier.trim() : undefined,
+            invoiceNumber: typeof data.invoiceNumber === 'string' ? data.invoiceNumber.trim() : undefined,
+            date: typeof data.date === 'string' ? data.date.trim() : undefined,
+            items,
+            subtotal: typeof data.subtotal === 'number' ? data.subtotal : undefined,
+            tax: typeof data.tax === 'number' ? data.tax : undefined,
+            grandTotal: typeof data.grandTotal === 'number' ? data.grandTotal : undefined,
+            scanQuality: ['good', 'medium', 'poor'].includes(data.scanQuality) ? data.scanQuality : 'medium',
+          };
+        }
+        console.warn('[Invoice] Repair parse OK but items.length=', items.length, 'data.items=', (data.items || []).length);
+      } catch (repairErr) {
+        console.warn('[Invoice] Repair failed:', repairErr);
+      }
+    } else {
+      console.warn('[Invoice] Truncation repair skipped: looksTruncated=', looksTruncated, 'pos=', pos, 'len=', len);
+    }
     return null;
   }
 }
