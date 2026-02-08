@@ -49,7 +49,7 @@ export function ManagerMenuForm({
         if (!name || !price) return;
 
         const newItem: MenuItem = {
-            id: Date.now().toString(),
+            id: crypto.randomUUID(),
             businessId: '',
             name,
             description,

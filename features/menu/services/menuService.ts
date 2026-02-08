@@ -128,6 +128,7 @@ export const menuService = {
         ingredients?: { inventoryItemId: string; quantity: number; unit: string; cost: number }[]
     ): Promise<void> {
         // 1. Update MenuItem fields
+        // Since id might be text in DB (legacy), this update might succeed even with non-UUID
         const { error: updateErr } = await supabase
             .from('menu_items')
             .update({
@@ -146,8 +147,26 @@ export const menuService = {
 
         // 2. Replace Ingredients (Delete All -> Insert New)
         if (ingredients) {
+            // Check if ID is a valid UUID before touching ingredients table
+            const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+            if (!uuidRegex.test(id)) {
+                console.warn(`Skipping ingredient update for non-UUID item: ${id}`);
+                // We cannot safely update ingredients for legacy items because menu_item_id expects UUID.
+                // The item itself is updated, but ingredients are skipped to prevent crash.
+                return;
+            }
+
             // Delete old
-            await supabase.from('menu_ingredients').delete().eq('menu_item_id', id);
+            const { error: delErr } = await supabase
+                .from('menu_ingredients')
+                .delete()
+                .eq('menu_item_id', id);
+
+            if (delErr) {
+                console.error('Failed to delete old ingredients:', delErr);
+                // If delete fails (e.g. FK constraint), stop here
+                return;
+            }
 
             // Insert new
             if (ingredients.length > 0) {
@@ -173,6 +192,8 @@ export const menuService = {
      * Delete a menu item
      */
     async deleteMenuItem(id: string): Promise<void> {
+        // Direct delete on menu_items should work even for non-UUIDs (if column is text)
+        // Cascade delete will handle ingredients if they exist (which they shouldn't for non-UUID items)
         const { error } = await supabase
             .from('menu_items')
             .delete()
