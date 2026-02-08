@@ -218,7 +218,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         };
 
         // Merge user config with defaults (user config takes precedence)
-        const finalConfig = { ...defaultConfig, ...config };
+        const finalConfig: any = { ...defaultConfig, ...config };
+
+        // CRITICAL: Google REST API expects "responseJsonSchema", not "responseSchema"
+        // Without this mapping, structured output is ignored and Gemini returns free-form text
+        // (causing malformed JSON, excessive decimals like tax:0.00000..., truncation)
+        if (finalConfig.responseSchema && !finalConfig.responseJsonSchema) {
+            finalConfig.responseJsonSchema = finalConfig.responseSchema;
+            delete finalConfig.responseSchema;
+        }
 
         const payload: any = {
             contents: [{ parts }],
