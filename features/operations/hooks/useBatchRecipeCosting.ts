@@ -6,6 +6,7 @@
  */
 
 import { useState, useEffect, useMemo } from 'react';
+import { calculateIngredientCost } from '../../../utils/costCalculations';
 import { supabase } from '../../../lib/supabase';
 import { MenuItem, InventoryItem, MenuIngredient } from '../../../types';
 
@@ -49,7 +50,7 @@ export function useBatchRecipeCosting(menuItems: MenuItem[], inventory: Inventor
             // #region agent log
             const firstRow = (data || [])[0];
             if (firstRow) {
-                fetch('http://127.0.0.1:7242/ingest/6586675c-9966-46a3-ac5d-1d79fea93820',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useBatchRecipeCosting.ts:loadAllIngredients',message:'First menu_ingredients row keys',data:{keys:Object.keys(firstRow),inventory_id:firstRow?.inventory_id,inventory_item_id:firstRow?.inventory_item_id,ingredient_name:firstRow?.ingredient_name},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
+                fetch('http://127.0.0.1:7242/ingest/6586675c-9966-46a3-ac5d-1d79fea93820', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'useBatchRecipeCosting.ts:loadAllIngredients', message: 'First menu_ingredients row keys', data: { keys: Object.keys(firstRow), inventory_id: firstRow?.inventory_id, inventory_item_id: firstRow?.inventory_item_id, ingredient_name: firstRow?.ingredient_name }, timestamp: Date.now(), hypothesisId: 'A' }) }).catch(() => { });
             }
             // #endregion
 
@@ -96,7 +97,14 @@ export function useBatchRecipeCosting(menuItems: MenuItem[], inventory: Inventor
                     : inventory.find(i => i.name.toLowerCase() === ingredient.ingredientName.toLowerCase());
 
                 if (inventoryItem && inventoryItem.unitCost) {
-                    totalCost += ingredient.quantityUsed * inventoryItem.unitCost;
+                    // Use shared utility to handle unit conversion (e.g. kg -> g)
+                    // We need to pass: item, qty, unit
+                    const cost = calculateIngredientCost(
+                        inventoryItem,
+                        ingredient.quantityUsed,
+                        ingredient.unitUsed
+                    );
+                    totalCost += cost;
                 } else if (ingredient.costPerUnit) {
                     // Fallback: 使用配方中記錄的快照成本
                     totalCost += ingredient.quantityUsed * ingredient.costPerUnit;
