@@ -13,6 +13,7 @@ import { useBusiness } from '../../../lib/BusinessContext';
 import { useInventoryContext } from '../../../lib/InventoryContext';
 import { useWastageData } from './useWastageData';
 import { useBatchRecipeCosting } from './useBatchRecipeCosting';
+import { menuService } from '../../menu/services/menuService';
 
 export interface OperationsStats {
     totalLaborCost: number;
@@ -101,9 +102,66 @@ export function useOperationsData() {
         pendingStaff,
         activeStaff,
 
+
         // 操作方法
         setShifts,
-        setMenu,
+        // setMenu, // Create custom handlers instead
         refreshDashboard,
+
+        // Menu Persistence Handlers
+        handleAddMenuItem: async (item: any) => {
+            if (!currentBusinessId) return;
+            try {
+                // Separation of concerns: item vs ingredients
+                const { ingredients, ...menuItemData } = item;
+                const ingredientsList = ingredients?.map((ing: any) => ({
+                    inventoryItemId: ing.id || ing.inventoryItemId,
+                    quantity: ing.qty || ing.quantityUsed,
+                    unit: ing.unit || ing.unitUsed,
+                    cost: ing.cost || ing.costSnapshot || 0
+                })) || [];
+
+                await menuService.createMenuItem(currentBusinessId, menuItemData, ingredientsList);
+                await refreshDashboard();
+            } catch (error) {
+                console.error('Failed to create menu item:', error);
+                alert('Failed to save menu item');
+            }
+        },
+
+        handleUpdateMenuItem: async (item: any) => {
+            try {
+                // Separation of concerns: item vs ingredients
+                const { ingredients, ...menuItemData } = item;
+
+                // If ingredients are present, format them for the service
+                let ingredientsList;
+                if (ingredients) {
+                    ingredientsList = ingredients.map((ing: any) => ({
+                        inventoryItemId: ing.id || ing.inventoryItemId,
+                        quantity: ing.qty || ing.quantityUsed,
+                        unit: ing.unit || ing.unitUsed,
+                        cost: ing.cost || ing.costSnapshot || 0
+                    }));
+                }
+
+                await menuService.updateMenuItem(item.id, menuItemData, ingredientsList);
+                await refreshDashboard();
+            } catch (error) {
+                console.error('Failed to update menu item:', error);
+                alert('Failed to update menu item');
+            }
+        },
+
+        handleDeleteMenuItem: async (id: string) => {
+            if (!confirm('Are you sure you want to delete this item?')) return;
+            try {
+                await menuService.deleteMenuItem(id);
+                await refreshDashboard();
+            } catch (error) {
+                console.error('Failed to delete menu item:', error);
+                alert('Failed to delete menu item');
+            }
+        },
     };
 }

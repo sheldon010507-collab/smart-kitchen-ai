@@ -169,6 +169,7 @@ export interface MenuItem {
   imageUrl?: string;
   isActive: boolean;
   sortOrder: number;
+  ingredients?: IngredientUsage[];
   createdAt: string;
   updatedAt: string;
 }

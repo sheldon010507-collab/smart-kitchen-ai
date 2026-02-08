@@ -128,16 +128,15 @@ export function MenuManager({
                     onDelete={onDeleteMenuItem}
                 />
 
-                {/* Staff: Edit/Create Modal */}
-                {isStaff && (
-                    <StaffMenuModal
-                        isOpen={isStaffModalOpen}
-                        isCreating={isCreating}
-                        editingItem={editingItem}
-                        onClose={closeModal}
-                        onSave={handleStaffSave}
-                    />
-                )}
+                {/* Edit/Create Modal - Shared for Staff and Manager editing */}
+                <StaffMenuModal
+                    isOpen={isStaffModalOpen}
+                    isCreating={isCreating}
+                    editingItem={editingItem}
+                    onClose={closeModal}
+                    onSave={handleStaffSave}
+                    inventory={inventory} // Pass inventory for IngredientSelector
+                />
             </div>
         </div>
     );

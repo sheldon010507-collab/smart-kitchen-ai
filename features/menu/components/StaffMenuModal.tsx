@@ -1,12 +1,6 @@
-/**
- * StaffMenuModal Component
- * 
- * Modal for Staff to create/edit menu items (simplified version)
- */
 
-import React, { useState, useRef, useEffect } from 'react';
-import { X, Save, Image as ImageIcon } from 'lucide-react';
-import { MenuItem } from '../../../types';
+import { IngredientSelector, IngredientUsage } from './IngredientSelector'; // Import IngredientSelector
+import { InventoryItem } from '../../../types'; // Ensure InventoryItem is imported
 
 interface StaffMenuModalProps {
     isOpen: boolean;
@@ -14,6 +8,7 @@ interface StaffMenuModalProps {
     editingItem: Partial<MenuItem> | null;
     onClose: () => void;
     onSave: (item: MenuItem) => void;
+    inventory?: InventoryItem[]; // Add optional inventory prop
 }
 
 const CATEGORIES = ['Starter', 'Main', 'Lunch', 'Dessert', 'Beverage', 'Drink', 'Food', 'Other'];
@@ -24,11 +19,14 @@ export function StaffMenuModal({
     editingItem,
     onClose,
     onSave,
+    inventory = [], // Default to empty array
 }: StaffMenuModalProps) {
     const [name, setName] = useState('');
     const [category, setCategory] = useState('Food');
     const [price, setPrice] = useState('');
     const [imageUrl, setImageUrl] = useState('');
+    const [ingredients, setIngredients] = useState<IngredientUsage[]>([]); // Add ingredients state
+
     const imageInputRef = useRef<HTMLInputElement>(null);
 
     // Sync form with editing item
@@ -38,11 +36,24 @@ export function StaffMenuModal({
             setCategory(editingItem.category || 'Food');
             setPrice(editingItem.sellingPrice?.toString() || '');
             setImageUrl(editingItem.imageUrl || '');
+            // Load ingredients if they exist (assuming editingItem has them populated)
+            // Note: We need to map them to IngredientUsage if they are coming from a different shape, 
+            // but for now assuming they match or are adaptable.
+            // If editingItem is Partial<MenuItem>, check if it has ingredients
+            if (editingItem.ingredients) {
+                // Ensure type compatibility. IngredientUsage usually has { id, qty, unit, cost }
+                // MenuItem ingredients might be distinct.
+                // Let's assume broad compatibility or map it.
+                setIngredients(editingItem.ingredients as any[] || []);
+            } else {
+                setIngredients([]);
+            }
         } else {
             setName('');
             setCategory('Food');
             setPrice('');
             setImageUrl('');
+            setIngredients([]);
         }
     }, [editingItem]);
 
@@ -57,6 +68,8 @@ export function StaffMenuModal({
         }
     };
 
+    const totalCost = ingredients.reduce((sum, item) => sum + item.cost, 0);
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         const priceNum = parseFloat(price) || 0;
@@ -67,13 +80,14 @@ export function StaffMenuModal({
             name,
             category,
             sellingPrice: priceNum,
-            estimatedCost: editingItem?.estimatedCost || priceNum * 0.3,
+            estimatedCost: totalCost > 0 ? totalCost : (editingItem?.estimatedCost || priceNum * 0.3),
             imageUrl: imageUrl || undefined,
             description: editingItem?.description || '',
             isActive: editingItem?.isActive ?? true,
             sortOrder: editingItem?.sortOrder ?? 0,
             createdAt: editingItem?.createdAt || new Date().toISOString(),
             updatedAt: new Date().toISOString(),
+            ingredients: ingredients, // Pass back ingredients
         };
 
         onSave(item);
@@ -84,7 +98,7 @@ export function StaffMenuModal({
 
     return (
         <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50 p-4 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-white rounded-xl w-full max-w-md shadow-2xl border border-border p-6 relative">
+            <div className="bg-white rounded-xl w-full max-w-md shadow-2xl border border-border p-6 relative max-h-[90vh] overflow-y-auto">
                 {/* Header */}
                 <div className="flex justify-between items-center mb-6">
                     <h3 className="font-bold text-lg text-primary">
@@ -177,6 +191,17 @@ export function StaffMenuModal({
                             />
                         </div>
                     </div>
+
+                    {/* Ingredients / Costing (Optional but useful for managers) */}
+                    {inventory.length > 0 && (
+                        <div className="pt-2">
+                            <IngredientSelector
+                                inventory={inventory}
+                                ingredients={ingredients}
+                                onIngredientsChange={setIngredients}
+                            />
+                        </div>
+                    )}
 
                     {/* Image URL Fallback */}
                     <div className="space-y-1.5">

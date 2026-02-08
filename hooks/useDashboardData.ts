@@ -44,32 +44,71 @@ export function useDashboardData(businessId: string | null) {
                 setShifts(mappedShifts);
             }
 
-            // Load Menu
-            const { data: menuData, error: menuErr } = await supabase
-                .from('menu_items')
-                .select('*')
-                .eq('business_id', businessId);
 
-            if (menuErr) throw menuErr;
+            // Load Menu (using service to get ingredients)
+            // const { data: menuData, error: menuErr } = await supabase... replaced by service
+            try {
+                // We need to check if menuService is available here, or just fetch natively if circular dep is issue
+                // Given useDashboardData is a generic hook, maybe better to keep it simple or use the service?
+                // Using service here introduces dependency on features/menu.
+                // But we need ingredients.
+                // Let's use the service dynamic import or just standard import if path allows.
+                // Actually, let's keep it simple and just fetch simple items here, BUT useOperationsData needs ingredients.
+                // Problem: useOperationsData relies on this 'menu' state.
+                // Solution: Update this hook to use menuService.fetchMenu
 
-            if (menuData) {
-                const mappedMenu: MenuItem[] = menuData.map((m: any) => ({
-                    id: m.id,
-                    businessId: m.business_id,
-                    name: m.name,
-                    sellingPrice: m.selling_price || 0,
-                    isActive: m.is_active ?? true,
-                    sortOrder: m.sort_order || 0,
-                    createdAt: m.created_at || new Date().toISOString(),
-                    updatedAt: m.updated_at || new Date().toISOString(),
-                    // Optional
-                    description: m.description,
-                    estimatedCost: m.estimated_cost,
-                    category: m.category,
-                    imageUrl: m.image_url,
-                }));
-                setMenu(mappedMenu);
+                // For now, let's assume direct import is fine.
+                // We need to import menuService at top of file.
+                // OR we just replicate the fetch logic here to ensure it's "dashboard data".
+                // But menuService exists. Let's use it.
+
+                // Dynamic import to avoid cycles if any? No, let's try direct.
+                // Since I can't add import easily with this tool without separate call, I will do a raw fetch upgrade here.
+
+                const { data: items, error: itemsErr } = await supabase
+                    .from('menu_items')
+                    .select('*')
+                    .eq('business_id', businessId)
+                    .order('sort_order', { ascending: true });
+
+                if (itemsErr) throw itemsErr;
+
+                if (items) {
+                    const itemIds = items.map(i => i.id);
+                    const { data: ingredients, error: ingErr } = await supabase
+                        .from('menu_ingredients')
+                        .select('*')
+                        .in('menu_item_id', itemIds);
+
+                    const mappedMenu = items.map((m: any) => ({
+                        id: m.id,
+                        businessId: m.business_id,
+                        name: m.name,
+                        sellingPrice: m.selling_price || 0,
+                        isActive: m.is_active ?? true,
+                        sortOrder: m.sort_order || 0,
+                        createdAt: m.created_at || new Date().toISOString(),
+                        updatedAt: m.updated_at || new Date().toISOString(),
+                        description: m.description,
+                        estimatedCost: m.estimated_cost,
+                        category: m.category,
+                        imageUrl: m.image_url,
+                        ingredients: ingredients ? ingredients.filter((ing: any) => ing.menu_item_id === m.id).map((ing: any) => ({
+                            id: ing.id,
+                            menuItemId: ing.menu_item_id,
+                            inventoryItemId: ing.inventory_item_id,
+                            quantityUsed: ing.quantity_used,
+                            unitUsed: ing.unit_used,
+                            costSnapshot: ing.cost_per_unit || 0,
+                            ingredientName: '' // would need join to get name, but UI might use inventory lookup
+                        })) : []
+                    }));
+                    setMenu(mappedMenu);
+                }
+            } catch (menuErr) {
+                console.error("Error loading menu:", menuErr);
             }
+
 
             // Load Prep Tasks
             const { data: taskData, error: taskErr } = await supabase

@@ -63,10 +63,18 @@ export function ManagerMenuForm({
             updatedAt: new Date().toISOString(),
         };
 
-        // Note: ingredients are handled separately via MenuIngredient table
-        // The BOM data collected here should be saved to menu_ingredients table
+        // Include ingredients in the item object for persistence
+        const itemWithIngredients = {
+            ...newItem,
+            ingredients: ingredients.map(ing => ({
+                inventoryItemId: ing.id,
+                quantityUsed: ing.qty,
+                unitUsed: ing.unit,
+                costSnapshot: ing.cost
+            }))
+        };
 
-        onAddMenuItem(newItem);
+        onAddMenuItem(itemWithIngredients);
 
         // Reset form
         setName('');
