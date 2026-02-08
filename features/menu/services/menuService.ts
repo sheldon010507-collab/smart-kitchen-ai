@@ -147,15 +147,65 @@ export const menuService = {
 
         // 2. Replace Ingredients (Delete All -> Insert New)
         if (ingredients) {
-            // Check if ID is a valid UUID before touching ingredients table
+            // Check if ID is a valid UUID
             const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
             if (!uuidRegex.test(id)) {
-                console.warn(`Skipping ingredient update for non-UUID item: ${id}`);
-                // We cannot safely update ingredients for legacy items because menu_item_id expects UUID.
-                // The item itself is updated, but ingredients are skipped to prevent crash.
-                return;
+                console.warn(`Migrating legacy item ${id} to UUID...`);
+
+                // MIGRATION STRATEGY:
+                // 1. Create NEW item with valid UUID using the updated data
+                // 2. Insert ingredients for the NEW item
+                // 3. Delete the OLD item
+
+                try {
+                    // We need the full item data. 'updates' might be partial.
+                    // Fetch current item first to merge (safest), but 'updates' usually comes from form with full state?
+                    // actually updateMenuItem receives 'updates'.
+                    // To be safe, we should probably fetch the existing record if updates is incomplete, 
+                    // but typically the Edit Form sends everything.
+                    // For now, let's assume 'updates' contains the important fields or we query.
+
+                    const { data: currentItem } = await supabase
+                        .from('menu_items')
+                        .select('*')
+                        .eq('id', id)
+                        .single();
+
+                    if (!currentItem && !updates.name) {
+                        throw new Error("Cannot migrate item: source not found and no updates provided");
+                    }
+
+                    const mergedItem = { ...currentItem, ...updates };
+
+                    // Create New
+                    await this.createMenuItem(
+                        mergedItem.business_id || currentItem.business_id, // Ensure business_id
+                        {
+                            name: mergedItem.name,
+                            description: mergedItem.description,
+                            sellingPrice: mergedItem.selling_price || mergedItem.sellingPrice,
+                            estimatedCost: mergedItem.estimated_cost || mergedItem.estimatedCost,
+                            category: mergedItem.category,
+                            imageUrl: mergedItem.image_url || mergedItem.imageUrl,
+                            isActive: mergedItem.is_active ?? mergedItem.isActive,
+                            sortOrder: mergedItem.sort_order ?? mergedItem.sortOrder
+                        },
+                        ingredients
+                    );
+
+                    // Delete Old
+                    await this.deleteMenuItem(id);
+
+                    console.log(`Migration successful for ${id}`);
+                    return;
+                } catch (migrationErr) {
+                    console.error("Migration failed:", migrationErr);
+                    throw migrationErr;
+                }
             }
 
+            // Standard UUID flow:
             // Delete old
             const { error: delErr } = await supabase
                 .from('menu_ingredients')
@@ -164,7 +214,6 @@ export const menuService = {
 
             if (delErr) {
                 console.error('Failed to delete old ingredients:', delErr);
-                // If delete fails (e.g. FK constraint), stop here
                 return;
             }
 
@@ -176,7 +225,7 @@ export const menuService = {
                     quantity_used: ing.quantity,
                     unit_used: ing.unit,
                     cost_per_unit: ing.cost,
-                    // Assuming business_id is needed or optional, fetch if strictly required but usually item_id is enough
+                    business_id: updates.businessId // Optional, usually null in updates
                 }));
 
                 const { error: ingError } = await supabase
