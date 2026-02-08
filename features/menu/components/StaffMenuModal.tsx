@@ -1,6 +1,7 @@
-
-import { IngredientSelector, IngredientUsage } from './IngredientSelector'; // Import IngredientSelector
-import { InventoryItem } from '../../../types'; // Ensure InventoryItem is imported
+import React, { useState, useRef, useEffect } from 'react';
+import { X, Save, Image as ImageIcon } from 'lucide-react';
+import { MenuItem, InventoryItem } from '../../../types';
+import { IngredientSelector, IngredientUsage } from './IngredientSelector';
 
 interface StaffMenuModalProps {
     isOpen: boolean;
