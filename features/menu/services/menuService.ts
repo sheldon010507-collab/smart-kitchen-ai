@@ -42,16 +42,25 @@ export const menuService = {
         if (!items || items.length === 0) return [];
 
         // 2. Get Ingredients for these items
-        const itemIds = items.map(i => i.id);
-        const { data: ingredients, error: ingErr } = await supabase
-            .from('menu_ingredients')
-            .select('*')
-            .in('menu_item_id', itemIds);
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        const itemIds = items.map(i => i.id).filter(id => uuidRegex.test(id));
 
-        if (ingErr) {
-            console.error('Error fetching menu ingredients:', ingErr);
-            // Return items without ingredients if query fails
-            return items.map(i => transformMenuItem(i, []));
+        let ingredients: any[] = [];
+        if (itemIds.length > 0) {
+            const { data: ingData, error: ingErr } = await supabase
+                .from('menu_ingredients')
+                .select('*')
+                .in('menu_item_id', itemIds);
+
+            if (ingErr) {
+                console.error('Error fetching menu ingredients:', ingErr);
+                // Return items without ingredients if query fails
+                return items.map(i => transformMenuItem(i, []));
+            }
+
+            if (ingData) {
+                ingredients = ingData;
+            }
         }
 
         // 3. Merge

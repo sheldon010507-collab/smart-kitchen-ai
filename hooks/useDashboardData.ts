@@ -74,11 +74,20 @@ export function useDashboardData(businessId: string | null) {
                 if (itemsErr) throw itemsErr;
 
                 if (items) {
-                    const itemIds = items.map(i => i.id);
-                    const { data: ingredients, error: ingErr } = await supabase
-                        .from('menu_ingredients')
-                        .select('*')
-                        .in('menu_item_id', itemIds);
+                    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+                    const itemIds = items.map(i => i.id).filter(id => uuidRegex.test(id));
+
+                    let ingredients: any[] = [];
+                    if (itemIds.length > 0) {
+                        const { data: ingData, error: ingErr } = await supabase
+                            .from('menu_ingredients')
+                            .select('*')
+                            .in('menu_item_id', itemIds);
+
+                        if (!ingErr && ingData) {
+                            ingredients = ingData;
+                        }
+                    }
 
                     const mappedMenu = items.map((m: any) => ({
                         id: m.id,

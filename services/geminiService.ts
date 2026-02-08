@@ -572,7 +572,7 @@ export const analyzeMenuPhoto = async (base64Image: string, mimeType: string): P
     }
   };
   const text = await callGeminiApi({ prompt, imageBase64: base64Image, mimeType, config: { responseMimeType: 'application/json', responseSchema: menuSchema } });
-  if (text) { try { return JSON.parse(text).map((p: any, i: number) => ({ ...p, id: `scan-${Date.now()}-${i}` })); } catch (e) { } }
+  if (text) { try { return JSON.parse(text).map((p: any) => ({ ...p, id: crypto.randomUUID() })); } catch (e) { } }
   return [];
 };
 
@@ -581,7 +581,7 @@ export const estimateMenuCosts = async (menuItems: string[]): Promise<MenuItem[]
   const prompt = `Estimate COGS for: ${menuItems.join(', ')}. JSON array of {name, category, sellingPrice, estimatedCost}.`;
   const schema = { type: "ARRAY", items: { type: "OBJECT", properties: { name: { type: "STRING" }, category: { type: "STRING" }, sellingPrice: { type: "NUMBER" }, estimatedCost: { type: "NUMBER" } } } };
   const text = await callGeminiApi({ prompt, config: { responseMimeType: 'application/json', responseSchema: schema } });
-  if (text) { try { return JSON.parse(text).map((p: any, i: number) => ({ ...p, id: `menu-${Date.now()}-${i}` })); } catch (e) { } }
+  if (text) { try { return JSON.parse(text).map((p: any) => ({ ...p, id: crypto.randomUUID() })); } catch (e) { } }
   return [];
 };
 

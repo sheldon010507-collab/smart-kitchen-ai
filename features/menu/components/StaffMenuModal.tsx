@@ -92,7 +92,7 @@ export function StaffMenuModal({
         const priceNum = parseFloat(price) || 0;
 
         const item: MenuItem = {
-            id: editingItem?.id || Date.now().toString(),
+            id: editingItem?.id || crypto.randomUUID(),
             businessId: editingItem?.businessId || '',
             name,
             category,
