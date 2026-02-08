@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PrepTask, User } from '../types';
-import { CheckSquare, Square, Plus, Trash2 } from 'lucide-react';
+import { CheckSquare, Square, Plus, Trash2, Mic, MicOff } from 'lucide-react';
+import { useVoiceInput } from '../hooks/useVoiceInput';
 
 interface Props {
   tasks: PrepTask[];
@@ -13,11 +14,43 @@ interface Props {
 const PrepList: React.FC<Props> = ({ tasks, onAddTask, onToggleTask, onDeleteTask, currentUser }) => {
   const [newTask, setNewTask] = useState('');
 
+  // 语音输入 Hook
+  const {
+    transcript,
+    isListening,
+    isSupported,
+    error: voiceError,
+    startListening,
+    stopListening,
+    resetTranscript,
+  } = useVoiceInput({
+    lang: 'zh-CN', // 支持中文
+    continuous: false,
+    interimResults: true,
+  });
+
+  // 当语音识别有结果时，自动填充到输入框
+  useEffect(() => {
+    if (transcript) {
+      setNewTask(transcript);
+    }
+  }, [transcript]);
+
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
     if (newTask.trim()) {
       onAddTask(newTask);
       setNewTask('');
+      resetTranscript(); // 重置语音识别结果
+    }
+  };
+
+  // 处理麦克风按钮点击
+  const handleVoiceInput = () => {
+    if (isListening) {
+      stopListening();
+    } else {
+      startListening();
     }
   };
 
@@ -69,10 +102,30 @@ const PrepList: React.FC<Props> = ({ tasks, onAddTask, onToggleTask, onDeleteTas
             type="text"
             value={newTask}
             onChange={(e) => setNewTask(e.target.value)}
-            placeholder="Add a task..."
+            placeholder={isListening ? "正在聆听..." : "Add a task..."}
             className="flex-1 text-sm bg-transparent border-none focus:ring-0 placeholder-[#D3D1CB] text-[#37352F]"
           />
+          {/* 语音输入按钮 */}
+          {isSupported && (
+            <button
+              type="button"
+              onClick={handleVoiceInput}
+              className={`p-1.5 rounded transition-all ${isListening
+                  ? 'bg-red-500 text-white animate-pulse'
+                  : 'text-[#D3D1CB] hover:text-[#787774] hover:bg-[#F7F6F3]'
+                }`}
+              title={isListening ? '点击停止录音' : '点击开始语音输入'}
+            >
+              {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+            </button>
+          )}
         </div>
+        {/* 语音识别错误提示 */}
+        {voiceError && (
+          <div className="mt-2 text-xs text-red-500">
+            {voiceError}
+          </div>
+        )}
       </form>
     </div>
   );

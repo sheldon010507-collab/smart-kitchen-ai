@@ -1,0 +1,101 @@
+{
+  "meta": {
+    "name": "Smart Kitchen AI",
+    "version": "1.0.0",
+    "description": "UI Design for Smart Kitchen AI Management System"
+  },
+  "theme": {
+    "colors": {
+      "primary": "hsl(var(--primary))",
+      "background": "hsl(var(--background))",
+      "muted": "hsl(var(--muted))",
+      "accent": "hsl(var(--accent))"
+    },
+    "borderRadius": {
+      "default": "var(--radius)"
+    }
+  },
+  "pages": [
+    {
+      "id": "dashboard",
+      "name": "Dashboard",
+      "route": "/dashboard",
+      "elements": [
+        {
+          "type": "layout",
+          "name": "DesktopSidebar",
+          "description": "Left sidebar navigation"
+        },
+        {
+          "type": "container",
+          "name": "MainContent",
+          "children": [
+            {
+              "type": "header",
+              "text": "Dashboard Overview"
+            },
+            {
+              "type": "component",
+              "name": "LocationCard",
+              "props": {
+                "businessName": "Main Kitchen",
+                "status": "Active"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "inventory",
+      "name": "Inventory",
+      "route": "/inventory",
+      "elements": [
+        {
+          "type": "header",
+          "text": "Inventory Management"
+        },
+        {
+          "type": "component",
+          "name": "Scanner",
+          "description": "Receipt and Fridge Scanner Modal"
+        },
+        {
+          "type": "list",
+          "name": "InventoryItems",
+          "itemComponent": "InventoryCard"
+        }
+      ]
+    },
+    {
+      "id": "shopping-list",
+      "name": "Shopping List",
+      "route": "/shopping-list",
+      "elements": [
+        {
+          "type": "component",
+          "name": "ShoppingListView"
+        }
+      ]
+    }
+  ],
+  "components": [
+    {
+      "name": "InventoryCard",
+      "description": "Card displaying inventory item details, expiry status, and stock level.",
+      "props": {
+        "item": "InventoryItem",
+        "onRemove": "function",
+        "onEdit": "function"
+      }
+    },
+    {
+      "name": "Scanner",
+      "description": "Camera interface for scanning receipts or fridge items.",
+      "props": {
+        "mode": "'receipt' | 'fridge'",
+        "onItemsFound": "function"
+      }
+    }
+  ]
+}

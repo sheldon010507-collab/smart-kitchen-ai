@@ -24,6 +24,7 @@ export const PhotoScanSection: React.FC<PhotoScanSectionProps> = ({
     existingNames = [],
 }) => {
     const [photos, setPhotos] = useState<PhotoPreview[]>([]);
+    const [scanMode, setScanMode] = useState<'shelf' | 'invoice'>('shelf');
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [results, setResults] = useState<DraftInventoryItem[]>([]);
     const [error, setError] = useState<string | null>(null);
@@ -68,7 +69,7 @@ export const PhotoScanSection: React.FC<PhotoScanSectionProps> = ({
         fileInputRef.current?.click();
     }, []);
 
-    // Run AI analysis - 🆕 Analyze ALL photos using multi-image API
+    // Run AI analysis
     const handleAnalyze = useCallback(async () => {
         if (photos.length === 0) return;
 
@@ -76,11 +77,11 @@ export const PhotoScanSection: React.FC<PhotoScanSectionProps> = ({
         setError(null);
 
         try {
-            // 🆕 Process ALL photos, not just the first one
+            // Process images
             const processedImages = await Promise.all(
                 photos.map(async (photo) => {
                     const processed = await preprocessImage(photo.file, {
-                        targetSizeKB: 300,  // Higher quality for OCR
+                        targetSizeKB: 300,
                         maxWidth: 1500,
                         autoEnhance: true
                     });
@@ -91,34 +92,71 @@ export const PhotoScanSection: React.FC<PhotoScanSectionProps> = ({
                 })
             );
 
-            console.log(`[PhotoScanSection] Analyzing ${processedImages.length} photos`);
+            console.log(`[PhotoScanSection] Analyzing ${processedImages.length} photos in mode: ${scanMode}`);
 
-            // 🆕 Use multi-invoice analyzer with all images
-            const invoiceResult = await analyzeMultipleInvoices(
-                processedImages,
-                existingNames
-            );
+            let draftItems: DraftInventoryItem[] = [];
 
-            if (!invoiceResult.items || invoiceResult.items.length === 0) {
-                throw new Error('No items found. Please try clearer photos.');
+            if (scanMode === 'invoice') {
+                // INVOICE MODE (Existing logic)
+                const invoiceResult = await analyzeMultipleInvoices(
+                    processedImages,
+                    existingNames
+                );
+
+                if (!invoiceResult.items || invoiceResult.items.length === 0) {
+                    throw new Error('No items found. Please try clearer photos.');
+                }
+
+                draftItems = invoiceResult.items.map((item) => ({
+                    id: crypto.randomUUID(),
+                    name: item.name || '',
+                    category: '',
+                    quantityUnit: item.unit || 'pcs',
+                    unitCost: item.unitCost,
+                    minStockLevel: 0,
+                    supplier: invoiceResult.supplier,
+                    issues: [],
+                }));
+
+            } else {
+                // SHELF MODE (New logic)
+                const { analyzeMultiAngleImages } = await import('../../services/geminiService');
+
+                // Map to 'fridge' or 'storage' generic area for now
+                const shelfResult = await analyzeMultiAngleImages(
+                    processedImages,
+                    'storage', // Defaulting to storage, could add specific selector later if needed
+                    existingNames
+                );
+
+                if (!shelfResult || shelfResult.length === 0) {
+                    throw new Error('No food items identified. Try closer photos.');
+                }
+
+                draftItems = shelfResult.map((item: any) => ({
+                    id: crypto.randomUUID(),
+                    name: item.name || item.itemName || '',
+                    category: item.category || '',
+                    quantityUnit: item.quantityUnit || item.unit || 'pcs',
+                    // Shelf scan doesn't give cost, default to 0
+                    unitCost: 0,
+                    // Use quantity found as initial stock? Wizard usually sets *items*, 
+                    // usually wizard is for defining the *item list*, but quantity is useful for initial count.
+                    // The DraftInventoryItem type might not have 'quantity' field visible in this file, 
+                    // but looking at Stage1Ingest it maps template items. 
+                    // Let's check DraftInventoryItem def. logic below assumes keys.
+                    // Wait, helper in Stage1Ingest didn't set quantity, only minStockLevel. 
+                    // But 'excelItems' probably has quantity. 
+                    // Let's assume we capture what we can. 
+                    // Actually, for Setup, we primarily want the Item Definition (Name, Unit, Category).
+                    minStockLevel: 0,
+                    supplier: undefined,
+                    issues: [],
+                    // If DraftInventoryItem has distinct 'currentQuantity', we might want to set it if supported
+                    // But based on types in Stage1, it seems focused on catalogue. 
+                    // We'll stick to basic fields.
+                }));
             }
-
-            // Log supplier if detected
-            if (invoiceResult.supplier) {
-                console.log(`[PhotoScanSection] Detected supplier: ${invoiceResult.supplier}`);
-            }
-
-            // Convert to DraftInventoryItem format with cost data
-            const draftItems: DraftInventoryItem[] = invoiceResult.items.map((item) => ({
-                id: crypto.randomUUID(),
-                name: item.name || '',
-                category: '',
-                quantityUnit: item.unit || 'pcs',
-                unitCost: item.unitCost,
-                minStockLevel: 0,
-                supplier: invoiceResult.supplier,  // Attach detected supplier
-                issues: [],
-            }));
 
             setResults(draftItems);
             onItemsFound(draftItems);
@@ -129,10 +167,39 @@ export const PhotoScanSection: React.FC<PhotoScanSectionProps> = ({
         } finally {
             setIsAnalyzing(false);
         }
-    }, [photos, existingNames, onItemsFound]);
+    }, [photos, existingNames, onItemsFound, scanMode]);
 
     return (
         <div className="space-y-6">
+            {/* Scan Mode Selector */}
+            <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
+                <button
+                    onClick={() => setScanMode('shelf')}
+                    className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${scanMode === 'shelf'
+                        ? 'bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm'
+                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                        }`}
+                >
+                    <span className="mr-2">🥫</span>
+                    {WIZARD_STRINGS.modeShelf}
+                </button>
+                <button
+                    onClick={() => setScanMode('invoice')}
+                    className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${scanMode === 'invoice'
+                        ? 'bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm'
+                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                        }`}
+                >
+                    <span className="mr-2">📄</span>
+                    {WIZARD_STRINGS.modeInvoice}
+                </button>
+            </div>
+
+            {/* Helper Text */}
+            <p className="text-sm text-gray-500 dark:text-gray-400 text-center -mt-2">
+                {scanMode === 'shelf' ? WIZARD_STRINGS.modeShelfDesc : WIZARD_STRINGS.modeInvoiceDesc}
+            </p>
+
             {/* Photo Grid */}
             <div className="bg-gray-50 dark:bg-gray-900 rounded-xl p-6">
                 <h3 className="font-semibold text-gray-900 dark:text-white mb-4">

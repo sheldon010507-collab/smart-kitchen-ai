@@ -57,6 +57,14 @@ export const WIZARD_STRINGS = {
     preview: 'Preview',
     select: 'Select',
 
+    // Scan Mode
+    scanMode: 'Scan Mode',
+    modeShelf: 'Inventory Shelves',
+    modeShelfDesc: 'Physical items on shelves/fridge',
+    modeInvoice: 'Invoices / Receipts',
+    modeInvoiceDesc: 'Paper documents with costs',
+
+
     // Stage 3
     dataClean: 'Data Cleaning',
     itemsToProcess: 'items to process',
