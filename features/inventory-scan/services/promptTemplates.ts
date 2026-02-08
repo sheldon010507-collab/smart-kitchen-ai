@@ -676,6 +676,13 @@ export function validateInvoiceScanResult(raw: string): InvoiceScanResult | null
       cleaned = cleaned.substring(firstOpen, lastClose + 1);
     }
 
+    // Sanitize: Gemini sometimes returns numbers with hundreds of decimal places (e.g. tax: 0.00000...)
+    // which can break JSON.parse or cause "Expected ',' or '}' after property value"
+    cleaned = cleaned.replace(/(\d+\.\d{10,})(?=[,\]\}\s]|$)/g, (match) => {
+      const n = parseFloat(match);
+      return isNaN(n) ? match : String(Number(n.toFixed(4)));
+    });
+
     const data = JSON.parse(cleaned);
 
     // Validate items array
@@ -729,11 +736,14 @@ export function validateInvoiceScanResult(raw: string): InvoiceScanResult | null
 
     // Truncation repair: when error at/near end and string ends with "}", Gemini may have truncated before "]}" 
     const len = cleaned?.length ?? 0;
-    const looksTruncated = pos >= len - 20 && len > 0 && /\}\s*$/.test(cleaned);
+    const endsWithBrace = /\}\s*$/.test(cleaned);
+    const endsWithValue = /[\d"]\s*$/.test(cleaned); // number or end of string
+    const looksTruncated = pos >= len - 50 && len > 0 && (endsWithBrace || endsWithValue);
     if (looksTruncated) {
-      console.warn('[Invoice] Attempting truncation repair, pos=', pos, 'len=', len, 'endsWithBrace=', /\}\s*$/.test(cleaned));
+      console.warn('[Invoice] Attempting truncation repair, pos=', pos, 'len=', len, 'endsWithBrace=', endsWithBrace, 'endsWithValue=', endsWithValue);
       try {
-        const repaired = cleaned.replace(/\s*$/, '') + ']}';
+        let repaired = cleaned.replace(/\s*$/, '');
+        repaired += endsWithBrace ? ']}' : '}'; // endsWith } => need ]; endsWith value => need }
         const data = JSON.parse(repaired);
         // Relaxed filter for recovery: accept items with name (quantity can be null/0 - treat as 1)
         const items: InvoiceItem[] = (data.items || [])
