@@ -105,6 +105,10 @@ export default defineConfig(({ mode }) => {
             const text = googleData.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
             console.log('✅ Local API: Success');
+            console.log('📊 Response Length:', text.length);
+            console.log('🔍 Response Preview (First 100 chars):', text.substring(0, 100));
+            console.log('🔍 Response Preview (Last 100 chars):', text.substring(text.length - 100));
+
 
             // 5. Respond
             res.setHeader('Content-Type', 'application/json');
