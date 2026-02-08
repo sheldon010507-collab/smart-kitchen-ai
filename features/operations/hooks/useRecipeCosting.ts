@@ -47,12 +47,12 @@ export function useRecipeCosting(menuItemId: string | null, inventory: Inventory
 
             if (error) throw error;
 
-            // Map snake_case to camelCase
-            const mappedIngredients: MenuIngredient[] = (data || []).map((row: MenuIngredientRow) => ({
+            // Map snake_case to camelCase (inventory_item_id is actual DB column)
+            const mappedIngredients: MenuIngredient[] = (data || []).map((row: any) => ({
                 id: row.id,
                 menuItemId: row.menu_item_id,
-                inventoryId: row.inventory_id,
-                ingredientName: row.ingredient_name,
+                inventoryId: row.inventory_item_id ?? row.inventory_id,
+                ingredientName: row.ingredient_name ?? '',
                 quantityUsed: row.quantity_used,
                 unitUsed: row.unit_used,
                 costPerUnit: row.cost_per_unit,

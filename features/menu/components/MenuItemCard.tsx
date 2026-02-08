@@ -33,6 +33,9 @@ export function MenuItemCard({
 
     const handleEdit = (e: React.MouseEvent) => {
         e.stopPropagation();
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/6586675c-9966-46a3-ac5d-1d79fea93820',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MenuItemCard.tsx:handleEdit',message:'Edit clicked',data:{itemId:item?.id,itemName:item?.name},timestamp:Date.now(),hypothesisId:'A2'})}).catch(()=>{});
+        // #endregion
         onEdit(item);
     };
 
@@ -53,8 +56,8 @@ export function MenuItemCard({
                         </div>
                     )}
 
-                    {/* Staff Actions Overlay */}
-                    <div className="absolute top-2 right-2 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                    {/* Staff Actions Overlay - always visible on touch (no hover), hover-only on desktop */}
+                    <div className="absolute top-2 right-2 flex space-x-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity z-10">
                         <button
                             onClick={handleEdit}
                             className="p-1.5 bg-white/90 rounded-md text-primary hover:text-accent shadow-sm backdrop-blur-sm border border-black/5"
@@ -100,8 +103,8 @@ export function MenuItemCard({
                     </div>
                 )}
 
-                {/* Action Buttons */}
-                <div className="absolute top-3 right-3 flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                {/* Action Buttons - always visible on touch (no hover), hover-only on desktop */}
+                <div className="absolute top-3 right-3 flex space-x-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity z-10">
                     <button
                         onClick={handleEdit}
                         className="p-2 bg-white rounded-lg text-primary hover:bg-gray-100 shadow-sm border border-border"

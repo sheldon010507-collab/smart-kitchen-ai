@@ -46,12 +46,19 @@ export function useBatchRecipeCosting(menuItems: MenuItem[], inventory: Inventor
 
             if (error) throw error;
 
+            // #region agent log
+            const firstRow = (data || [])[0];
+            if (firstRow) {
+                fetch('http://127.0.0.1:7242/ingest/6586675c-9966-46a3-ac5d-1d79fea93820',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useBatchRecipeCosting.ts:loadAllIngredients',message:'First menu_ingredients row keys',data:{keys:Object.keys(firstRow),inventory_id:firstRow?.inventory_id,inventory_item_id:firstRow?.inventory_item_id,ingredient_name:firstRow?.ingredient_name},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
+            }
+            // #endregion
+
             // Map snake_case to camelCase
-            const mappedIngredients: MenuIngredient[] = (data || []).map((row: MenuIngredientRow) => ({
+            const mappedIngredients: MenuIngredient[] = (data || []).map((row: any) => ({
                 id: row.id,
                 menuItemId: row.menu_item_id,
-                inventoryId: row.inventory_id,
-                ingredientName: row.ingredient_name,
+                inventoryId: row.inventory_item_id ?? row.inventory_id,
+                ingredientName: row.ingredient_name ?? '',
                 quantityUsed: row.quantity_used,
                 unitUsed: row.unit_used,
                 costPerUnit: row.cost_per_unit,

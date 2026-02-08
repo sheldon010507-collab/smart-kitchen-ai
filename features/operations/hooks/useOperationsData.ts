@@ -62,6 +62,10 @@ export function useOperationsData() {
             }, 0) / menuItemsWithCosts.length
             : 0;
 
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/6586675c-9966-46a3-ac5d-1d79fea93820',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useOperationsData.ts:stats',message:'Avg Food Cost calc',data:{menuLen:menu.length,menuItemsWithCostsLen:menuItemsWithCosts.length,avgFoodCost:avgCost,sampleCosts:Object.fromEntries(Object.entries(menuCosts).slice(0,3))},timestamp:Date.now(),hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
+
         // Wastage metrics
         const totalWastage = wastageStats.totalWastage;
         const wastageRate = inventoryValue > 0 ? totalWastage / inventoryValue : 0;
@@ -130,6 +134,9 @@ export function useOperationsData() {
         },
 
         handleUpdateMenuItem: async (item: any) => {
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/6586675c-9966-46a3-ac5d-1d79fea93820',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useOperationsData.ts:handleUpdateMenuItem',message:'Edit started',data:{itemId:item?.id,hasIngredients:!!item?.ingredients,ingredientsLen:item?.ingredients?.length},timestamp:Date.now(),hypothesisId:'B2'})}).catch(()=>{});
+            // #endregion
             try {
                 // Separation of concerns: item vs ingredients
                 const { ingredients, ...menuItemData } = item;
@@ -147,7 +154,13 @@ export function useOperationsData() {
 
                 await menuService.updateMenuItem(item.id, menuItemData, ingredientsList);
                 await refreshDashboard();
+                // #region agent log
+                fetch('http://127.0.0.1:7242/ingest/6586675c-9966-46a3-ac5d-1d79fea93820',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useOperationsData.ts:handleUpdateMenuItem',message:'Edit success',data:{itemId:item?.id},timestamp:Date.now(),hypothesisId:'B2'})}).catch(()=>{});
+                // #endregion
             } catch (error) {
+                // #region agent log
+                fetch('http://127.0.0.1:7242/ingest/6586675c-9966-46a3-ac5d-1d79fea93820',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useOperationsData.ts:handleUpdateMenuItem',message:'Edit error',data:{itemId:item?.id,err:String(error)},timestamp:Date.now(),hypothesisId:'B2'})}).catch(()=>{});
+                // #endregion
                 console.error('Failed to update menu item:', error);
                 alert('Failed to update menu item');
             }
