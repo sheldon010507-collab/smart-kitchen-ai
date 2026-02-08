@@ -663,17 +663,17 @@ Analyze now:`.trim();
  * Parse and validate invoice scan result from AI
  */
 export function validateInvoiceScanResult(raw: string): InvoiceScanResult | null {
+  let cleaned = '';
   try {
-    // Clean JSON markers
-    let cleaned = raw
-      .replace(/```json\n?/g, '')
-      .replace(/```\n?/g, '')
-      .trim();
+    // 1. Remove Markdown code blocks and clean trimming
+    cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
 
-    // Extract JSON object
-    const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      cleaned = jsonMatch[0];
+    // 2. Extract JSON object (find first { and last } to handle surrounding text)
+    const firstOpen = cleaned.indexOf('{');
+    const lastClose = cleaned.lastIndexOf('}');
+
+    if (firstOpen !== -1 && lastClose !== -1 && lastClose > firstOpen) {
+      cleaned = cleaned.substring(firstOpen, lastClose + 1);
     }
 
     const data = JSON.parse(cleaned);
@@ -710,6 +710,22 @@ export function validateInvoiceScanResult(raw: string): InvoiceScanResult | null
     };
   } catch (e) {
     console.error('Failed to parse invoice scan result:', e);
+    // Log preview for debugging
+    if (raw) console.error('Raw content preview:', raw.substring(0, 100) + '...' + raw.substring(raw.length - 100));
+    // #region agent log
+    const errMsg = String((e as Error)?.message || e);
+    const posMatch = errMsg.match(/position\s+(\d+)/);
+    const pos = posMatch ? parseInt(posMatch[1], 10) : -1;
+    const ctxStart = Math.max(0, pos - 100);
+    const ctxEnd = Math.min(cleaned?.length ?? 0, pos + 100);
+    const ctxSnippet = cleaned ? cleaned.substring(ctxStart, ctxEnd) : '';
+    const charAtPos = cleaned && pos >= 0 && pos < cleaned.length ? JSON.stringify(cleaned[pos]) : '';
+    const line113Approx = cleaned?.split('\n')[112];
+    const payload = {location:'promptTemplates.ts:validateInvoiceScanResult',message:'Invoice JSON parse failed',data:{rawLen:raw?.length,cleanedLen:cleaned?.length,errMsg,pos,ctxSnippet,charAtPos,line113Approx},timestamp:Date.now(),hypothesisId:'A'};
+    fetch('http://127.0.0.1:7242/ingest/6586675c-9966-46a3-ac5d-1d79fea93820',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).catch(()=>{});
+    if (typeof window !== 'undefined') (window as any).__DEBUG_INVOICE_PARSE = payload;
+    console.error('[DEBUG_INVOICE_PARSE]', JSON.stringify(payload, null, 2));
+    // #endregion
     return null;
   }
 }

@@ -104,6 +104,9 @@ export const PhotoScanSection: React.FC<PhotoScanSectionProps> = ({
                 );
 
                 if (!invoiceResult.items || invoiceResult.items.length === 0) {
+                    // #region agent log
+                    fetch('http://127.0.0.1:7242/ingest/6586675c-9966-46a3-ac5d-1d79fea93820',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PhotoScanSection.tsx:handleAnalyze',message:'Invoice result empty before throw',data:{scanMode,itemCount:invoiceResult?.items?.length??0,hasSupplier:!!invoiceResult?.supplier},timestamp:Date.now(),hypothesisId:'A'})}).catch(()=>{});
+                    // #endregion
                     throw new Error('No items found. Please try clearer photos.');
                 }
 

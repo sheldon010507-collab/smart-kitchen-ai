@@ -44,8 +44,10 @@ export default defineConfig(({ mode }) => {
             }
 
             // 3. Prepare Google API Request
-            // Use gemini-1.5-flash for speed and stability
-            const modelName = 'gemini-1.5-flash';
+            // Use gemini-3-flash-preview as requested by user
+            const modelName = 'gemini-3-flash-preview';
+
+
             const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
 
             const { prompt, imageBase64, mimeType, images, config } = body;

@@ -491,7 +491,13 @@ ${basePrompt}
   });
 
   if (text) {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/6586675c-9966-46a3-ac5d-1d79fea93820',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'geminiService.ts:analyzeMultipleInvoices',message:'Multi-invoice API returned text',data:{textLen:text?.length,imageCount:images.length},timestamp:Date.now(),hypothesisId:'E'})}).catch(()=>{});
+    // #endregion
     const result = validateInvoiceScanResult(text);
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/6586675c-9966-46a3-ac5d-1d79fea93820',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'geminiService.ts:analyzeMultipleInvoices',message:'validateInvoiceScanResult result',data:{hasResult:!!result,itemCount:result?.items?.length??0},timestamp:Date.now(),hypothesisId:'E'})}).catch(()=>{});
+    // #endregion
     if (result) {
       return {
         supplier: result.supplier,
