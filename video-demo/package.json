@@ -1,0 +1,26 @@
+{
+  "name": "smart-kitchen-ai-video-demo",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "npx remotion studio src/index.ts",
+    "build": "npx remotion bundle src/index.ts --out-dir dist",
+    "render": "npx remotion render src/index.ts SmartKitchenDemo out/smart-kitchen-demo.mp4",
+    "render:all": "npx remotion render src/index.ts SmartKitchenDemo out/smart-kitchen-demo.mp4 --codec prores"
+  },
+  "dependencies": {
+    "@remotion/bundler": "4.0.419",
+    "@remotion/cli": "4.0.419",
+    "@remotion/renderer": "4.0.419",
+    "lucide-react": "^0.454.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "remotion": "4.0.419"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "typescript": "~5.3.0"
+  }
+}
