@@ -12,6 +12,7 @@ import { OverviewTab } from './components/overview/OverviewTab';
 import { StaffTab } from './components/staff/StaffTab';
 import { MenuTab } from './components/menu/MenuTab';
 import { InsightsTab } from './components/insights/InsightsTab';
+import { StoreBrainPanel } from '../brain';
 
 export const OperationsPage: React.FC = () => {
     const tabs = [
@@ -19,6 +20,7 @@ export const OperationsPage: React.FC = () => {
         { id: 'staff', label: 'Staff', component: StaffTab },
         { id: 'menu', label: 'Menu', component: MenuTab },
         { id: 'insights', label: 'Insights', component: InsightsTab },
+        { id: 'brain', label: 'Brain', component: StoreBrainPanel },
     ];
 
     return <OperationsLayout tabs={tabs} />;

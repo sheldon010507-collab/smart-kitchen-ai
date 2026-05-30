@@ -10,6 +10,7 @@
 import React from 'react';
 import { Plus, AlertTriangle, ShoppingCart, ChevronRight } from 'lucide-react';
 import { Business, InventoryItem, ViewState } from '../../types';
+import { BrainActivityFeed, BrainOverviewCards, TelegramLinkManager } from '../brain';
 import { EditableTitle } from '../../components/EditableTitle';
 import { LocationCard } from './components/LocationCard';
 import { FEATURE_SHOPPING_LIST_ENABLED, ShoppingListSummary as ShoppingListSummaryType } from '../../features/shopping-list';
@@ -77,6 +78,19 @@ export function MasterDashboard({
                     ))}
                 </div>
             </section>
+
+
+            {/* AI Brain Overview */}
+            <BrainOverviewCards businessIds={businesses.map(business => business.id)} />
+
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+                <BrainActivityFeed
+                    businessIds={businesses.map(business => business.id)}
+                    title="Cross-store AI Brain Activity"
+                    limit={10}
+                />
+                <TelegramLinkManager />
+            </div>
 
             {/* Shopping List Summary */}
             {FEATURE_SHOPPING_LIST_ENABLED && (

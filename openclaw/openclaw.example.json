@@ -1,0 +1,80 @@
+{
+  "$schema": "https://docs.openclaw.ai/schemas/openclaw.config.json",
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "nvidia-nim/${NVIDIA_MODEL}"
+      },
+      "skills": ["kitchen-brain"],
+      "tools": {
+        "allow": ["kitchen-tools"],
+        "deny": ["exec", "process", "write", "edit", "apply_patch", "browser", "canvas", "cron"]
+      }
+    }
+  },
+  "models": {
+    "mode": "merge",
+    "providers": {
+      "nvidia-nim": {
+        "baseUrl": "https://integrate.api.nvidia.com/v1",
+        "apiKey": "ENV:NVIDIA_API_KEY",
+        "api": "openai-completions",
+        "models": [
+          {
+            "id": "${NVIDIA_MODEL}",
+            "name": "NVIDIA NIM Kitchen Brain",
+            "input": ["text"],
+            "contextWindow": 128000,
+            "maxTokens": 8192
+          }
+        ]
+      }
+    }
+  },
+  "channels": {
+    "telegram": {
+      "enabled": true,
+      "botToken": "ENV:TELEGRAM_BOT_TOKEN",
+      "dmPolicy": "allowlist",
+      "allowFrom": ["ENV:TELEGRAM_ALLOWED_USER_IDS"],
+      "streaming": {
+        "mode": "progress"
+      }
+    }
+  },
+  "tools": {
+    "allow": ["kitchen-tools"],
+    "deny": ["exec", "process", "write", "edit", "apply_patch", "browser", "canvas", "cron"],
+    "media": {
+      "audio": {
+        "enabled": true,
+        "echoTranscript": true,
+        "maxBytes": 20971520,
+        "models": [
+          {
+            "provider": "groq",
+            "model": "whisper-large-v3-turbo"
+          },
+          {
+            "type": "cli",
+            "command": "whisper",
+            "args": ["--model", "base", "{{MediaPath}}"],
+            "timeoutSeconds": 45
+          }
+        ]
+      }
+    }
+  },
+  "mcp": {
+    "servers": {
+      "kitchen-tools": {
+        "command": "node",
+        "args": ["./mcp/kitchen-tools/dist/index.js"],
+        "env": {
+          "SUPABASE_URL": "ENV:SUPABASE_URL",
+          "SUPABASE_SERVICE_ROLE_KEY": "ENV:SUPABASE_SERVICE_ROLE_KEY"
+        }
+      }
+    }
+  }
+}
