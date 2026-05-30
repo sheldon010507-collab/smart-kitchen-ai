@@ -88,3 +88,9 @@ gh pr create --title "<标题>" --body "..."
 | 2. 创建 PR | - | ✓ | ✓ | - |
 | 3. 保持现状 | - | - | ✓ | - |
 | 4. 丢弃 | - | - | - | ✓ (强制) |
+
+## Smart Kitchen AI 项目约定（第一性原理与资产）
+
+- **Remotion 第一性原理**：Code as Video。视频相关实现参考 `remotion_architecture.md`，项目位于 `video-demo/`。
+- **品牌 Logo**：厨师帽（Chef Hat）置于 `video-demo/public/assets/`（如 `chef-hat.png`），在 OpeningLogo、ClosingLogo 中统一使用。
+- **Skills**：涉及规则、技能或编辑器配置时，使用 `.cursor/skills` 下对应 SKILL（create-rule、create-skill、update-cursor-settings）。

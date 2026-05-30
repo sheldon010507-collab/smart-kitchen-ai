@@ -76,3 +76,9 @@ description: 当在当前会话中执行具有独立任务的实施计划时使�
 - 并行派发多个实现子代理（冲突）
 - 让子代理读计划文件（直接提供完整文本）
 - 在规格合规✅之前开始代码质量审查（顺序错误）
+
+## Smart Kitchen AI 项目约定（第一性原理与资产）
+
+- **Remotion 第一性原理**：Code as Video。视频相关计划/实现参考 `remotion_architecture.md`，项目位于 `video-demo/`。
+- **品牌 Logo**：厨师帽（Chef Hat）置于 `video-demo/public/assets/`（如 `chef-hat.png`），在 OpeningLogo、ClosingLogo 中统一使用。
+- **Skills**：涉及规则、技能或编辑器配置时，使用 `.cursor/skills` 下对应 SKILL（create-rule、create-skill、update-cursor-settings）。

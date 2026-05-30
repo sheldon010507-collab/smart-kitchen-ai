@@ -79,3 +79,9 @@ description: 当收到代码审查反馈、在实施建议之前使用，特别�
 ```
 
 **为什么不说谢谢：** 行动胜于言语。直接修复。代码本身就证明你听到了反馈。
+
+## Smart Kitchen AI 项目约定（第一性原理与资产）
+
+- **Remotion 第一性原理**：Code as Video。视频相关实现参考 `remotion_architecture.md`，项目位于 `video-demo/`。
+- **品牌 Logo**：厨师帽（Chef Hat）置于 `video-demo/public/assets/`（如 `chef-hat.png`），在 OpeningLogo、ClosingLogo 中统一使用。
+- **Skills**：涉及规则、技能或编辑器配置时，使用 `.cursor/skills` 下对应 SKILL（create-rule、create-skill、update-cursor-settings）。

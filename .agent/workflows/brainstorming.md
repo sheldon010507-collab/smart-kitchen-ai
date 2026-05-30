@@ -40,3 +40,9 @@ description: 在任何创造性工作之前必须使用 - 创建功能、构建�
 - **一次一个问题** - 不要用问题轰炸用户
 - **YAGNI** - 你不需要的功能，不要加
 - **渐进验证** - 分段确认，随时调整
+
+## Smart Kitchen AI 项目约定（第一性原理与资产）
+
+- **Remotion 第一性原理**：Code as Video。视觉语言 → React 组件，动效逻辑 → Remotion 原语（`interpolate`、`spring`、`Sequence`）。视频相关实现参考 `remotion_architecture.md`，项目位于 `video-demo/`。
+- **品牌 Logo**：厨师帽（Chef Hat）为项目 Logo，置于 `video-demo/public/assets/`（如 `chef-hat.png`），在 OpeningLogo、ClosingLogo 等 composition 中统一使用。
+- **Skills**：涉及规则、技能或编辑器配置时，使用 `.cursor/skills` 下对应 SKILL（create-rule、create-skill、update-cursor-settings）。

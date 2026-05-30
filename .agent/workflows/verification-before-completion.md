@@ -89,3 +89,9 @@ description: 关于完成前必须验证工作的规则 - 要求运行验证命�
 运行命令。读取输出。然后才能声称结果。
 
 这不可商量。
+
+## Smart Kitchen AI 项目约定（第一性原理与资产）
+
+- **Remotion 第一性原理**：Code as Video。视频相关实现参考 `remotion_architecture.md`，项目位于 `video-demo/`。**video-demo 验证**：`npm run render` 成功；预览：`npm run dev`。
+- **品牌 Logo**：厨师帽（Chef Hat）置于 `video-demo/public/assets/`（如 `chef-hat.png`），在 OpeningLogo、ClosingLogo 中统一使用。
+- **Skills**：涉及规则、技能或编辑器配置时，使用 `.cursor/skills` 下对应 SKILL（create-rule、create-skill、update-cursor-settings）。

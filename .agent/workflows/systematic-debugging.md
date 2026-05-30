@@ -107,3 +107,9 @@ description: 遇到任何 bug、测试失败或意外行为时使用，在提出
 | 2. 模式 | 找工作示例、比较 | 识别差异 |
 | 3. 假设 | 形成理论、最小测试 | 确认或新假设 |
 | 4. 实施 | 创建测试、修复、验证 | bug 解决，测试通过 |
+
+## Smart Kitchen AI 项目约定（第一性原理与资产）
+
+- **Remotion 第一性原理**：Code as Video。视频相关实现参考 `remotion_architecture.md`，项目位于 `video-demo/`。
+- **品牌 Logo**：厨师帽（Chef Hat）置于 `video-demo/public/assets/`（如 `chef-hat.png`），在 OpeningLogo、ClosingLogo 中统一使用。
+- **Skills**：涉及规则、技能或编辑器配置时，使用 `.cursor/skills` 下对应 SKILL（create-rule、create-skill、update-cursor-settings）。

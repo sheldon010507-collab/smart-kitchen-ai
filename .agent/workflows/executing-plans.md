@@ -55,3 +55,9 @@ description: 当有一份书面实施计划需要在独立会话中分批执行�
 - 验证反复失败
 
 **宁可问清楚，不要瞎猜。**
+
+## Smart Kitchen AI 项目约定（第一性原理与资产）
+
+- **Remotion 第一性原理**：Code as Video。实现视频 composition 时遵循 `remotion_architecture.md`（OpeningLogo/ClosingLogo 使用 Chef Hat；Folder 名称仅含 a-z、0-9、`-`）。
+- **品牌 Logo**：厨师帽（Chef Hat）置于 `video-demo/public/assets/`（如 `chef-hat.png`），在 OpeningLogo、ClosingLogo 中统一使用。
+- **Skills**：涉及规则、技能或编辑器配置时，使用 `.cursor/skills` 下对应 SKILL（create-rule、create-skill、update-cursor-settings）。
