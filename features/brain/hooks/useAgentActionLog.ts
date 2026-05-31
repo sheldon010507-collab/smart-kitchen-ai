@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { AgentActionLog, fetchAgentActionLogs } from '../services/agentLogService';
+import { AgentActionLog, fetchAgentActionLogs, formatAgentLogError } from '../services/agentLogService';
 
 export function useAgentActionLog(options: {
     businessIds?: string[];
@@ -17,7 +17,7 @@ export function useAgentActionLog(options: {
             const result = await fetchAgentActionLogs(options);
             setLogs(result);
         } catch (err: any) {
-            setError(err?.message || 'Failed to load AI Brain activity. Apply the agent_action_log migration first.');
+            setError(formatAgentLogError(err));
             setLogs([]);
         } finally {
             setLoading(false);

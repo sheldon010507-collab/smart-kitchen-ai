@@ -29,7 +29,6 @@ CREATE POLICY "telegram_links_select_own_or_owned_store"
   ON telegram_user_links FOR SELECT
   USING (
     supabase_user_id = auth.uid()
-    OR linked_by = auth.uid()
     OR (default_business_id IS NOT NULL AND is_business_owner(default_business_id))
     OR EXISTS (
       SELECT 1
@@ -46,15 +45,9 @@ CREATE POLICY "telegram_links_insert_self_or_owned_store"
   ON telegram_user_links FOR INSERT
   WITH CHECK (
     supabase_user_id = auth.uid()
-    OR linked_by = auth.uid()
-    OR (default_business_id IS NOT NULL AND is_business_owner(default_business_id))
-    OR EXISTS (
-      SELECT 1
-      FROM business_members bm
-      JOIN businesses b ON b.id = bm.business_id
-      WHERE bm.user_id = telegram_user_links.supabase_user_id
-        AND bm.status = 'active'
-        AND b.owner_id = auth.uid()
+    AND (
+      default_business_id IS NULL
+      OR has_business_access(default_business_id)
     )
   );
 
@@ -63,7 +56,6 @@ CREATE POLICY "telegram_links_update_self_or_owned_store"
   ON telegram_user_links FOR UPDATE
   USING (
     supabase_user_id = auth.uid()
-    OR linked_by = auth.uid()
     OR (default_business_id IS NOT NULL AND is_business_owner(default_business_id))
     OR EXISTS (
       SELECT 1
@@ -76,15 +68,9 @@ CREATE POLICY "telegram_links_update_self_or_owned_store"
   )
   WITH CHECK (
     supabase_user_id = auth.uid()
-    OR linked_by = auth.uid()
-    OR (default_business_id IS NOT NULL AND is_business_owner(default_business_id))
-    OR EXISTS (
-      SELECT 1
-      FROM business_members bm
-      JOIN businesses b ON b.id = bm.business_id
-      WHERE bm.user_id = telegram_user_links.supabase_user_id
-        AND bm.status = 'active'
-        AND b.owner_id = auth.uid()
+    AND (
+      default_business_id IS NULL
+      OR has_business_access(default_business_id)
     )
   );
 
@@ -93,7 +79,6 @@ CREATE POLICY "telegram_links_delete_self_or_owned_store"
   ON telegram_user_links FOR DELETE
   USING (
     supabase_user_id = auth.uid()
-    OR linked_by = auth.uid()
     OR (default_business_id IS NOT NULL AND is_business_owner(default_business_id))
     OR EXISTS (
       SELECT 1
