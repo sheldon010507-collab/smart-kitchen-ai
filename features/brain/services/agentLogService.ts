@@ -17,6 +17,14 @@ export interface AgentActionLog {
     createdAt: string;
 }
 
+export function formatAgentLogError(error: any) {
+    const message = String(error?.message || error || '');
+    if (message.includes('agent_action_log') || message.includes('schema cache')) {
+        return 'AI action history is not installed yet. Apply the Kitchen Brain Supabase migrations, then refresh this page.';
+    }
+    return message || 'Failed to load AI Brain activity.';
+}
+
 export function mapAgentActionLog(row: any): AgentActionLog {
     return {
         id: row.id,

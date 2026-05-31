@@ -4,6 +4,8 @@ import { getInventory, findInventoryItem, setStock, addStock, deductStock } from
 import { createPrepTasks, getPrepTasks } from './tools/prep.js';
 import { suggestReorder, createShoppingItem } from './tools/shopping.js';
 import { recordWastage } from './tools/wastage.js';
+import { redeemTelegramLinkCode } from './linkCodes.js';
+import { supabase } from './supabase.js';
 
 const actorFields = {
   telegram_user_id: { type: 'string', description: 'Telegram numeric user id for the sender.' },
@@ -17,6 +19,7 @@ const businessFields = {
 
 const tools = [
   { name: 'kitchen_resolve_actor', description: 'Resolve a Telegram sender to a linked Supabase user and their accessible stores.', inputSchema: { type: 'object', properties: actorFields, required: ['telegram_user_id'] } },
+  { name: 'kitchen_link_telegram_code', description: 'Redeem a short-lived Smart Kitchen web link code sent as /link CODE from Telegram.', inputSchema: { type: 'object', properties: { ...actorFields, code: { type: 'string', description: 'One-time code generated in the Smart Kitchen web app, such as SK-482913.' } }, required: ['telegram_user_id', 'code'] } },
   { name: 'kitchen_set_default_business', description: 'Set the linked Telegram user default store after validating access.', inputSchema: { type: 'object', properties: { ...actorFields, business_id: { type: 'string' } }, required: ['telegram_user_id', 'business_id'] } },
   { name: 'kitchen_get_inventory', description: 'Read inventory_items for an accessible store.', inputSchema: { type: 'object', properties: { ...actorFields, ...businessFields }, required: ['telegram_user_id'] } },
   { name: 'kitchen_find_inventory_item', description: 'Find the best inventory_items match for an item name in an accessible store.', inputSchema: { type: 'object', properties: { ...actorFields, ...businessFields, item_name: { type: 'string' } }, required: ['telegram_user_id', 'item_name'] } },
@@ -33,6 +36,7 @@ const tools = [
 async function callTool(name: string, args: any) {
   switch (name) {
     case 'kitchen_resolve_actor': return resolveActor(args);
+    case 'kitchen_link_telegram_code': return redeemTelegramLinkCode(supabase, args);
     case 'kitchen_set_default_business': return setDefaultBusiness(args);
     case 'kitchen_get_inventory': return getInventory(args);
     case 'kitchen_find_inventory_item': return findInventoryItem(args);

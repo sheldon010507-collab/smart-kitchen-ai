@@ -17,6 +17,12 @@ vi.mock('../components/SupabaseLogin', () => ({
     )
 }));
 
+vi.mock('../lib/BusinessContext', () => ({
+    useBusiness: () => ({
+        setCurrentBusinessId: vi.fn(),
+    }),
+}));
+
 const mockNavigate = vi.fn();
 vi.mock('react-router-dom', async () => ({
     ...(await vi.importActual('react-router-dom')),

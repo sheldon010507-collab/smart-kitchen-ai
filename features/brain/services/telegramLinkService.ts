@@ -12,6 +12,18 @@ export interface TelegramUserLink {
     lastSeenAt?: string | null;
 }
 
+export function formatTelegramLinkError(error: any) {
+    const message = String(error?.message || error || '');
+    if (
+        message.includes('telegram_user_links') ||
+        message.includes('telegram_link_codes') ||
+        message.includes('schema cache')
+    ) {
+        return 'Telegram setup is not installed yet. Apply the Kitchen Brain Supabase migrations, then refresh this page.';
+    }
+    return message || 'Failed to load Telegram links.';
+}
+
 export function mapTelegramUserLink(row: any): TelegramUserLink {
     return {
         id: row.id,
@@ -35,28 +47,6 @@ export async function fetchTelegramUserLinks(limit = 50) {
 
     if (error) throw error;
     return (data || []).map(mapTelegramUserLink);
-}
-
-export async function upsertTelegramUserLink(input: {
-    telegramUserId: string;
-    telegramUsername?: string;
-    supabaseUserId: string;
-    defaultBusinessId?: string | null;
-    linkedBy?: string;
-    isActive?: boolean;
-}) {
-    const { error } = await supabase.from('telegram_user_links').upsert({
-        telegram_user_id: input.telegramUserId.trim(),
-        telegram_username: input.telegramUsername?.trim() || null,
-        supabase_user_id: input.supabaseUserId,
-        default_business_id: input.defaultBusinessId || null,
-        linked_by: input.linkedBy || null,
-        is_active: input.isActive ?? true,
-    }, {
-        onConflict: 'telegram_user_id',
-    });
-
-    if (error) throw error;
 }
 
 export async function updateTelegramLinkActive(id: string, isActive: boolean) {

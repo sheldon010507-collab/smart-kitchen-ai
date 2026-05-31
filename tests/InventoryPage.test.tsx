@@ -13,6 +13,12 @@ vi.mock('../lib/BusinessContext', () => ({
     })
 }));
 
+vi.mock('../lib/AuthContext', () => ({
+    useAuthContext: () => ({
+        user: { id: 'user-1', email: 'manager@example.com', user_metadata: { role: 'Manager' } },
+    }),
+}));
+
 vi.mock('../lib/InventoryContext', () => ({
     useInventoryContext: () => ({
         inventory: [{ id: 'item-1', name: 'Carrot', businessId: 'biz-1' }],

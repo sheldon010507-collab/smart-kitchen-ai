@@ -37,7 +37,21 @@ describe('useDashboardData', () => {
             if (table === 'menu_items') {
                 return {
                     select: vi.fn().mockReturnThis(),
-                    eq: vi.fn().mockResolvedValue({ data: mockMenu, error: null }),
+                    eq: vi.fn().mockReturnThis(),
+                    order: vi.fn().mockResolvedValue({ data: mockMenu, error: null }),
+                };
+            }
+            if (table === 'prep_tasks') {
+                return {
+                    select: vi.fn().mockReturnThis(),
+                    eq: vi.fn().mockReturnThis(),
+                    order: vi.fn().mockResolvedValue({ data: [], error: null }),
+                };
+            }
+            if (table === 'business_members') {
+                return {
+                    select: vi.fn().mockReturnThis(),
+                    eq: vi.fn().mockResolvedValue({ data: [], error: null }),
                 };
             }
             return {

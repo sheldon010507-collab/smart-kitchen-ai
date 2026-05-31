@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { fetchTelegramUserLinks, TelegramUserLink } from '../services/telegramLinkService';
+import { fetchTelegramUserLinks, formatTelegramLinkError, TelegramUserLink } from '../services/telegramLinkService';
 
 export function useTelegramUserLinks(limit = 50) {
     const [links, setLinks] = useState<TelegramUserLink[]>([]);
@@ -12,7 +12,7 @@ export function useTelegramUserLinks(limit = 50) {
         try {
             setLinks(await fetchTelegramUserLinks(limit));
         } catch (err: any) {
-            setError(err?.message || 'Failed to load Telegram links. Apply the telegram_user_links migration first.');
+            setError(formatTelegramLinkError(err));
             setLinks([]);
         } finally {
             setLoading(false);
