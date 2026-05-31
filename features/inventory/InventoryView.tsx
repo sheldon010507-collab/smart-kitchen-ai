@@ -2,13 +2,13 @@
  * InventoryView Component
  * 
  * Main inventory management view
- * Supports master view, search, scan, and CRUD operations
+ * Supports master view, search, and CRUD operations
  * 
  * Extracted from App.tsx
  */
 
 import React, { useState, useMemo } from 'react';
-import { Store, ScanLine, Edit, Plus, Search, X, Package, Filter, MapPin } from 'lucide-react';
+import { Store, Edit, Plus, Search, X, Package, Filter, MapPin } from 'lucide-react';
 import InventoryCard from '../../components/InventoryCard';
 import { EditableTitle } from '../../components/EditableTitle';
 import { InventoryItem, Business } from '../../types';
@@ -21,7 +21,6 @@ interface InventoryViewProps {
     filteredInventory: InventoryItem[];
     onDeleteInventoryItem: (id: string) => void;
     onEditInventoryItem: (item: InventoryItem) => void;
-    onOpenScanner: (mode: 'receipt' | 'fridge' | 'sales') => void;
     onOpenMetaManager: () => void;
     onAddItem: () => void;
     onWastage?: (item: InventoryItem) => void;
@@ -36,7 +35,6 @@ export function InventoryView({
     filteredInventory,
     onDeleteInventoryItem,
     onEditInventoryItem,
-    onOpenScanner,
     onOpenMetaManager,
     onAddItem,
     onWastage,
@@ -105,7 +103,7 @@ export function InventoryView({
                     </h2>
                     <p className="text-[#787774] mt-2 md:mt-3 text-sm md:text-lg">Manage stock for {activeBusiness?.name}</p>
                 </div>
-                <div className="grid grid-cols-4 md:flex md:space-x-3 gap-2 md:gap-0">
+                <div className="grid grid-cols-3 md:flex md:space-x-3 gap-2 md:gap-0">
                     {onOpenSetupWizard && (
                         <button
                             onClick={onOpenSetupWizard}
@@ -115,13 +113,6 @@ export function InventoryView({
                             <span className="hidden md:inline">Setup</span>
                         </button>
                     )}
-                    <button
-                        onClick={() => onOpenScanner('receipt')}
-                        className="flex items-center justify-center px-3 md:px-6 py-2 md:py-3 bg-white text-[#37352f] border border-[#e9e9e7] rounded-lg shadow-sm text-xs md:text-sm font-semibold hover:bg-[#f7f6f3] transition-colors"
-                    >
-                        <ScanLine className="w-4 md:w-5 h-4 md:h-5 md:mr-2" />
-                        <span className="hidden md:inline">Scan</span>
-                    </button>
                     <button
                         onClick={onOpenMetaManager}
                         className="flex items-center justify-center px-3 md:px-6 py-2 md:py-3 bg-white text-[#37352f] border border-[#e9e9e7] rounded-lg shadow-sm text-xs md:text-sm font-semibold hover:bg-[#f7f6f3] transition-colors"

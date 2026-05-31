@@ -18,7 +18,6 @@ export { TemplateCard } from './TemplateCard';
 export { TemplatePreviewModal } from './TemplatePreviewModal';
 export { SaveAsTemplateModal } from './SaveAsTemplateModal';
 export { ExcelPreview } from './ExcelPreview';
-export { PhotoScanSection } from './PhotoScanSection';
 export { DataHealthBar } from './DataHealthBar';
 export { SuccessPage } from './SuccessPage';
 

@@ -81,7 +81,6 @@ vi.mock('recharts', () => ({
 }));
 
 // Mock all child components to isolate App logic failure
-vi.mock('../components/Scanner', () => ({ default: () => <div>Scanner</div> }));
 vi.mock('../components/ChefView', () => ({ default: () => <div>ChefView</div> }));
 vi.mock('../components/PrivacyPolicyPage', () => ({ default: () => <div>PrivacyPolicyPage</div> }));
 vi.mock('../components/SubscriptionView', () => ({ SubscriptionView: () => <div>SubscriptionView</div> }));

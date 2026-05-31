@@ -1,18 +1,14 @@
-import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Navigate, useLocation, useNavigate, Outlet } from 'react-router-dom';
 import {
-  ChefHat,
   Store,
 } from 'lucide-react';
 
 import {
-  InventoryItem,
   ViewState,
-  MenuItem,
 } from './types';
 
 // import InventoryCard from './components/InventoryCard'; // Moved to InventoryView.tsx
-import Scanner from './components/Scanner';
 // ChefView migrated to DashboardPage
 // import RestaurantDashboard from './components/RestaurantDashboard'; // Migrated to DashboardPage
 // StoreModal is removed from render so import is already removed above. 
@@ -27,7 +23,6 @@ import { useBusiness } from './lib/BusinessContext';
 import { useAuthContext } from './lib/AuthContext'; // Added
 
 import { sanitizeStorage } from './utils/storageUtils';
-import { ErrorBoundary } from './components/ErrorBoundary';
 // Modals migrated to DashboardPage
 // Dashboard components migrated to DashboardPage
 import { DesktopSidebar } from './components/layout/DesktopSidebar';
@@ -44,8 +39,7 @@ export default function App() {
     accessibleBusinesses,
     currentBusinessId,
     setCurrentBusinessId,
-    staffMemberships,
-    isMasterView
+    staffMemberships
   } = useBusiness();
 
   const [view, setView] = useState<ViewState>(ViewState.DASHBOARD);
@@ -60,26 +54,21 @@ export default function App() {
 
   // ✅ 使用 InventoryContext 管理庫存狀態
   const inventoryCtx = useInventoryContext();
-  const inventory = inventoryCtx.inventory;
 
   // Data State（其他狀態保持本地管理）
   // Legacy states removed: staff, shifts, menu, prepTasks - all migrated to DashboardPage
 
   // UI State
-  const [isScannerOpen, setIsScannerOpen] = useState(false);
-  const [scannerMode, setScannerMode] = useState<'receipt' | 'fridge'>('receipt');
   const [isBusinessDropdownOpen, setIsBusinessDropdownOpen] = useState(false);
 
   // ✅ P1 優化：使用 useRef 避免 popstate 監聽器頻繁重新註冊
   const modalStatesRef = useRef({
-    isScannerOpen,
     isBusinessDropdownOpen
   });
 
   // 更新 ref（不觸發重新渲染）
   useEffect(() => {
     modalStatesRef.current = {
-      isScannerOpen,
       isBusinessDropdownOpen
     };
   });
@@ -88,7 +77,6 @@ export default function App() {
   useEffect(() => {
     const handlePopState = () => {
       const states = modalStatesRef.current;
-      if (states.isScannerOpen) { setIsScannerOpen(false); return; }
       if (states.isBusinessDropdownOpen) { setIsBusinessDropdownOpen(false); return; }
     };
     window.addEventListener('popstate', handlePopState);
@@ -131,12 +119,6 @@ export default function App() {
     }
   }, [view, navigate, location.pathname]);
 
-  const openScanner = (mode: 'receipt' | 'fridge') => {
-    setScannerMode(mode);
-    window.history.pushState({ modal: 'scanner' }, '');
-    setIsScannerOpen(true);
-  };
-
   // --- Derived State ---
   // Replaced by BusinessContext
 
@@ -162,11 +144,6 @@ export default function App() {
     };
   }, [user, currentBusinessId]);
 
-  const filteredInventory = useMemo(
-    () => (isMasterView ? inventory : inventory.filter(i => i.businessId === currentBusinessId)),
-    [inventory, currentBusinessId, isMasterView]
-  );
-
   // ✅ 使用 Context 加載庫存
   const loadInventory = async (bizId: string) => {
     await inventoryCtx.loadInventory(bizId);
@@ -180,20 +157,6 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, currentBusinessId]);
 
-
-  // --- Data Handlers ---
-  // ✅ 使用 InventoryContext 處理掃描結果
-  const handleScanResult = async (items: InventoryItem[], mode: 'cumulative' | 'stocktake' = 'cumulative') => {
-    if (!currentBusinessId) return;
-
-    try {
-      await inventoryCtx.addItems(items, currentBusinessId, mode);
-      setIsScannerOpen(false);
-    } catch (err: any) {
-      console.error('handleScanResult error:', err);
-      alert(err?.message || 'Scan import failed');
-    }
-  };
 
   // --- Render Login if not authenticated ---
   if (!user) {
@@ -236,17 +199,17 @@ export default function App() {
 
         <div className="p-4 md:p-16 max-w-6xl mx-auto min-h-screen bg-white dark:bg-gray-900">
           {/* MASTER DASHBOARD VIEW & SINGLE STORE DASHBOARD (Routed) */}
-          {view === ViewState.DASHBOARD && <Outlet context={{ onOpenScanner: openScanner }} />}
+          {view === ViewState.DASHBOARD && <Outlet context={{}} />}
 
           {/* INVENTORY VIEW (Routed) */}
-          {view === ViewState.INVENTORY && <Outlet context={{ onOpenScanner: openScanner }} />}
+          {view === ViewState.INVENTORY && <Outlet context={{}} />}
 
 
           {/* CHEF VIEW - Now handled via Outlet to DashboardPage */}
-          {view === ViewState.CHEF && <Outlet context={{ onOpenScanner: openScanner }} />}
+          {view === ViewState.CHEF && <Outlet context={{}} />}
 
           {/* RESTAURANT VIEW (Routed) */}
-          {view === ViewState.RESTAURANT && <Outlet context={{ onOpenScanner: openScanner }} />}
+          {view === ViewState.RESTAURANT && <Outlet context={{}} />}
 
           {/* SHOPPING LIST VIEW */}
           {view === ViewState.SHOPPING && (
@@ -282,21 +245,6 @@ export default function App() {
 
       {/* Mobile Bottom Navigation */}
       <MobileNav view={view} setView={setView} isManager={user.role === 'Manager'} />
-
-      {/* Overlays */}
-      {isScannerOpen && (
-        <div className="fixed inset-0 bg-white/90 z-50 flex items-center justify-center p-4 backdrop-blur-md">
-          <ErrorBoundary>
-            <Scanner
-              initialMode={scannerMode}
-              inventoryNameOptions={filteredInventory.map((i) => i.name)}
-              businessId={currentBusinessId || ''}
-              onClose={() => setIsScannerOpen(false)}
-              onItemsFound={handleScanResult}
-            />
-          </ErrorBoundary>
-        </div>
-      )}
 
       {/* EditItemModal migrated to InventoryPage */}
 

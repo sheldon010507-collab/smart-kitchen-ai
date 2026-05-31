@@ -12,14 +12,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { InventoryItem, Business } from '../types';
 
 export interface UseModalStatesReturn {
-    // Scanner
-    isScannerOpen: boolean;
-    setIsScannerOpen: React.Dispatch<React.SetStateAction<boolean>>;
-    scannerMode: 'receipt' | 'fridge' | 'sales';
-    setScannerMode: React.Dispatch<React.SetStateAction<'receipt' | 'fridge' | 'sales'>>;
-    openScanner: (mode: 'receipt' | 'fridge' | 'sales') => void;
-    closeScanner: () => void;
-
     // Edit Item Modal
     isEditModalOpen: boolean;
     setIsEditModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
@@ -57,10 +49,6 @@ export interface UseModalStatesReturn {
 }
 
 export function useModalStates(): UseModalStatesReturn {
-    // Scanner
-    const [isScannerOpen, setIsScannerOpen] = useState(false);
-    const [scannerMode, setScannerMode] = useState<'receipt' | 'fridge' | 'sales'>('receipt');
-
     // Edit Item Modal
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
@@ -86,8 +74,7 @@ export function useModalStates(): UseModalStatesReturn {
     useEffect(() => {
         const handlePopState = () => {
             // Close modals when user presses back
-            if (isScannerOpen || isEditModalOpen || isStoreModalOpen || isJoinStoreModalOpen || isMetaManagerOpen) {
-                setIsScannerOpen(false);
+            if (isEditModalOpen || isStoreModalOpen || isJoinStoreModalOpen || isMetaManagerOpen) {
                 setIsEditModalOpen(false);
                 setIsStoreModalOpen(false);
                 setIsJoinStoreModalOpen(false);
@@ -99,27 +86,10 @@ export function useModalStates(): UseModalStatesReturn {
 
         window.addEventListener('popstate', handlePopState);
         return () => window.removeEventListener('popstate', handlePopState);
-    }, [isScannerOpen, isEditModalOpen, isStoreModalOpen, isJoinStoreModalOpen, isMetaManagerOpen]);
-
-    // Push state when opening modal for back button support
-    const pushState = useCallback(() => {
-        window.history.pushState({ modal: true }, '');
-    }, []);
-
-    // Scanner helpers
-    const openScanner = useCallback((mode: 'receipt' | 'fridge' | 'sales') => {
-        pushState();
-        setScannerMode(mode);
-        setIsScannerOpen(true);
-    }, [pushState]);
-
-    const closeScanner = useCallback(() => {
-        setIsScannerOpen(false);
-    }, []);
+    }, [isEditModalOpen, isStoreModalOpen, isJoinStoreModalOpen, isMetaManagerOpen]);
 
     // Close all modals
     const closeAllModals = useCallback(() => {
-        setIsScannerOpen(false);
         setIsEditModalOpen(false);
         setIsStoreModalOpen(false);
         setIsJoinStoreModalOpen(false);
@@ -132,14 +102,6 @@ export function useModalStates(): UseModalStatesReturn {
     }, []);
 
     return {
-        // Scanner
-        isScannerOpen,
-        setIsScannerOpen,
-        scannerMode,
-        setScannerMode,
-        openScanner,
-        closeScanner,
-
         // Edit Item Modal
         isEditModalOpen,
         setIsEditModalOpen,

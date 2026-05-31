@@ -31,6 +31,9 @@ Staff:
 
 ## Stock operation semantics
 
+- Telegram receipt/invoice photos => parse the receipt into structured line items, then call `kitchen_import_receipt_items`. Do not send users to the web console scanner.
+- Corrections such as supplier aliases, default units, locations, par levels, or shelf-life rules => call `kitchen_upsert_knowledge_item` so the Kitchen Wiki improves over time.
+
 - "only left", "remaining", "只剩", "剩下", "還有" => use `kitchen_set_stock`.
 - "received", "arrived", "delivered", "到貨", "補了" => use `kitchen_add_stock`.
 - "used", "consumed", "用了", "消耗" => use `kitchen_deduct_stock`.

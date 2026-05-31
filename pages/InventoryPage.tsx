@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { useOutletContext, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useBusiness } from '../lib/BusinessContext';
 import { useInventoryContext } from '../lib/InventoryContext';
@@ -13,15 +12,10 @@ import { InventoryItem, Business } from '../types';
 import { toISODate } from '../utils/dateUtils';
 import { recordWastage } from '../services/wastageService';
 
-interface OutletContextType {
-    onOpenScanner: () => void;
-}
-
 export const InventoryPage = () => {
     const { activeBusiness, isMasterView, refreshBusinesses, currentBusinessId } = useBusiness();
     const inventoryCtx = useInventoryContext();
     const { user } = useAuthContext();
-    const { onOpenScanner } = useOutletContext<OutletContextType>() || { onOpenScanner: () => { console.warn('No scanner context'); } };
 
     // Local State
     const [inventorySearchQuery, setInventorySearchQuery] = useState('');
@@ -180,7 +174,6 @@ export const InventoryPage = () => {
                     setEditingItem(it);
                     setIsEditModalOpen(true);
                 }}
-                onOpenScanner={onOpenScanner}
                 onOpenMetaManager={() => {
                     setMetaTab('categories');
                     setMetaNewValue('');

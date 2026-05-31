@@ -8,7 +8,7 @@
  */
 
 import React from 'react';
-import { ScanLine, Store } from 'lucide-react';
+import { Store } from 'lucide-react';
 
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import PrepList from '../../components/PrepList';
@@ -24,7 +24,6 @@ interface StoreDashboardProps {
     onAddTask: (text: string) => void;
     onToggleTask: (id: string) => void;
     onDeleteTask: (id: string) => void;
-    onOpenScanner: (mode: 'receipt' | 'fridge' | 'sales') => void;
 }
 
 
@@ -37,7 +36,6 @@ export function StoreDashboard({
     onAddTask,
     onToggleTask,
     onDeleteTask,
-    onOpenScanner,
 }: StoreDashboardProps) {
 
     return (
@@ -53,22 +51,6 @@ export function StoreDashboard({
                     </p>
                 </div>
 
-                <div className="grid grid-cols-2 md:flex md:space-x-4 gap-2 md:gap-0 w-full md:w-auto">
-                    <button
-                        onClick={() => onOpenScanner('receipt')}
-                        className="flex items-center justify-center px-3 md:px-6 py-2.5 md:py-3 bg-white text-primary border border-border rounded-lg shadow-sm hover:bg-background text-sm font-semibold transition-colors"
-                    >
-                        <ScanLine className="w-4 md:w-5 h-4 md:h-5 mr-1.5 md:mr-2" />
-                        <span className="hidden sm:inline">Scan </span>Invoice
-                    </button>
-                    <button
-                        onClick={() => onOpenScanner('fridge')}
-                        className="flex items-center justify-center px-3 md:px-6 py-2.5 md:py-3 bg-accent text-white rounded-lg shadow-sm hover:bg-accentHover text-sm font-semibold transition-colors"
-                    >
-                        <ScanLine className="w-4 md:w-5 h-4 md:h-5 mr-1.5 md:mr-2" />
-                        <span className="hidden sm:inline">Scan </span>Fridge
-                    </button>
-                </div>
             </header>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">

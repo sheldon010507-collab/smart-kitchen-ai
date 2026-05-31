@@ -15,7 +15,7 @@ import TemplateOnboardingModal from '../components/modals/TemplateOnboardingModa
 import { ChefHat } from 'lucide-react';
 import { OperationsPage } from '../features/operations';
 
-import { useLocation, useNavigate, useOutletContext } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 export const DashboardPage = () => {
     const { activeBusiness, currentBusinessId, isMasterView,
@@ -23,10 +23,6 @@ export const DashboardPage = () => {
     const { user } = useAuthContext();
     const location = useLocation();
     const navigate = useNavigate();
-
-    // Get onOpenScanner from outlet context (passed from App.tsx)
-    const outletContext = useOutletContext<{ onOpenScanner?: (mode: 'receipt' | 'fridge') => void }>();
-    const onOpenScanner = outletContext?.onOpenScanner || (() => console.warn('Scanner not available'));
 
     // Data Hook (Shifts, Menu, Tasks, Staff)
     const {
