@@ -1,8 +1,7 @@
 {
   "name": "Copy of Copy of Smart Kitchen AI",
-  "description": "Intelligent inventory management using Gemini to scan receipts, analyze fridge contents, and generate recipes with deep thinking capabilities.",
+  "description": "Intelligent inventory management for receipts, Telegram kitchen operations, shopping, wastage, and AI-assisted recipes.",
   "requestFramePermissions": [
-    "camera",
     "microphone"
   ]
 }
