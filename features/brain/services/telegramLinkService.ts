@@ -57,3 +57,12 @@ export async function updateTelegramLinkActive(id: string, isActive: boolean) {
 
     if (error) throw error;
 }
+
+export async function updateTelegramLinkDefaultBusiness(id: string, defaultBusinessId: string | null) {
+    const { error } = await supabase
+        .from('telegram_user_links')
+        .update({ default_business_id: defaultBusinessId })
+        .eq('id', id);
+
+    if (error) throw error;
+}

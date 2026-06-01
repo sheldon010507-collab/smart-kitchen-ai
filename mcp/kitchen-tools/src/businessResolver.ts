@@ -2,7 +2,7 @@ import type { BusinessSelectionInput, ResolvedActor, ResolvedBusiness, ToolResul
 import { resolveActor } from './identity.js';
 
 function normalizeName(value: string): string {
-  return value.trim().toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ');
+  return value.normalize('NFKC').trim().toLowerCase().replace(/[^\p{Letter}\p{Number}\s]/gu, '').replace(/\s+/g, ' ');
 }
 
 export async function resolveBusiness(input: BusinessSelectionInput): Promise<ToolResult<{ actor: ResolvedActor; business: ResolvedBusiness }>> {

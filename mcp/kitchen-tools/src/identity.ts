@@ -82,22 +82,59 @@ export async function resolveActor(input: TelegramActorInput): Promise<ResolvedA
   };
 }
 
-export async function setDefaultBusiness(input: TelegramActorInput & { business_id: string }) {
+function normalizeName(value: string): string {
+  return value.normalize('NFKC').trim().toLowerCase().replace(/[^\p{Letter}\p{Number}\s]/gu, '').replace(/\s+/g, ' ');
+}
+
+export async function listAccessibleBusinesses(input: TelegramActorInput) {
   const actor = await resolveActor(input);
   if (!actor.linked || !actor.supabase_user_id) {
     return { ok: false, error: actor.error || 'Telegram account is not linked' };
   }
 
-  const target = actor.accessible_businesses.find(business => business.business_id === input.business_id);
+  return {
+    ok: true,
+    data: {
+      telegram_user_id: actor.telegram_user_id,
+      supabase_user_id: actor.supabase_user_id,
+      default_business_id: actor.default_business_id || null,
+      businesses: actor.accessible_businesses.map(business => ({
+        ...business,
+        is_default: business.business_id === actor.default_business_id,
+      })),
+    },
+  };
+}
+
+export async function setDefaultBusiness(input: TelegramActorInput & { business_id?: string; business_name?: string }) {
+  const actor = await resolveActor(input);
+  if (!actor.linked || !actor.supabase_user_id) {
+    return { ok: false, error: actor.error || 'Telegram account is not linked' };
+  }
+
+  const target = input.business_id
+    ? actor.accessible_businesses.find(business => business.business_id === input.business_id)
+    : input.business_name
+      ? actor.accessible_businesses.find(business => normalizeName(business.name) === normalizeName(input.business_name || ''))
+        || actor.accessible_businesses.find(business => {
+          const candidate = normalizeName(business.name);
+          const requested = normalizeName(input.business_name || '');
+          return candidate.includes(requested) || requested.includes(candidate);
+        })
+      : null;
+
   if (!target) {
-    return { ok: false, error: 'You do not have access to that business' };
+    return {
+      ok: false,
+      clarification: `Which store should I set as default? Options: ${actor.accessible_businesses.map(business => business.name).join(', ')}`,
+    };
   }
 
   const { error } = await supabase
     .from('telegram_user_links')
-    .update({ default_business_id: input.business_id })
+    .update({ default_business_id: target.business_id })
     .eq('telegram_user_id', actor.telegram_user_id);
 
   if (error) return { ok: false, error: error.message };
-  return { ok: true, data: { default_business_id: input.business_id, business_name: target.name } };
+  return { ok: true, data: { default_business_id: target.business_id, business_name: target.name } };
 }

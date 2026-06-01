@@ -15,7 +15,10 @@ vi.mock('../../../lib/AuthContext', () => ({
 
 vi.mock('../../../lib/BusinessContext', () => ({
     useBusiness: () => ({
-        accessibleBusinesses: [{ id: 'biz-1', name: 'Cloud Cafe' }],
+        accessibleBusinesses: [
+            { id: 'biz-1', name: 'Cloud Cafe' },
+            { id: 'biz-2', name: 'Market Bar' },
+        ],
         currentBusinessId: 'biz-1',
     }),
 }));
@@ -37,6 +40,7 @@ vi.mock('../../../features/brain/services/telegramLinkService', () => {
     return {
         formatTelegramLinkError: (error: any) => error?.message || 'Failed to generate link code',
         updateTelegramLinkActive: vi.fn(),
+        updateTelegramLinkDefaultBusiness: vi.fn(),
     };
 });
 
@@ -57,6 +61,7 @@ describe('TelegramLinkManager', () => {
 
         expect(createTelegramLinkCode).toHaveBeenCalledWith({ defaultBusinessId: 'biz-1' });
         expect(screen.queryByPlaceholderText(/telegram user id/i)).not.toBeInTheDocument();
+        expect(screen.getByText(/one telegram bot, 2 stores/i)).toBeInTheDocument();
         expect(screen.getByText(/staff and managers keep their normal store permissions/i)).toBeInTheDocument();
     });
 });

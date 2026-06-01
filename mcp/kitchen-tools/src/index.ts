@@ -1,5 +1,5 @@
 import { createInterface } from 'node:readline';
-import { resolveActor, setDefaultBusiness } from './identity.js';
+import { listAccessibleBusinesses, resolveActor, setDefaultBusiness } from './identity.js';
 import { getInventory, findInventoryItem, setStock, addStock, deductStock } from './tools/inventory.js';
 import { createPrepTasks, getPrepTasks } from './tools/prep.js';
 import { suggestReorder, createShoppingItem } from './tools/shopping.js';
@@ -22,7 +22,8 @@ const businessFields = {
 const tools = [
   { name: 'kitchen_resolve_actor', description: 'Resolve a Telegram sender to a linked Supabase user and their accessible stores.', inputSchema: { type: 'object', properties: actorFields, required: ['telegram_user_id'] } },
   { name: 'kitchen_link_telegram_code', description: 'Redeem a short-lived Smart Kitchen web link code sent as /link CODE from Telegram.', inputSchema: { type: 'object', properties: { ...actorFields, code: { type: 'string', description: 'One-time code generated in the Smart Kitchen web app, such as SK-482913.' } }, required: ['telegram_user_id', 'code'] } },
-  { name: 'kitchen_set_default_business', description: 'Set the linked Telegram user default store after validating access.', inputSchema: { type: 'object', properties: { ...actorFields, business_id: { type: 'string' } }, required: ['telegram_user_id', 'business_id'] } },
+  { name: 'kitchen_list_businesses', description: 'List all Smart Kitchen stores this linked Telegram user can access, including per-store role and current default store.', inputSchema: { type: 'object', properties: actorFields, required: ['telegram_user_id'] } },
+  { name: 'kitchen_set_default_business', description: 'Set the linked Telegram user default store by store UUID or store name after validating access. Use for /store STORE_NAME or when the sender asks to switch stores.', inputSchema: { type: 'object', properties: { ...actorFields, ...businessFields }, required: ['telegram_user_id'] } },
   { name: 'kitchen_get_inventory', description: 'Read inventory_items for an accessible store.', inputSchema: { type: 'object', properties: { ...actorFields, ...businessFields }, required: ['telegram_user_id'] } },
   { name: 'kitchen_find_inventory_item', description: 'Find the best inventory_items match for an item name in an accessible store.', inputSchema: { type: 'object', properties: { ...actorFields, ...businessFields, item_name: { type: 'string' } }, required: ['telegram_user_id', 'item_name'] } },
   { name: 'kitchen_set_stock', description: 'Set/overwrite stock quantity for stocktake phrases such as "only left" or "只剩".', inputSchema: { type: 'object', properties: { ...actorFields, ...businessFields, item_name: { type: 'string' }, quantity: { type: 'number' }, unit: { type: 'string' }, reason: { type: 'string' } }, required: ['telegram_user_id', 'item_name', 'quantity'] } },
@@ -42,6 +43,7 @@ async function callTool(name: string, args: any) {
   switch (name) {
     case 'kitchen_resolve_actor': return resolveActor(args);
     case 'kitchen_link_telegram_code': return redeemTelegramLinkCode(supabase, args);
+    case 'kitchen_list_businesses': return listAccessibleBusinesses(args);
     case 'kitchen_set_default_business': return setDefaultBusiness(args);
     case 'kitchen_get_inventory': return getInventory(args);
     case 'kitchen_find_inventory_item': return findInventoryItem(args);
