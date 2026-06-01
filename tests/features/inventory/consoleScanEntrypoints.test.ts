@@ -13,6 +13,7 @@ describe('console scanning entrypoints', () => {
 
     expect(existsSync(join(repoRoot, 'components/Scanner.tsx'))).toBe(false);
     expect(existsSync(join(repoRoot, 'components/setup/PhotoScanSection.tsx'))).toBe(false);
+    expect(existsSync(join(repoRoot, 'features/inventory-scan'))).toBe(false);
     expect(appShell).not.toContain("from './components/Scanner'");
     expect(appShell).not.toContain('isScannerOpen');
     expect(appShell).not.toContain('openScanner');
