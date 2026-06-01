@@ -15,6 +15,19 @@ describe('telegram link migrations', () => {
     expect(migration).toContain('CREATE OR REPLACE FUNCTION create_telegram_link_code');
     expect(migration).toContain('auth.uid()');
     expect(migration).toContain('expires_at');
+    expect(migration).toContain('telegram_link_codes.expires_at > now()');
+    expect(migration).toContain('created_expires_at TIMESTAMPTZ');
+  });
+
+  it('patches existing databases with the unambiguous link-code RPC', () => {
+    const migration = readFileSync(
+      join(repoRoot, 'supabase/migrations/015_fix_telegram_link_code_expires_at_ambiguity.sql'),
+      'utf8',
+    );
+
+    expect(migration).toContain('CREATE OR REPLACE FUNCTION create_telegram_link_code');
+    expect(migration).toContain('telegram_link_codes.expires_at > now()');
+    expect(migration).toContain('INTO created_code, created_expires_at');
   });
 
   it('does not allow browser clients to insert arbitrary telegram_user_links rows', () => {

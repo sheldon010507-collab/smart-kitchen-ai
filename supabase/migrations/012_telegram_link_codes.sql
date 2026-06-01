@@ -52,6 +52,8 @@ LANGUAGE plpgsql
 AS $$
 DECLARE
   generated_code TEXT;
+  created_code TEXT;
+  created_expires_at TIMESTAMPTZ;
 BEGIN
   IF auth.uid() IS NULL THEN
     RAISE EXCEPTION 'Authentication required';
@@ -65,7 +67,7 @@ BEGIN
   SET used_at = now()
   WHERE supabase_user_id = auth.uid()
     AND used_at IS NULL
-    AND expires_at > now();
+    AND telegram_link_codes.expires_at > now();
 
   LOOP
     generated_code := 'SK-' || lpad(floor(random() * 1000000)::int::text, 6, '0');
@@ -83,8 +85,10 @@ BEGIN
         now() + interval '10 minutes'
       )
       RETURNING telegram_link_codes.code, telegram_link_codes.expires_at
-      INTO code, expires_at;
+      INTO created_code, created_expires_at;
 
+      code := created_code;
+      expires_at := created_expires_at;
       RETURN NEXT;
       RETURN;
     EXCEPTION WHEN unique_violation THEN
