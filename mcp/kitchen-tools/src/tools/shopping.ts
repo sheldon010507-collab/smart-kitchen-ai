@@ -1,6 +1,7 @@
 import { supabase } from '../supabase.js';
 import { resolveBusiness } from '../businessResolver.js';
 import { logAgentAction } from './audit.js';
+import { canSeeSensitiveFields } from '../permissions.js';
 import type { BusinessSelectionInput, ToolResult } from '../types.js';
 
 export async function suggestReorder(input: BusinessSelectionInput): Promise<ToolResult> {
@@ -15,19 +16,23 @@ export async function suggestReorder(input: BusinessSelectionInput): Promise<Too
 
   if (error) return { ok: false, error: error.message };
 
+  const showSensitive = canSeeSensitiveFields(resolved.data);
   const suggestions = (data || [])
     .filter(item => Number(item.quantity_value || 0) < Number(item.min_stock_level || 0))
-    .map(item => ({
-      inventory_item_id: item.id,
-      item_name: item.name,
-      category: item.category,
-      current_quantity: Number(item.quantity_value || 0),
-      min_stock_level: Number(item.min_stock_level || 0),
-      quantity_needed: Math.max(0, Number(item.min_stock_level || 0) - Number(item.quantity_value || 0)),
-      unit: item.quantity_unit || 'pcs',
-      supplier: item.supplier,
-      priority: Number(item.quantity_value || 0) === 0 ? 'urgent' : 'normal',
-    }));
+    .map(item => {
+      const suggestion: any = {
+        inventory_item_id: item.id,
+        item_name: item.name,
+        category: item.category,
+        current_quantity: Number(item.quantity_value || 0),
+        min_stock_level: Number(item.min_stock_level || 0),
+        quantity_needed: Math.max(0, Number(item.min_stock_level || 0) - Number(item.quantity_value || 0)),
+        unit: item.quantity_unit || 'pcs',
+        priority: Number(item.quantity_value || 0) === 0 ? 'urgent' : 'normal',
+      };
+      if (showSensitive) suggestion.supplier = item.supplier;
+      return suggestion;
+    });
 
   return { ok: true, data: { business: resolved.data.business, suggestions } };
 }

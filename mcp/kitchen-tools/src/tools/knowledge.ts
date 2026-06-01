@@ -1,4 +1,5 @@
 import type { ToolResult } from '../types.js';
+import { requireManager } from '../permissions.js';
 
 export interface KnowledgeItemInput {
   business_id: string;
@@ -85,6 +86,8 @@ export async function upsertTelegramKnowledgeItem(input: Omit<KnowledgeItemInput
   const { supabase } = await import('../supabase.js');
   const resolved = await resolveBusiness(input);
   if (!resolved.ok || !resolved.data) return resolved;
+  const permission = requireManager(resolved.data, 'upsert_knowledge');
+  if (permission) return permission;
 
   return upsertKnowledgeItem(supabase, {
     ...input,

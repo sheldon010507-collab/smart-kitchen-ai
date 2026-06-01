@@ -67,4 +67,44 @@ describe('receipt import MCP tool', () => {
       status: 'executed',
     }));
   });
+
+  it('requires manager review before staff receipt imports create new inventory items', async () => {
+    const inventoryBuilder = builder({ data: [], error: null });
+    inventoryBuilder.order = vi.fn(() => Promise.resolve({ data: [], error: null }));
+    inventoryBuilder.eq = vi.fn(() => inventoryBuilder);
+    inventoryBuilder.insert = vi.fn(() => inventoryBuilder);
+
+    const auditBuilder = builder({ data: null, error: null });
+    const receiptLogBuilder = builder({ data: null, error: null });
+
+    const db = {
+      from: vi.fn((table: string) => {
+        if (table === 'inventory_items') return inventoryBuilder;
+        if (table === 'agent_action_log') return auditBuilder;
+        if (table === 'receipt_import_logs') return receiptLogBuilder;
+        throw new Error(`unexpected table ${table}`);
+      }),
+    };
+
+    const result = await importReceiptItems(db as any, {
+      actor: { supabase_user_id: 'staff-1', role: 'Staff' },
+      business: { business_id: 'biz-1', name: 'Cloud cafe', access_role: 'staff' },
+      telegram_user_id: 'tg-1',
+      telegram_username: 'staff',
+      supplier: 'Booker',
+      items: [{ item_name: 'New Sauce', quantity: 2, unit: 'bottle', total_price: 8 }],
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      needs_confirmation: true,
+    });
+    expect(inventoryBuilder.insert).not.toHaveBeenCalled();
+    expect(receiptLogBuilder.insert).toHaveBeenCalledWith(expect.objectContaining({
+      status: 'requires_confirmation',
+    }));
+    expect(auditBuilder.insert).toHaveBeenCalledWith(expect.objectContaining({
+      status: 'requires_confirmation',
+    }));
+  });
 });

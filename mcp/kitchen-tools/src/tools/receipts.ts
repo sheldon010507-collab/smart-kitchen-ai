@@ -1,4 +1,5 @@
 import { findBestInventoryMatch, type InventoryRow } from '../itemMatcher.js';
+import { staffRiskCheck } from '../permissions.js';
 import type { AccessibleBusiness, ResolvedActor, ToolResult } from '../types.js';
 
 export interface ParsedReceiptItem {
@@ -39,8 +40,62 @@ export async function importReceiptItems(db: any, input: ReceiptImportInput): Pr
   const businessId = input.business.business_id;
   const inventory = await fetchInventory(db, businessId);
   const appliedItems: any[] = [];
+  const validItems = input.items.filter(item => {
+    const quantity = Number(item.quantity);
+    return Boolean(item.item_name?.trim()) && Number.isFinite(quantity) && quantity > 0;
+  });
+  const unmatchedItems = validItems.filter(item => !findBestInventoryMatch(item.item_name, inventory).match);
+  const staffNeedsReview = validItems.length > 15 || unmatchedItems.length > 0;
+  const review = staffRiskCheck(
+    { actor: input.actor, business: input.business },
+    'import_receipt',
+    staffNeedsReview,
+    unmatchedItems.length > 0
+      ? 'This receipt contains new inventory items. A manager should review it before inventory is changed.'
+      : 'This receipt contains many line items. A manager should review it before inventory is changed.',
+    {
+      item_count: validItems.length,
+      unmatched_items: unmatchedItems.map(item => item.item_name),
+    },
+  );
 
-  for (const receiptItem of input.items) {
+  if (review) {
+    const output = {
+      business: input.business,
+      supplier: input.supplier || null,
+      item_count: validItems.length,
+      unmatched_items: unmatchedItems.map(item => item.item_name),
+    };
+
+    await db.from('receipt_import_logs').insert({
+      business_id: businessId,
+      actor_user_id: input.actor.supabase_user_id || null,
+      supplier: input.supplier || null,
+      receipt_date: input.receipt_date || null,
+      raw_text: input.raw_text || null,
+      parsed_items: input.items,
+      applied_items: [],
+      status: 'requires_confirmation',
+    });
+
+    await db.from('agent_action_log').insert({
+      business_id: businessId,
+      actor_user_id: input.actor.supabase_user_id || null,
+      actor_role: input.actor.role || null,
+      channel: 'telegram',
+      sender_id: input.telegram_user_id || null,
+      sender_username: input.telegram_username || null,
+      tool_name: 'kitchen_import_receipt_items',
+      intent: 'receipt_inventory_import',
+      input,
+      output,
+      status: 'requires_confirmation',
+    });
+
+    return review;
+  }
+
+  for (const receiptItem of validItems) {
     const quantity = Number(receiptItem.quantity);
     if (!receiptItem.item_name?.trim() || !Number.isFinite(quantity) || quantity <= 0) continue;
 

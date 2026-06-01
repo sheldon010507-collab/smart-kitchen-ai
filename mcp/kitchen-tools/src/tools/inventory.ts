@@ -3,6 +3,7 @@ import { resolveBusiness } from '../businessResolver.js';
 import { findBestInventoryMatch, type InventoryRow } from '../itemMatcher.js';
 import { normalizeUnit } from '../unitNormalizer.js';
 import { logAgentAction } from './audit.js';
+import { canSeeSensitiveFields, requireManager, staffRiskCheck } from '../permissions.js';
 import type { BusinessSelectionInput, ToolResult } from '../types.js';
 
 interface StockInput extends BusinessSelectionInput {
@@ -28,13 +29,23 @@ async function matchItem(businessId: string, itemName: string) {
   return findBestInventoryMatch(itemName, inventory);
 }
 
+function sanitizeInventoryItem(item: InventoryRow, showSensitive: boolean): InventoryRow {
+  if (showSensitive) return item;
+  const { unit_cost, ...safeItem } = item;
+  return safeItem;
+}
+
 export async function getInventory(input: BusinessSelectionInput): Promise<ToolResult> {
   const resolved = await resolveBusiness(input);
   if (!resolved.ok || !resolved.data) return resolved;
 
   try {
     const inventory = await fetchInventory(resolved.data.business.business_id);
-    const output = { business: resolved.data.business, inventory };
+    const showSensitive = canSeeSensitiveFields(resolved.data);
+    const output = {
+      business: resolved.data.business,
+      inventory: inventory.map(item => sanitizeInventoryItem(item, showSensitive)),
+    };
     await logAgentAction({
       business_id: resolved.data.business.business_id,
       actor_user_id: resolved.data.actor.supabase_user_id,
@@ -59,7 +70,16 @@ export async function findInventoryItem(input: BusinessSelectionInput & { item_n
 
   try {
     const match = await matchItem(resolved.data.business.business_id, input.item_name);
-    return { ok: true, data: { business: resolved.data.business, ...match } };
+    const showSensitive = canSeeSensitiveFields(resolved.data);
+    return {
+      ok: true,
+      data: {
+        business: resolved.data.business,
+        ...match,
+        match: match.match ? sanitizeInventoryItem(match.match, showSensitive) : undefined,
+        alternatives: match.alternatives.map(item => sanitizeInventoryItem(item, showSensitive)),
+      },
+    };
   } catch (error: any) {
     return { ok: false, error: error.message };
   }
@@ -72,6 +92,24 @@ async function updateStock(input: StockInput, operation: 'set' | 'add' | 'deduct
   const businessId = resolved.data.business.business_id;
   const normalizedUnit = normalizeUnit(input.unit);
   const quantity = Number(input.quantity);
+
+  if (operation === 'set') {
+    const permission = requireManager(resolved.data, 'set_stock');
+    if (permission) {
+      await logAgentAction({
+        business_id: businessId,
+        actor_user_id: resolved.data.actor.supabase_user_id,
+        actor_role: resolved.data.actor.role,
+        sender_id: input.telegram_user_id,
+        sender_username: input.telegram_username,
+        tool_name: 'kitchen_set_stock',
+        intent: 'set_stock',
+        input,
+        status: 'requires_confirmation',
+      });
+      return permission;
+    }
+  }
 
   if (!Number.isFinite(quantity) || quantity < 0) {
     return { ok: false, error: 'quantity must be a non-negative number' };
@@ -107,7 +145,15 @@ async function updateStock(input: StockInput, operation: 'set' | 'add' | 'deduct
     if (operation === 'add') nextQty = currentQty + quantity;
     if (operation === 'deduct') nextQty = Math.max(0, currentQty - quantity);
 
-    if (operation === 'deduct' && currentQty > 0 && quantity / currentQty > 0.5) {
+    const staffHighDeduction = operation === 'deduct' && currentQty > 0 && quantity / currentQty > 0.5;
+    const highDeductionPermission = staffRiskCheck(
+      resolved.data,
+      'deduct_stock',
+      staffHighDeduction,
+      `This would deduct more than 50% of ${match.match.name}. A manager should confirm before stock is updated.`,
+      { current_quantity: currentQty, requested_deduction: quantity, item: sanitizeInventoryItem(match.match, false) },
+    );
+    if (highDeductionPermission) {
       const output = { current_quantity: currentQty, requested_deduction: quantity, item: match.match };
       await logAgentAction({
         business_id: businessId,
@@ -121,12 +167,7 @@ async function updateStock(input: StockInput, operation: 'set' | 'add' | 'deduct
         output,
         status: 'requires_confirmation',
       });
-      return {
-        ok: false,
-        needs_confirmation: true,
-        clarification: `This would deduct more than 50% of ${match.match.name}. Please confirm before I update stock.`,
-        data: output,
-      };
+      return highDeductionPermission;
     }
 
     const { error } = await supabase

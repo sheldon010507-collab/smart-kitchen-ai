@@ -33,6 +33,7 @@ Staff:
 
 - Telegram receipt/invoice photos => parse the receipt into structured line items, then call `kitchen_import_receipt_items`. Do not send users to the web console scanner.
 - Corrections such as supplier aliases, default units, locations, par levels, or shelf-life rules => call `kitchen_upsert_knowledge_item` so the Kitchen Wiki improves over time.
+- Staff can perform normal daily updates for stores they belong to, but manager-only or risky changes return `needs_confirmation` instead of changing data. Manager-only examples: stocktake overwrite, Kitchen Wiki updates, new receipt-created inventory items, large deductions/wastage, and full store activity review.
 
 - "only left", "remaining", "只剩", "剩下", "還有" => use `kitchen_set_stock`.
 - "received", "arrived", "delivered", "到貨", "補了" => use `kitchen_add_stock`.

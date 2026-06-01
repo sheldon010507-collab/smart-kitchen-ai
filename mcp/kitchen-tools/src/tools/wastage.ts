@@ -3,6 +3,7 @@ import { resolveBusiness } from '../businessResolver.js';
 import { findBestInventoryMatch, type InventoryRow } from '../itemMatcher.js';
 import { normalizeUnit } from '../unitNormalizer.js';
 import { logAgentAction } from './audit.js';
+import { staffRiskCheck } from '../permissions.js';
 import type { BusinessSelectionInput, ToolResult } from '../types.js';
 
 export async function recordWastage(input: BusinessSelectionInput & {
@@ -36,6 +37,31 @@ export async function recordWastage(input: BusinessSelectionInput & {
       };
     }
 
+    const currentQty = Number(match.match.quantity_value || 0);
+    const quantity = Number(input.quantity);
+    const review = staffRiskCheck(
+      resolved.data,
+      'record_wastage',
+      currentQty > 0 && quantity / currentQty > 0.5,
+      `This wastage would remove more than 50% of ${match.match.name}. A manager should review it before stock is updated.`,
+      { current_quantity: currentQty, requested_wastage: quantity, item_name: match.match.name },
+    );
+    if (review) {
+      await logAgentAction({
+        business_id: businessId,
+        actor_user_id: resolved.data.actor.supabase_user_id,
+        actor_role: resolved.data.actor.role,
+        sender_id: input.telegram_user_id,
+        sender_username: input.telegram_username,
+        tool_name: 'kitchen_record_wastage',
+        intent: 'record_wastage',
+        input,
+        output: review.data,
+        status: 'requires_confirmation',
+      });
+      return review;
+    }
+
     const { data: wastage, error: wastageError } = await supabase.from('wastage_records').insert({
       business_id: businessId,
       inventory_item_id: match.match.id,
@@ -52,7 +78,6 @@ export async function recordWastage(input: BusinessSelectionInput & {
 
     if (wastageError) throw new Error(wastageError.message);
 
-    const currentQty = Number(match.match.quantity_value || 0);
     const newQty = Math.max(0, currentQty - Number(input.quantity));
 
     const { error: stockError } = await supabase
