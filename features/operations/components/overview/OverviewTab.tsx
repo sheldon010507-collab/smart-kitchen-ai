@@ -9,9 +9,12 @@
 import React from 'react';
 import { useOperationsData } from '../../hooks/useOperationsData';
 import { WastageCard } from '../wastage/WastageCard';
+import PrepList from '../../../../components/PrepList';
+import { useAuthContext } from '../../../../lib/AuthContext';
 
 export const OverviewTab: React.FC = () => {
-    const { stats } = useOperationsData();
+    const { user } = useAuthContext();
+    const { stats, prepTasks, handleAddPrepTask, handleDeletePrepTask } = useOperationsData();
 
     return (
         <div className="space-y-8">
@@ -46,19 +49,31 @@ export const OverviewTab: React.FC = () => {
                 />
             </div>
 
-            {/* Quick Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-white p-4 rounded-lg border border-[#e9e9e7]">
-                    <p className="text-xs font-medium text-[#787774] mb-2">Staff Members</p>
-                    <p className="text-2xl font-bold text-[#37352f]">{stats.staffCount}</p>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Quick Stats Grid */}
+                <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="bg-white p-4 rounded-lg border border-[#e9e9e7]">
+                        <p className="text-xs font-medium text-[#787774] mb-2">Staff Members</p>
+                        <p className="text-2xl font-bold text-[#37352f]">{stats.staffCount}</p>
+                    </div>
+                    <div className="bg-white p-4 rounded-lg border border-[#e9e9e7]">
+                        <p className="text-xs font-medium text-[#787774] mb-2">Active Shifts</p>
+                        <p className="text-2xl font-bold text-[#37352f]">{stats.activeShifts}</p>
+                    </div>
+                    <div className="bg-white p-4 rounded-lg border border-[#e9e9e7]">
+                        <p className="text-xs font-medium text-[#787774] mb-2">Menu Items</p>
+                        <p className="text-2xl font-bold text-[#37352f]">{stats.menuItems}</p>
+                    </div>
                 </div>
-                <div className="bg-white p-4 rounded-lg border border-[#e9e9e7]">
-                    <p className="text-xs font-medium text-[#787774] mb-2">Active Shifts</p>
-                    <p className="text-2xl font-bold text-[#37352f]">{stats.activeShifts}</p>
-                </div>
-                <div className="bg-white p-4 rounded-lg border border-[#e9e9e7]">
-                    <p className="text-xs font-medium text-[#787774] mb-2">Menu Items</p>
-                    <p className="text-2xl font-bold text-[#37352f]">{stats.menuItems}</p>
+
+                <div className="h-[360px]">
+                    <PrepList
+                        tasks={prepTasks}
+                        currentUser={user || undefined}
+                        onAddTask={handleAddPrepTask}
+                        onToggleTask={handleDeletePrepTask}
+                        onDeleteTask={handleDeletePrepTask}
+                    />
                 </div>
             </div>
 

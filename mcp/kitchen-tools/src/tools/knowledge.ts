@@ -55,18 +55,21 @@ export async function upsertKnowledgeItem(db: any, input: KnowledgeItemInput): P
   const parLevel = Number(input.par_level ?? 0);
   if (parLevel > 0) {
     const names = [...new Set([canonicalName, ...aliases])];
-    const { data: syncedRows, error: syncError } = await db
-      .from('inventory_items')
-      .update({
-        min_stock_level: parLevel,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('business_id', input.business_id)
-      .in('name', names)
-      .select('id, name, min_stock_level');
+    try {
+      const { data: syncedRows, error: syncError } = await db
+        .from('inventory_items')
+        .update({
+          min_stock_level: parLevel,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('business_id', input.business_id)
+        .in('name', names)
+        .select('id, name, min_stock_level');
 
-    if (syncError) return { ok: false, error: syncError.message };
-    syncedInventory = syncedRows || [];
+      if (!syncError) syncedInventory = syncedRows || [];
+    } catch {
+      syncedInventory = [];
+    }
   }
 
   return { ok: true, data: { item, aliases, synced_inventory: syncedInventory } };

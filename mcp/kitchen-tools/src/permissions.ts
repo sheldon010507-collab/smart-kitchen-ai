@@ -8,6 +8,7 @@ export type KitchenAction =
   | 'set_stock'
   | 'create_prep_tasks'
   | 'read_prep_tasks'
+  | 'delete_prep_task'
   | 'suggest_reorder'
   | 'create_shopping_item'
   | 'record_wastage'

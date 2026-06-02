@@ -11,6 +11,7 @@ import { useMemo } from 'react';
 import { useDashboardData } from '../../../hooks/useDashboardData';
 import { useBusiness } from '../../../lib/BusinessContext';
 import { useInventoryContext } from '../../../lib/InventoryContext';
+import { useAuthContext } from '../../../lib/AuthContext';
 import { useWastageData } from './useWastageData';
 import { useBatchRecipeCosting } from './useBatchRecipeCosting';
 import { menuService } from '../../menu/services/menuService';
@@ -28,10 +29,13 @@ export interface OperationsStats {
 
 export function useOperationsData() {
     const { currentBusinessId } = useBusiness();
+    const { user } = useAuthContext();
     const {
         shifts,
         staff,
         menu,
+        prepTasks,
+        setPrepTasks,
         setShifts,
         setMenu,
         refreshDashboard
@@ -98,6 +102,7 @@ export function useOperationsData() {
         staff,
         shifts,
         menu,
+        prepTasks,
         inventory,
         currentBusinessId,
 
@@ -111,6 +116,65 @@ export function useOperationsData() {
         setShifts,
         // setMenu, // Create custom handlers instead
         refreshDashboard,
+
+        handleAddPrepTask: async (text: string) => {
+            if (!currentBusinessId) return;
+            const taskText = text.trim();
+            if (!taskText) return;
+
+            const { supabase } = await import('../../../lib/supabase');
+            const { data, error } = await supabase
+                .from('prep_tasks')
+                .insert({
+                    business_id: currentBusinessId,
+                    task_text: taskText,
+                    completed: false,
+                    task_date: new Date().toISOString().split('T')[0],
+                    priority: 1,
+                    created_by: user?.id ?? null
+                })
+                .select('*')
+                .single();
+
+            if (error) {
+                console.error('Failed to add prep task:', error);
+                alert('Failed to add prep task');
+                return;
+            }
+
+            setPrepTasks(prev => [...prev, {
+                id: data.id,
+                businessId: data.business_id,
+                taskText: data.task_text,
+                completed: data.completed,
+                taskDate: data.task_date,
+                priority: data.priority,
+                createdAt: data.created_at,
+                assignedTo: data.assigned_to,
+                completedAt: data.completed_at,
+                completedBy: data.completed_by,
+                createdBy: data.created_by
+            }]);
+        },
+
+        handleDeletePrepTask: async (id: string) => {
+            if (!currentBusinessId) return;
+
+            const { supabase } = await import('../../../lib/supabase');
+            const { error } = await supabase
+                .from('prep_tasks')
+                .delete()
+                .eq('id', id)
+                .eq('business_id', currentBusinessId);
+
+            if (error) {
+                console.error('Failed to delete prep task:', error);
+                alert('Failed to delete prep task');
+                return;
+            }
+
+            setPrepTasks(prev => prev.filter(t => t.id !== id));
+        },
 
         // Menu Persistence Handlers
         handleAddMenuItem: async (item: any) => {

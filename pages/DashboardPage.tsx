@@ -131,20 +131,64 @@ export const DashboardPage = () => {
         setMenu(prev => prev.map(m => m.id === item.id ? item : m));
     };
 
-    const handleAddTask = (text: string) => {
+    const handleAddTask = async (text: string) => {
         if (!currentBusinessId || !user) return;
-        const newTask = {
-            id: Date.now().toString(),
-            businessId: currentBusinessId,
-            taskText: text,
-            completed: false,
-            createdBy: user.id,
-            taskDate: new Date().toISOString().split('T')[0],
-            priority: 1,
-            createdAt: new Date().toISOString()
-        };
-        setPrepTasks(prev => [...prev, newTask]);
+        const taskText = text.trim();
+        if (!taskText) return;
+
+        const { supabase } = await import('../lib/supabase');
+        const { data, error } = await supabase
+            .from('prep_tasks')
+            .insert({
+                business_id: currentBusinessId,
+                task_text: taskText,
+                completed: false,
+                task_date: new Date().toISOString().split('T')[0],
+                priority: 1,
+                created_by: user.id
+            })
+            .select('*')
+            .single();
+
+        if (error) {
+            console.error('Failed to add prep task:', error);
+            alert('Failed to add prep task');
+            return;
+        }
+
+        setPrepTasks(prev => [...prev, {
+            id: data.id,
+            businessId: data.business_id,
+            taskText: data.task_text,
+            completed: data.completed,
+            taskDate: data.task_date,
+            priority: data.priority,
+            createdAt: data.created_at,
+            assignedTo: data.assigned_to,
+            completedAt: data.completed_at,
+            completedBy: data.completed_by,
+            createdBy: data.created_by
+        }]);
     }
+
+    const handleDeletePrepTask = async (id: string) => {
+        if (!currentBusinessId) return;
+
+        const { supabase } = await import('../lib/supabase');
+        const { error } = await supabase
+            .from('prep_tasks')
+            .delete()
+            .eq('id', id)
+            .eq('business_id', currentBusinessId);
+
+        if (error) {
+            console.error('Failed to delete prep task:', error);
+            alert('Failed to delete prep task');
+            return;
+        }
+
+        setPrepTasks(prev => prev.filter(t => t.id !== id));
+    };
 
     // Derived values
     const filteredInventory = currentBusinessId
@@ -210,8 +254,8 @@ export const DashboardPage = () => {
                     onDeleteMenuItem={handleDeleteMenuItem}
                     onUpdateMenuItem={handleUpdateMenuItem}
                     onAddTask={handleAddTask}
-                    onToggleTask={(id) => setPrepTasks(prev => prev.map(t => t.id === id ? { ...t, completed: !t.completed } : t))}
-                    onDeleteTask={(id) => setPrepTasks(prev => prev.filter(t => t.id !== id))}
+                    onToggleTask={handleDeletePrepTask}
+                    onDeleteTask={handleDeletePrepTask}
                     onOpenJoinStore={() => setIsJoinStoreModalOpen(true)}
                 />
             );

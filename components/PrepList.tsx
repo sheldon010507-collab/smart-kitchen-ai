@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { PrepTask, User } from '../types';
-import { CheckSquare, Square, Plus, Trash2, Mic, MicOff } from 'lucide-react';
+import { CheckSquare, Plus, Trash2, Mic, MicOff } from 'lucide-react';
 import { useVoiceInput } from '../hooks/useVoiceInput';
 
 interface Props {
@@ -8,7 +8,7 @@ interface Props {
   onAddTask: (text: string) => void;
   onToggleTask: (id: string) => void;
   onDeleteTask: (id: string) => void;
-  currentUser: User;
+  currentUser?: User;
 }
 
 const PrepList: React.FC<Props> = ({ tasks, onAddTask, onToggleTask, onDeleteTask, currentUser }) => {
@@ -75,12 +75,14 @@ const PrepList: React.FC<Props> = ({ tasks, onAddTask, onToggleTask, onDeleteTas
                 <div className="flex items-center space-x-3 overflow-hidden">
                   <button
                     onClick={() => onToggleTask(task.id)}
-                    className={`flex-shrink-0 transition-colors ${task.completed ? 'text-[#2383E2]' : 'text-[#D3D1CB] hover:text-[#787774]'}`}
+                    className="flex-shrink-0 text-[#D3D1CB] hover:text-[#2383E2] transition-colors"
+                    title="Mark done and delete"
                   >
-                    {task.completed ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+                    <CheckSquare className="w-4 h-4" />
                   </button>
-                  <div className={`truncate ${task.completed ? 'line-through text-[#D3D1CB]' : 'text-[#37352F]'}`}>
-                    <p className="text-sm truncate">{task.text}</p>
+                  <div className="min-w-0 text-[#37352F]">
+                    <p className="text-sm truncate">{task.taskText}</p>
+                    <p className="text-[11px] text-[#9b9a97]">{task.taskDate}</p>
                   </div>
                 </div>
                 <button

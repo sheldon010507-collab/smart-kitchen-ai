@@ -82,3 +82,58 @@ export async function getPrepTasks(input: BusinessSelectionInput & { task_date?:
   if (error) return { ok: false, error: error.message };
   return { ok: true, data: { business: resolved.data.business, tasks: data || [] } };
 }
+
+export async function deletePrepTask(input: BusinessSelectionInput & { task_id?: string; task_text?: string; task_date?: string }): Promise<ToolResult> {
+  const resolved = await resolveBusiness(input);
+  if (!resolved.ok || !resolved.data) return resolved;
+
+  if (!input.task_id && !input.task_text) {
+    return { ok: false, error: 'task_id or task_text is required' };
+  }
+
+  let lookup = supabase
+    .from('prep_tasks')
+    .select('*')
+    .eq('business_id', resolved.data.business.business_id);
+
+  if (input.task_id) lookup = lookup.eq('id', input.task_id);
+  if (input.task_text) lookup = lookup.ilike('task_text', input.task_text);
+  if (input.task_date) lookup = lookup.eq('task_date', input.task_date);
+
+  const { data: matches, error: lookupError } = await lookup.limit(2);
+  if (lookupError) return { ok: false, error: lookupError.message };
+  if (!matches || matches.length === 0) return { ok: false, error: 'prep task not found' };
+  if (matches.length > 1) {
+    return {
+      ok: false,
+      needs_confirmation: true,
+      clarification: 'More than one prep task matched. Please specify the exact task or date.',
+      data: matches,
+    };
+  }
+
+  const task = matches[0];
+  const { error } = await supabase
+    .from('prep_tasks')
+    .delete()
+    .eq('id', task.id)
+    .eq('business_id', resolved.data.business.business_id);
+
+  if (error) return { ok: false, error: error.message };
+
+  const output = { business: resolved.data.business, task };
+  await logAgentAction({
+    business_id: resolved.data.business.business_id,
+    actor_user_id: resolved.data.actor.supabase_user_id,
+    actor_role: resolved.data.actor.role,
+    sender_id: input.telegram_user_id,
+    sender_username: input.telegram_username,
+    tool_name: 'kitchen_delete_prep_task',
+    intent: 'delete_prep_task',
+    input,
+    output,
+    status: 'executed',
+  });
+
+  return { ok: true, data: output };
+}

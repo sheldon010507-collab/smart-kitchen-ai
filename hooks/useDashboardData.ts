@@ -124,7 +124,8 @@ export function useDashboardData(businessId: string | null) {
                 .from('prep_tasks')
                 .select('*')
                 .eq('business_id', businessId)
-                .order('priority', { ascending: false });
+                .eq('completed', false)
+                .order('task_date', { ascending: true });
 
             if (taskErr) throw taskErr;
 

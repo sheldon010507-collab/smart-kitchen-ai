@@ -1,6 +1,6 @@
 import { listAccessibleBusinesses, resolveActor, setDefaultBusiness } from './identity.js';
 import { getInventory, findInventoryItem, setStock, addStock, deductStock } from './tools/inventory.js';
-import { createPrepTasks, getPrepTasks } from './tools/prep.js';
+import { createPrepTasks, deletePrepTask, getPrepTasks } from './tools/prep.js';
 import { suggestReorder, createShoppingItem } from './tools/shopping.js';
 import { recordWastage } from './tools/wastage.js';
 import { redeemTelegramLinkCode } from './linkCodes.js';
@@ -30,6 +30,7 @@ const tools = [
   { name: 'kitchen_deduct_stock', description: 'Deduct consumed/used quantity from current stock.', inputSchema: { type: 'object', properties: { ...actorFields, ...businessFields, item_name: { type: 'string' }, quantity: { type: 'number' }, unit: { type: 'string' }, reason: { type: 'string' } }, required: ['telegram_user_id', 'item_name', 'quantity'] } },
   { name: 'kitchen_create_prep_tasks', description: 'Create prep_tasks for a target store and task date.', inputSchema: { type: 'object', properties: { ...actorFields, ...businessFields, task_date: { type: 'string' }, tasks: { type: 'array', items: { type: 'object', properties: { task_text: { type: 'string' }, assigned_to: { type: 'string' }, priority: { type: 'number' } }, required: ['task_text'] } } }, required: ['telegram_user_id', 'task_date', 'tasks'] } },
   { name: 'kitchen_get_prep_tasks', description: 'Read prep_tasks for a target store and optional date.', inputSchema: { type: 'object', properties: { ...actorFields, ...businessFields, task_date: { type: 'string' } }, required: ['telegram_user_id'] } },
+  { name: 'kitchen_delete_prep_task', description: 'Delete one completed or unwanted prep_task from an accessible store by task_id or exact task_text.', inputSchema: { type: 'object', properties: { ...actorFields, ...businessFields, task_id: { type: 'string' }, task_text: { type: 'string' }, task_date: { type: 'string' } }, required: ['telegram_user_id'] } },
   { name: 'kitchen_suggest_reorder', description: 'Suggest low-stock reorders using inventory_items.min_stock_level.', inputSchema: { type: 'object', properties: { ...actorFields, ...businessFields }, required: ['telegram_user_id'] } },
   { name: 'kitchen_create_shopping_item', description: 'Create a pending shopping_list item for an accessible store.', inputSchema: { type: 'object', properties: { ...actorFields, ...businessFields, item_name: { type: 'string' }, quantity_needed: { type: 'number' }, unit: { type: 'string' }, reason: { type: 'string', enum: ['low_stock', 'expiring', 'prep_required', 'manual'] }, priority: { type: 'string', enum: ['urgent', 'normal', 'low'] }, inventory_item_id: { type: 'string' }, category: { type: 'string' }, notes: { type: 'string' } }, required: ['telegram_user_id', 'item_name', 'quantity_needed'] } },
   { name: 'kitchen_record_wastage', description: 'Record wastage_records entry and deduct matching inventory stock.', inputSchema: { type: 'object', properties: { ...actorFields, ...businessFields, item_name: { type: 'string' }, quantity: { type: 'number' }, unit: { type: 'string' }, reason: { type: 'string', enum: ['expired', 'damaged', 'spoiled', 'preparation', 'other'] }, notes: { type: 'string' } }, required: ['telegram_user_id', 'item_name', 'quantity', 'reason'] } },
@@ -51,6 +52,7 @@ async function callTool(name: string, args: any) {
     case 'kitchen_deduct_stock': return deductStock(args);
     case 'kitchen_create_prep_tasks': return createPrepTasks(args);
     case 'kitchen_get_prep_tasks': return getPrepTasks(args);
+    case 'kitchen_delete_prep_task': return deletePrepTask(args);
     case 'kitchen_suggest_reorder': return suggestReorder(args);
     case 'kitchen_create_shopping_item': return createShoppingItem(args);
     case 'kitchen_record_wastage': return recordWastage(args);

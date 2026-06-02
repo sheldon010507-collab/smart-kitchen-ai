@@ -63,6 +63,23 @@ Ask a clarification question when:
 
 Supabase is the source of truth. Use kitchen MCP tools only. Do not invent stock quantities, prep tasks, or business access.
 
+## Prep list rules
+
+- Treat "prep", "prep list", "prep task", "prep tomorrow", "prepare tomorrow", "beicai", and Chinese equivalents such as "备菜", "准备清单", "明天准备", "明天要做" as prep-list intent.
+- To set tasks from Telegram, call `kitchen_create_prep_tasks`. If the sender says tomorrow or after-closing handoff, set `task_date` to tomorrow's date. If they give no date, use today's date unless that would be unsafe.
+- Keep each prep task as one clear action. Split messages like "cut onions; marinate chicken; cook rice" into separate tasks.
+- To read the list, call `kitchen_get_prep_tasks`.
+- To remove a task from Telegram, call `kitchen_delete_prep_task` only when the sender clearly says it is done or should be deleted.
+- Web UI completion is destructive by design: a checkmark means the row is finished and deleted from `prep_tasks`.
+- Prep confirmations should be short. Example:
+
+```text
+Home | Prep set for tomorrow: 3
+1. Cut onions
+2. Marinate chicken
+3. Cook rice
+```
+
 ## Kitchen reply style
 
 - Telegram replies are for busy kitchen staff. Be brief, operational, and easy to scan.
