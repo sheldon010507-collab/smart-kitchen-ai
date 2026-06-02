@@ -4,33 +4,62 @@ import { logAgentAction } from './audit.js';
 import { canSeeSensitiveFields } from '../permissions.js';
 import type { BusinessSelectionInput, ToolResult } from '../types.js';
 
+function normalizeName(value: string | null | undefined) {
+  return String(value || '').trim().toLowerCase();
+}
+
 export async function suggestReorder(input: BusinessSelectionInput): Promise<ToolResult> {
   const resolved = await resolveBusiness(input);
   if (!resolved.ok || !resolved.data) return resolved;
 
+  const businessId = resolved.data.business.business_id;
   const { data, error } = await supabase
     .from('inventory_items')
     .select('id, name, category, quantity_value, quantity_unit, min_stock_level, supplier')
-    .eq('business_id', resolved.data.business.business_id)
-    .gt('min_stock_level', 0);
+    .eq('business_id', businessId);
 
   if (error) return { ok: false, error: error.message };
 
+  const { data: knowledge, error: knowledgeError } = await supabase
+    .from('kitchen_knowledge_items')
+    .select('canonical_name, category, default_unit, par_level, kitchen_knowledge_aliases(alias)')
+    .eq('business_id', businessId)
+    .gt('par_level', 0);
+
+  if (knowledgeError) return { ok: false, error: knowledgeError.message };
+
+  const wikiByName = new Map<string, any>();
+  for (const item of knowledge || []) {
+    wikiByName.set(normalizeName(item.canonical_name), item);
+    for (const aliasRow of item.kitchen_knowledge_aliases || []) {
+      wikiByName.set(normalizeName(aliasRow.alias), item);
+    }
+  }
+
   const showSensitive = canSeeSensitiveFields(resolved.data);
   const suggestions = (data || [])
-    .filter(item => Number(item.quantity_value || 0) < Number(item.min_stock_level || 0))
     .map(item => {
+      const wikiItem = wikiByName.get(normalizeName(item.name));
+      const inventoryMin = Number(item.min_stock_level || 0);
+      const wikiMin = Number(wikiItem?.par_level || 0);
+      const minStockLevel = inventoryMin > 0 ? inventoryMin : wikiMin;
+
+      return { item, wikiItem, minStockLevel };
+    })
+    .filter(({ item, minStockLevel }) => minStockLevel > 0 && Number(item.quantity_value || 0) < minStockLevel)
+    .map(item => {
+      const currentQuantity = Number(item.item.quantity_value || 0);
       const suggestion: any = {
-        inventory_item_id: item.id,
-        item_name: item.name,
-        category: item.category,
-        current_quantity: Number(item.quantity_value || 0),
-        min_stock_level: Number(item.min_stock_level || 0),
-        quantity_needed: Math.max(0, Number(item.min_stock_level || 0) - Number(item.quantity_value || 0)),
-        unit: item.quantity_unit || 'pcs',
-        priority: Number(item.quantity_value || 0) === 0 ? 'urgent' : 'normal',
+        inventory_item_id: item.item.id,
+        item_name: item.item.name,
+        category: item.item.category || item.wikiItem?.category,
+        current_quantity: currentQuantity,
+        min_stock_level: item.minStockLevel,
+        quantity_needed: Math.max(0, item.minStockLevel - currentQuantity),
+        unit: item.item.quantity_unit || item.wikiItem?.default_unit || 'pcs',
+        priority: currentQuantity === 0 ? 'urgent' : 'normal',
       };
-      if (showSensitive) suggestion.supplier = item.supplier;
+      if (showSensitive) suggestion.supplier = item.item.supplier;
       return suggestion;
     });
 

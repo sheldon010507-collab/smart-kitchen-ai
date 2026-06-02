@@ -12,11 +12,12 @@ interface Props {
 
 const InventoryCard: React.FC<Props> = ({ item, onRemove, onEdit, onWastage }) => {
   // Calculate expiry status
-  const daysUntilExpiry = Math.ceil(
-    (new Date(item.expiryDate).getTime() - new Date().getTime()) / (1000 * 3600 * 24)
-  );
-  const isExpired = daysUntilExpiry < 0;
-  const isExpiringSoon = daysUntilExpiry >= 0 && daysUntilExpiry <= 3;
+  const hasExpiryDate = Boolean(item.expiryDate);
+  const daysUntilExpiry = hasExpiryDate
+    ? Math.ceil((new Date(item.expiryDate).getTime() - new Date().getTime()) / (1000 * 3600 * 24))
+    : null;
+  const isExpired = daysUntilExpiry !== null && daysUntilExpiry < 0;
+  const isExpiringSoon = daysUntilExpiry !== null && daysUntilExpiry >= 0 && daysUntilExpiry <= 3;
 
   // Get category styling
   const categoryStyle = getCategoryStyle(item.category || 'Other');
@@ -63,7 +64,7 @@ const InventoryCard: React.FC<Props> = ({ item, onRemove, onEdit, onWastage }) =
         {/* Expiry Status Badge */}
         <span className={`text-xs px-2.5 py-1 rounded-md font-medium border flex items-center ${expiryBadgeStyle}`}>
           <ExpiryIcon className="w-3.5 h-3.5 mr-1" />
-          {isExpired ? 'Expired' : `${daysUntilExpiry}d`}
+          {!hasExpiryDate ? 'No date' : isExpired ? 'Expired' : `${daysUntilExpiry}d`}
         </span>
       </div>
 

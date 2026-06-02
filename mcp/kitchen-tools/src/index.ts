@@ -1,4 +1,3 @@
-import { createInterface } from 'node:readline';
 import { listAccessibleBusinesses, resolveActor, setDefaultBusiness } from './identity.js';
 import { getInventory, findInventoryItem, setStock, addStock, deductStock } from './tools/inventory.js';
 import { createPrepTasks, getPrepTasks } from './tools/prep.js';
@@ -62,13 +61,18 @@ async function callTool(name: string, args: any) {
   }
 }
 
+let outputMode: 'framed' | 'line' = 'line';
+
 function writeResponse(response: unknown) {
-  process.stdout.write(`${JSON.stringify(response)}\n`);
+  const payload = JSON.stringify(response);
+  if (outputMode === 'framed') {
+    process.stdout.write(`Content-Length: ${Buffer.byteLength(payload, 'utf8')}\r\n\r\n${payload}`);
+    return;
+  }
+  process.stdout.write(`${payload}\n`);
 }
 
-const rl = createInterface({ input: process.stdin, crlfDelay: Infinity });
-
-rl.on('line', async line => {
+async function handleRequestLine(line: string) {
   if (!line.trim()) return;
 
   let request: any;
@@ -114,4 +118,68 @@ rl.on('line', async line => {
   } catch (error: any) {
     writeResponse({ jsonrpc: '2.0', id: request.id, error: { code: -32000, message: error.message } });
   }
+}
+
+let lineBuffer = '';
+let frameBuffer = Buffer.alloc(0);
+
+function handleLineChunk(chunk: Buffer) {
+  lineBuffer += chunk.toString('utf8');
+  let newlineIndex = lineBuffer.indexOf('\n');
+
+  while (newlineIndex >= 0) {
+    const line = lineBuffer.slice(0, newlineIndex).replace(/\r$/, '');
+    lineBuffer = lineBuffer.slice(newlineIndex + 1);
+    void handleRequestLine(line);
+    newlineIndex = lineBuffer.indexOf('\n');
+  }
+}
+
+function handleFramedChunk(chunk: Buffer) {
+  frameBuffer = Buffer.concat([frameBuffer, chunk]);
+
+  while (true) {
+    const crlfHeaderEnd = frameBuffer.indexOf('\r\n\r\n');
+    const lfHeaderEnd = frameBuffer.indexOf('\n\n');
+    const hasCrlfHeader = crlfHeaderEnd >= 0;
+    const hasLfHeader = lfHeaderEnd >= 0;
+    if (!hasCrlfHeader && !hasLfHeader) return;
+
+    const useCrlfHeader = hasCrlfHeader && (!hasLfHeader || crlfHeaderEnd <= lfHeaderEnd);
+    const headerEnd = useCrlfHeader ? crlfHeaderEnd : lfHeaderEnd;
+    const bodyStart = headerEnd + (useCrlfHeader ? 4 : 2);
+
+    const header = frameBuffer.slice(0, headerEnd).toString('ascii');
+    const lengthMatch = header.match(/(?:^|\r?\n)Content-Length:\s*(\d+)/i);
+
+    if (!lengthMatch) {
+      writeResponse({ jsonrpc: '2.0', id: null, error: { code: -32600, message: 'Missing Content-Length header' } });
+      frameBuffer = Buffer.alloc(0);
+      return;
+    }
+
+    const contentLength = Number(lengthMatch[1]);
+    const bodyEnd = bodyStart + contentLength;
+    if (frameBuffer.length < bodyEnd) return;
+
+    const body = frameBuffer.slice(bodyStart, bodyEnd).toString('utf8');
+    frameBuffer = frameBuffer.slice(bodyEnd);
+    void handleRequestLine(body);
+  }
+}
+
+process.stdin.on('data', chunk => {
+  if (outputMode === 'line') {
+    const preview = chunk.toString('ascii', 0, Math.min(chunk.length, 32));
+    if (preview.startsWith('Content-Length:')) {
+      outputMode = 'framed';
+    }
+  }
+
+  if (outputMode === 'framed') {
+    handleFramedChunk(chunk);
+    return;
+  }
+
+  handleLineChunk(chunk);
 });

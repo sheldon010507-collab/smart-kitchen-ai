@@ -11,6 +11,7 @@ import { TemplatePreviewModal } from './TemplatePreviewModal';
 import { ExcelPreview } from './ExcelPreview';
 
 export const Stage1Ingest: React.FC<Stage1IngestProps> = ({
+    businessId,
     userId,
     onNext,
     onCancel,
@@ -28,7 +29,7 @@ export const Stage1Ingest: React.FC<Stage1IngestProps> = ({
     useEffect(() => {
         const loadTemplates = async () => {
             setLoadingTemplates(true);
-            const result = await getAvailableTemplates(userId);
+            const result = await getAvailableTemplates(userId, businessId);
             if (result.data) {
                 setTemplates(result.data);
                 if (initialTemplateId) {
@@ -42,7 +43,7 @@ export const Stage1Ingest: React.FC<Stage1IngestProps> = ({
             setLoadingTemplates(false);
         };
         loadTemplates();
-    }, [userId, initialTemplateId]);
+    }, [userId, businessId, initialTemplateId]);
 
     const systemTemplates = templates.filter(t => t.isSystem);
     const userTemplates = templates.filter(t => !t.isSystem);

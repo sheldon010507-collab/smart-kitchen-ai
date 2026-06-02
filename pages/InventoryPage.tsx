@@ -74,6 +74,7 @@ export const InventoryPage = () => {
                 unit_cost: Number(item.unitCost || 0),
                 expiry_date: toISODate(item.expiryDate),
                 added_date: toISODate(item.addedDate) || new Date().toISOString().split('T')[0],
+                min_stock_level: item.minStockLevel ?? null,
             };
 
             if (editingItem) {

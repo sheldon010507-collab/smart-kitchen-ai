@@ -143,7 +143,7 @@ const EditItemModal: React.FC<Props> = ({ isOpen, onClose, onSave, item, categor
               name="name"
               value={formData.name}
               onChange={handleChange}
-              className="w-full px-4 py-2.5 rounded-lg border border-border focus:outline-none focus:border-accent text-sm"
+              className="w-full px-4 py-2.5 rounded-lg border border-border focus:outline-none focus:border-accent text-sm text-gray-900 bg-white"
               required
             />
           </div>
@@ -158,14 +158,14 @@ const EditItemModal: React.FC<Props> = ({ isOpen, onClose, onSave, item, categor
                   name="quantityValue"
                   value={formData.quantityValue}
                   onChange={handleNumericChange}
-                  className="w-2/3 px-3 py-2.5 rounded-lg border border-border focus:outline-none focus:border-accent text-sm"
+                  className="w-2/3 px-3 py-2.5 rounded-lg border border-border focus:outline-none focus:border-accent text-sm text-gray-900 bg-white"
                   required
                 />
                 <select
                   name="quantityUnit"
                   value={formData.quantityUnit}
                   onChange={handleChange}
-                  className="w-1/3 px-2 py-2.5 rounded-lg border border-border bg-white text-sm focus:outline-none focus:border-accent"
+                  className="w-1/3 px-2 py-2.5 rounded-lg border border-border bg-white text-gray-900 text-sm focus:outline-none focus:border-accent"
                 >
                   {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
                 </select>
@@ -178,7 +178,7 @@ const EditItemModal: React.FC<Props> = ({ isOpen, onClose, onSave, item, categor
                 step="0.01"
                 value={totalPrice}
                 onChange={handleTotalPriceChange}
-                className="w-full px-4 py-2.5 rounded-lg border border-border focus:outline-none focus:border-accent text-sm"
+                className="w-full px-4 py-2.5 rounded-lg border border-border focus:outline-none focus:border-accent text-sm text-gray-900 bg-white"
                 placeholder="0.00"
               />
             </div>
@@ -191,7 +191,7 @@ const EditItemModal: React.FC<Props> = ({ isOpen, onClose, onSave, item, categor
               name="expiryDate"
               value={formData.expiryDate}
               onChange={handleChange}
-              className="w-full px-4 py-2.5 rounded-lg border border-border focus:outline-none focus:border-accent text-sm"
+              className="w-full px-4 py-2.5 rounded-lg border border-border focus:outline-none focus:border-accent text-sm text-gray-900 bg-white"
               required
             />
           </div>
@@ -207,7 +207,7 @@ const EditItemModal: React.FC<Props> = ({ isOpen, onClose, onSave, item, categor
               name="minStockLevel"
               value={formData.minStockLevel ?? ''}
               onChange={handleNumericChange}
-              className="w-full px-4 py-2.5 rounded-lg border border-border focus:outline-none focus:border-accent text-sm"
+              className="w-full px-4 py-2.5 rounded-lg border border-border focus:outline-none focus:border-accent text-sm text-gray-900 bg-white"
               min="0"
               step="1"
               placeholder="0 = disabled"
@@ -236,7 +236,7 @@ const EditItemModal: React.FC<Props> = ({ isOpen, onClose, onSave, item, categor
                     quantityUnit: container ? container.capacityUnit.toLowerCase() : prev.quantityUnit,
                   }));
                 }}
-                className="w-full px-4 py-2.5 rounded-lg border border-border bg-white text-sm focus:outline-none focus:border-accent"
+                className="w-full px-4 py-2.5 rounded-lg border border-border bg-white text-gray-900 text-sm focus:outline-none focus:border-accent"
               >
                 <option value="">None (loose item)</option>
                 {containers.map(c => (
@@ -257,14 +257,14 @@ const EditItemModal: React.FC<Props> = ({ isOpen, onClose, onSave, item, categor
                   value={customCategory}
                   onChange={e => setCustomCategory(e.target.value)}
                   placeholder="New..."
-                  className="w-full px-4 py-2.5 rounded-lg border border-border focus:outline-none focus:border-accent text-sm"
+                  className="w-full px-4 py-2.5 rounded-lg border border-border focus:outline-none focus:border-accent text-sm text-gray-900 bg-white"
                 />
               ) : (
                 <select
                   name="category"
                   value={formData.category}
                   onChange={handleChange}
-                  className="w-full px-4 py-2.5 rounded-lg border border-border bg-white text-sm focus:outline-none focus:border-accent"
+                  className="w-full px-4 py-2.5 rounded-lg border border-border bg-white text-gray-900 text-sm focus:outline-none focus:border-accent"
                 >
                   {categories.map(c => <option key={c} value={c}>{c}</option>)}
                   <option value="add-new">+ New</option>
@@ -280,14 +280,14 @@ const EditItemModal: React.FC<Props> = ({ isOpen, onClose, onSave, item, categor
                   value={customLocation}
                   onChange={e => setCustomLocation(e.target.value)}
                   placeholder="New..."
-                  className="w-full px-4 py-2.5 rounded-lg border border-border focus:outline-none focus:border-accent text-sm"
+                  className="w-full px-4 py-2.5 rounded-lg border border-border focus:outline-none focus:border-accent text-sm text-gray-900 bg-white"
                 />
               ) : (
                 <select
                   name="location"
                   value={formData.location}
                   onChange={handleChange}
-                  className="w-full px-4 py-2.5 rounded-lg border border-border bg-white text-sm focus:outline-none focus:border-accent"
+                  className="w-full px-4 py-2.5 rounded-lg border border-border bg-white text-gray-900 text-sm focus:outline-none focus:border-accent"
                 >
                   {locations.map(l => <option key={l} value={l}>{l}</option>)}
                   <option value="add-new">+ New</option>

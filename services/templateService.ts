@@ -72,7 +72,8 @@ export interface ServiceResult<T> {
  * Get all available templates (system + user's own)
  */
 export const getAvailableTemplates = async (
-    userId: string
+    userId: string,
+    businessId?: string
 ): Promise<ServiceResult<InventoryTemplate[]>> => {
     try {
         const { data, error } = await supabase
@@ -84,12 +85,74 @@ export const getAvailableTemplates = async (
 
         if (error) throw error;
 
+        const templates = (data as InventoryTemplateRow[]).map(mapRowToTemplate);
+        if (businessId) {
+            const wikiTemplate = await getKitchenWikiTemplate(businessId);
+            if (wikiTemplate.data) templates.unshift(wikiTemplate.data);
+        }
+
         return {
-            data: (data as InventoryTemplateRow[]).map(mapRowToTemplate),
+            data: templates,
             error: null,
         };
     } catch (err) {
         console.error('getAvailableTemplates error:', err);
+        return { data: null, error: err as Error };
+    }
+};
+
+/**
+ * Build a virtual setup template from the store Kitchen Wiki.
+ */
+export const getKitchenWikiTemplate = async (
+    businessId: string
+): Promise<ServiceResult<InventoryTemplate | null>> => {
+    try {
+        const { data, error } = await supabase
+            .from('kitchen_knowledge_items')
+            .select('canonical_name, category, default_location, default_unit, par_level, updated_at')
+            .eq('business_id', businessId)
+            .order('canonical_name');
+
+        if (error) throw error;
+        if (!data || data.length === 0) {
+            return { data: null, error: null };
+        }
+
+        const categoryNames = Array.from(new Set(data.map(i => i.category).filter(Boolean)));
+        const locationNames = Array.from(new Set(data.map(i => i.default_location).filter(Boolean)));
+        const latestUpdatedAt = data
+            .map(i => i.updated_at)
+            .filter(Boolean)
+            .sort()
+            .at(-1) || new Date().toISOString();
+
+        return {
+            data: {
+                id: `wiki-${businessId}`,
+                businessId,
+                name: 'Kitchen Wiki Baseline',
+                nameZh: '厨房 Wiki 基准库',
+                description: 'Generated from Telegram Kitchen Wiki rules for this store.',
+                icon: 'KB',
+                industry: 'kitchen-wiki',
+                categories: categoryNames.map(name => ({ name })),
+                locations: locationNames.map(name => ({ name, type: 'Other' as const })),
+                items: data.map(item => ({
+                    name: item.canonical_name,
+                    category: item.category || 'Other',
+                    unit: item.default_unit || 'pcs',
+                    suggestedPar: Number(item.par_level || 0),
+                })),
+                isSystem: false,
+                usageCount: 0,
+                createdAt: latestUpdatedAt,
+                updatedAt: latestUpdatedAt,
+            },
+            error: null,
+        };
+    } catch (err) {
+        console.error('getKitchenWikiTemplate error:', err);
         return { data: null, error: err as Error };
     }
 };
@@ -189,7 +252,7 @@ export const createTemplateFromInventory = async (
         // 1. Fetch current inventory
         const { data: inventory, error: fetchError } = await supabase
             .from('inventory_items')
-            .select('name, category, location, quantity_unit, unit_cost')
+            .select('name, category, location, quantity_unit, unit_cost, min_stock_level')
             .eq('business_id', businessId);
 
         if (fetchError) throw fetchError;
@@ -212,6 +275,7 @@ export const createTemplateFromInventory = async (
             category: i.category || 'Other',
             unit: i.quantity_unit || 'pcs',
             cost: i.unit_cost ?? undefined,
+            suggestedPar: i.min_stock_level ?? undefined,
         }));
 
         // 4. Create template
@@ -300,6 +364,8 @@ export const deleteTemplate = async (
 export const incrementUsageCount = async (
     templateId: string
 ): Promise<void> => {
+    if (templateId.startsWith('wiki-')) return;
+
     try {
         await supabase.rpc('increment_template_usage', { template_id: templateId });
     } catch (err) {
