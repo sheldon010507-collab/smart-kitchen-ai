@@ -262,38 +262,37 @@ export function BusinessProvider({ children }: BusinessProviderProps) {
         userParam: AppUser
     ): Promise<{ success: boolean; businessId?: string; error?: string }> => {
         try {
-            const { data: business, error: findErr } = await supabase
-                .from('businesses')
-                .select('id, name, owner_id')
-                .eq('join_code', code.toUpperCase())
-                .single();
-
-            if (findErr || !business) {
-                return { success: false, error: 'Invalid or unauthorized store code.' };
+            const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+            if (sessionError || !sessionData.session?.access_token) {
+                return { success: false, error: 'Please sign in again.' };
             }
 
-            const { error: joinErr } = await supabase
-                .from('business_members')
-                .insert({
-                    business_id: business.id,
-                    user_id: userParam.id,
-                    role: 'staff',
-                    status: 'active'
-                });
+            const response = await fetch('/api/join-store', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${sessionData.session.access_token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ code }),
+            });
 
-            if (joinErr) {
-                if (joinErr.code === '23505') {
-                    return { success: false, error: 'You are already a member of this store.' };
-                }
-                return { success: false, error: joinErr.message };
+            const payload = await response.json().catch(() => null) as {
+                business?: { id: string; name: string; ownerId: string };
+                error?: string;
+            } | null;
+
+            if (!response.ok || !payload?.business) {
+                return { success: false, error: payload?.error || 'Could not join store.' };
             }
+
+            const business = payload.business;
 
             setBusinesses(prev => {
                 if (prev.some(b => b.id === business.id)) return prev;
                 return [...prev, {
                     id: business.id,
                     name: business.name,
-                    ownerId: business.owner_id,
+                    ownerId: business.ownerId,
                     joinCode: '',
                     customCategories: [],
                     customLocations: [],
@@ -313,7 +312,7 @@ export function BusinessProvider({ children }: BusinessProviderProps) {
 
             return { success: true, businessId: business.id };
         } catch (e: any) {
-            return { success: false, error: e.message };
+            return { success: false, error: e.message || 'Could not join store.' };
         }
     }, []);
 
