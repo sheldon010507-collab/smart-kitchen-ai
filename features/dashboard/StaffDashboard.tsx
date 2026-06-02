@@ -13,7 +13,7 @@ import StaffInventoryOverview from '../../components/StaffInventoryOverview';
 import { MenuManager } from '../menu';
 import PrepList from '../../components/PrepList';
 import { InventoryItem, MenuItem, PrepTask, User, Business } from '../../types';
-import { StaffBrainActivity } from '../brain';
+import { StaffBrainActivity, TelegramLinkManager } from '../brain';
 
 interface StaffDashboardProps {
     user: User;
@@ -67,6 +67,8 @@ export function StaffDashboard({
                         <StaffInventoryOverview inventory={inventory} />
 
                         <StaffBrainActivity businessId={activeBusiness.id} />
+
+                        <TelegramLinkManager />
 
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                             <div className="lg:col-span-2">
