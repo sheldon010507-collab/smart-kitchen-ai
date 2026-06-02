@@ -126,6 +126,11 @@ export function DesktopSidebar({
                                                 <span className="truncate text-[#37352f] dark:text-[#e9e9e7]">
                                                     {b.name}
                                                     {user.role === 'Staff' && isPending ? ' (Pending)' : ''}
+                                                    {b.accessRole && (
+                                                        <span className="ml-2 text-[10px] uppercase tracking-wider text-[#787774]">
+                                                            {b.accessRole}
+                                                        </span>
+                                                    )}
                                                 </span>
                                                 {b.id === currentBusinessId && <Check className="w-4 h-4 text-[#27ae60]" />}
                                             </button>

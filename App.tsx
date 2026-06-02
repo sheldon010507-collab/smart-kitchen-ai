@@ -134,15 +134,17 @@ export default function App() {
   // 🔄 Transform Supabase User to App User (types.ts User)
   const appUser = useMemo(() => {
     if (!user) return null;
+    const role = activeBusiness?.accessRole
+      || (accessibleBusinesses.some(business => business.accessRole === 'Manager') ? 'Manager' : 'Staff');
     return {
       id: user.id,
       name: user.user_metadata?.full_name || user.email || 'User',
       email: user.email || '',
-      role: (user.user_metadata?.role || 'Staff') as 'Manager' | 'Staff',
+      role,
       ownedBusinessIds: [],
       workingBusinessId: currentBusinessId || undefined,
     };
-  }, [user, currentBusinessId]);
+  }, [user, currentBusinessId, activeBusiness?.accessRole, accessibleBusinesses]);
 
   // ✅ 使用 Context 加載庫存
   const loadInventory = async (bizId: string) => {
@@ -244,7 +246,7 @@ export default function App() {
       </main>
 
       {/* Mobile Bottom Navigation */}
-      <MobileNav view={view} setView={setView} isManager={user.role === 'Manager'} />
+      <MobileNav view={view} setView={setView} isManager={appUser?.role === 'Manager'} />
 
       {/* EditItemModal migrated to InventoryPage */}
 

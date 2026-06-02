@@ -112,6 +112,7 @@ export function MobileHeader({
                                         <div className="flex-1 min-w-0">
                                             <div className={`font-medium truncate ${isActive ? 'text-[#37352f] dark:text-[#e9e9e7]' : ''}`}>{b.name}</div>
                                             {isPending && <div className="text-xs text-[#f2994a]">Pending approval</div>}
+                                            {b.accessRole && <div className="text-xs text-[#9b9a97]">{b.accessRole}</div>}
                                         </div>
                                         {isActive && <Check className="w-4 h-4 text-[#27ae60]" />}
                                     </button>

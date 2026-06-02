@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { supabase } from './supabase';
 import { Business, Staff, User as AppUser } from '../types';
-import { normMemberStatus } from '../utils/transforms';
 import { useAuthContext } from './AuthContext';
 
 // ============ Types ============
@@ -43,100 +42,96 @@ export function BusinessProvider({ children }: BusinessProviderProps) {
     // Derived state
     const activeBusiness = businesses.find(b => b.id === currentBusinessId);
 
-    const staffMemberships = user?.user_metadata?.role === 'Staff'
-        ? staff.filter(s => s.email === user.email && (s.status === 'Active' || s.status === 'Pending'))
-        : [];
+    const staffMemberships = staff.filter(s => s.email === user?.email && (s.status === 'Active' || s.status === 'Pending'));
 
-    const accessibleBusinesses = user?.user_metadata?.role === 'Manager'
-        ? businesses.filter(b => b.ownerId === user.id)
-        : businesses.filter(b => staffMemberships.some(m => m.businessId === b.id));
+    const accessibleBusinesses = businesses;
 
-    const isMasterView = user?.user_metadata?.role === 'Manager' && !currentBusinessId;
+    const hasManagerStore = businesses.some(b => b.accessRole === 'Manager' || b.ownerId === user?.id);
+    const isMasterView = hasManagerStore && !currentBusinessId;
+
+    const mapBusiness = useCallback((business: any, accessRole: 'Manager' | 'Staff'): Business => ({
+        id: business.id,
+        name: business.name,
+        ownerId: business.owner_id,
+        accessRole,
+        joinCode: business.join_code || '',
+        address: '',
+        hours: '',
+        customCategories: [],
+        customLocations: [],
+        pendingStaffIds: [],
+    }), []);
+
+    const loadBusinessesForUser = useCallback(async (userId: string, userEmail: string, userName: string) => {
+        setLoading(true);
+        try {
+            const [ownedResult, memberResult] = await Promise.all([
+                supabase
+                    .from('businesses')
+                    .select('id, name, owner_id, join_code')
+                    .eq('owner_id', userId),
+                supabase
+                    .from('business_members')
+                    .select('business_id, role, status, businesses(id, name, owner_id, join_code)')
+                    .eq('user_id', userId)
+                    .eq('status', 'active'),
+            ]);
+
+            if (ownedResult.error) throw ownedResult.error;
+            if (memberResult.error) throw memberResult.error;
+
+            const byId = new Map<string, Business>();
+
+            (ownedResult.data || []).forEach((business: any) => {
+                byId.set(business.id, mapBusiness(business, 'Manager'));
+            });
+
+            (memberResult.data || []).forEach((membership: any) => {
+                const business = Array.isArray(membership.businesses) ? membership.businesses[0] : membership.businesses;
+                if (!business?.id) return;
+
+                const accessRole = membership.role === 'owner' ? 'Manager' : 'Staff';
+                const existing = byId.get(business.id);
+                if (!existing || accessRole === 'Manager') {
+                    byId.set(business.id, mapBusiness(business, accessRole));
+                }
+            });
+
+            const mappedBusinesses = Array.from(byId.values());
+            setBusinesses(mappedBusinesses);
+
+            const selfRows: Staff[] = mappedBusinesses
+                .filter(business => business.accessRole === 'Staff')
+                .map(business => ({
+                    id: `${userId}_${business.id}`,
+                    businessId: business.id,
+                    name: userName,
+                    email: userEmail,
+                    role: 'Server',
+                    hourlyRate: 0,
+                    status: 'Active',
+                }));
+
+            setStaff(prev => {
+                const map = new Map(prev.map(x => [x.id, x]));
+                selfRows.forEach(r => map.set(r.id, r));
+                return Array.from(map.values());
+            });
+        } catch (e) {
+            console.error('Load businesses failed:', e);
+        } finally {
+            setLoading(false);
+        }
+    }, [mapBusiness]);
 
     // ============ Load Functions ============
     const loadBusinessesForManager = useCallback(async (userId: string) => {
-        setLoading(true);
-        try {
-            const { data: bizList, error } = await supabase
-                .from('businesses')
-                .select('id, name, owner_id, join_code')
-                .eq('owner_id', userId);
-
-            if (!error && bizList) {
-                const mapped: Business[] = bizList.map((b: any) => ({
-                    id: b.id,
-                    name: b.name,
-                    ownerId: b.owner_id,
-                    joinCode: b.join_code || '',
-                    address: '',
-                    hours: '',
-                    customCategories: [],
-                    customLocations: [],
-                    pendingStaffIds: [],
-                }));
-                setBusinesses(mapped);
-            }
-        } catch (e) {
-            console.error('Load businesses for manager failed:', e);
-        } finally {
-            setLoading(false);
-        }
-    }, []);
+        await loadBusinessesForUser(userId, user?.email || '', user?.user_metadata?.full_name || '');
+    }, [loadBusinessesForUser, user?.email, user?.user_metadata?.full_name]);
 
     const loadBusinessesForStaff = useCallback(async (userId: string, userEmail: string, userName: string) => {
-        setLoading(true);
-        try {
-            const { data: mems, error: memErr } = await supabase
-                .from('business_members')
-                .select('business_id, status')
-                .eq('user_id', userId);
-
-            if (!memErr && mems && mems.length > 0) {
-                const bizIds = mems.map(m => m.business_id);
-
-                const { data: bizRows, error: bizErr } = await supabase
-                    .from('businesses')
-                    .select('id, name, owner_id')
-                    .in('id', bizIds);
-
-                if (!bizErr && bizRows) {
-                    const mappedBiz: Business[] = bizRows.map((b: any) => ({
-                        id: b.id,
-                        name: b.name,
-                        ownerId: b.owner_id,
-                        joinCode: '',
-                        address: '',
-                        hours: '',
-                        customCategories: [],
-                        customLocations: [],
-                        pendingStaffIds: [],
-                    }));
-                    setBusinesses(mappedBiz);
-
-                    // Update staff memberships
-                    const selfRows: Staff[] = mems.map(m => ({
-                        id: `${userId}_${m.business_id}`,
-                        businessId: m.business_id,
-                        name: userName,
-                        email: userEmail,
-                        role: 'Server',
-                        hourlyRate: 0,
-                        status: normMemberStatus(m.status),
-                    }));
-
-                    setStaff(prev => {
-                        const map = new Map(prev.map(x => [x.id, x]));
-                        selfRows.forEach(r => map.set(r.id, r));
-                        return Array.from(map.values());
-                    });
-                }
-            }
-        } catch (e) {
-            console.error('Load businesses for staff failed:', e);
-        } finally {
-            setLoading(false);
-        }
-    }, []);
+        await loadBusinessesForUser(userId, userEmail, userName);
+    }, [loadBusinessesForUser]);
 
     // Effect: Load initial data when user changes
     useEffect(() => {
@@ -147,29 +142,18 @@ export function BusinessProvider({ children }: BusinessProviderProps) {
             return;
         }
 
-        const role = user.user_metadata?.role;
         const userId = user.id;
-
-        if (role === 'Manager') {
-            loadBusinessesForManager(userId);
-        } else if (role === 'Staff') {
-            const email = user.email || '';
-            const name = user.user_metadata?.full_name || '';
-            loadBusinessesForStaff(userId, email, name);
-        }
-    }, [user, loadBusinessesForManager, loadBusinessesForStaff]);
+        const email = user.email || '';
+        const name = user.user_metadata?.full_name || '';
+        loadBusinessesForUser(userId, email, name);
+    }, [user, loadBusinessesForUser]);
 
     const refreshBusinesses = useCallback(async () => {
         if (!user) return;
-        const role = user.user_metadata?.role;
-        if (role === 'Manager') {
-            await loadBusinessesForManager(user.id);
-        } else {
-            const email = user.email || '';
-            const name = user.user_metadata?.full_name || '';
-            await loadBusinessesForStaff(user.id, email, name);
-        }
-    }, [user, loadBusinessesForManager, loadBusinessesForStaff]);
+        const email = user.email || '';
+        const name = user.user_metadata?.full_name || '';
+        await loadBusinessesForUser(user.id, email, name);
+    }, [user, loadBusinessesForUser]);
 
     // ============ CRUD Operations ============
     const createBusiness = useCallback(async (name: string, userId: string): Promise<Business | null> => {
@@ -194,6 +178,7 @@ export function BusinessProvider({ children }: BusinessProviderProps) {
                 id: biz.id,
                 name: biz.name,
                 ownerId: biz.owner_id,
+                accessRole: 'Manager',
                 joinCode: 'PENDING',
                 customCategories: ['Produce', 'Dairy', 'Meat', 'Pantry'],
                 customLocations: ['Fridge', 'Freezer', 'Pantry'],
@@ -293,6 +278,7 @@ export function BusinessProvider({ children }: BusinessProviderProps) {
                     id: business.id,
                     name: business.name,
                     ownerId: business.ownerId,
+                    accessRole: 'Staff',
                     joinCode: '',
                     customCategories: [],
                     customLocations: [],

@@ -13,6 +13,7 @@ export interface Business {
   id: string;
   name: string;
   ownerId: string;
+  accessRole?: 'Manager' | 'Staff';
   joinCode: string;
   address?: string;
   hours?: string;

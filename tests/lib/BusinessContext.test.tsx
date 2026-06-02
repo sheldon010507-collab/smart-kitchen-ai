@@ -57,6 +57,14 @@ describe('BusinessContext', () => {
             if (table === 'businesses') {
                 return { select: () => ({ eq: () => Promise.resolve({ data: mockBusinesses, error: null }) }) };
             }
+            if (table === 'business_members') {
+                const builder: any = {
+                    select: () => builder,
+                    eq: () => builder,
+                    then: (resolve: any) => resolve({ data: [], error: null }),
+                };
+                return builder;
+            }
             return { select: () => ({ eq: () => Promise.resolve({ data: [], error: null }) }) };
         });
 
@@ -77,5 +85,6 @@ describe('BusinessContext', () => {
         });
 
         expect(result.current.businesses[0].name).toBe('Test Biz');
+        expect(result.current.businesses[0].accessRole).toBe('Manager');
     });
 });

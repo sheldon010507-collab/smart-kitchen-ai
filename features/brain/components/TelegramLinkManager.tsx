@@ -15,6 +15,10 @@ function formatTime(value: string) {
     return new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
+function formatBusinessRole(business: { name: string; accessRole?: 'Manager' | 'Staff' }) {
+    return `${business.name}${business.accessRole ? ` (${business.accessRole})` : ''}`;
+}
+
 export function TelegramLinkManager() {
     const { user } = useAuthContext();
     const { accessibleBusinesses, currentBusinessId } = useBusiness();
@@ -113,7 +117,7 @@ export function TelegramLinkManager() {
                         >
                             <option value="">Ask me each time</option>
                             {accessibleBusinesses.map(business => (
-                                <option key={business.id} value={business.id}>{business.name}</option>
+                                <option key={business.id} value={business.id}>{formatBusinessRole(business)}</option>
                             ))}
                         </select>
                     </label>
@@ -188,7 +192,7 @@ export function TelegramLinkManager() {
                                 >
                                     <option value="">Ask each time</option>
                                     {accessibleBusinesses.map(business => (
-                                        <option key={business.id} value={business.id}>{business.name}</option>
+                                        <option key={business.id} value={business.id}>{formatBusinessRole(business)}</option>
                                     ))}
                                 </select>
                                 <button

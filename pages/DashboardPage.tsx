@@ -38,7 +38,7 @@ export const DashboardPage = () => {
 
     // Shopping List Summary (For Master Dashboard)
     const { summaries: shoppingListSummaries, loading: shoppingListLoading } = useShoppingListSummary(
-        user?.role === 'Manager' && isMasterView ? user?.id : null
+        isMasterView ? user?.id : null
     );
 
     // Modal State
@@ -201,7 +201,7 @@ export const DashboardPage = () => {
         // --- CHEF VIEW (Routed) ---
         // Check path FIRST to allow Managers to see Chef View
         if (location.pathname.includes('/chef') || window.location.hash.includes('chef')) {
-            if (isMasterView && user.user_metadata?.role === 'Manager') {
+            if (isMasterView) {
                 return (
                     <div className="flex flex-col items-center justify-center h-96 animate-in fade-in duration-500">
                         <ChefHat className="w-16 h-16 text-border mb-6" />
@@ -220,11 +220,11 @@ export const DashboardPage = () => {
         }
 
         // --- MANAGER VIEW ---
-        if (user.user_metadata?.role === 'Manager') {
+        if (isMasterView || activeBusiness?.accessRole === 'Manager') {
             if (isMasterView) {
                 return (
                     <MasterDashboard
-                        businesses={businesses}
+                        businesses={businesses.filter(business => business.accessRole === 'Manager' || business.ownerId === user.id)}
                         inventory={inventory}
                         shoppingListSummaries={shoppingListSummaries}
                         shoppingListLoading={shoppingListLoading}
@@ -242,7 +242,7 @@ export const DashboardPage = () => {
         }
 
         // --- STAFF VIEW ---
-        if (user.user_metadata?.role === 'Staff') {
+        if (!currentBusinessId || activeBusiness?.accessRole === 'Staff') {
             return (
                 <StaffDashboard
                     user={user}
