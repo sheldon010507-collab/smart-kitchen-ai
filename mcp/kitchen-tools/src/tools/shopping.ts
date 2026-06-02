@@ -80,6 +80,31 @@ export async function createShoppingItem(input: BusinessSelectionInput & {
   if (!resolved.ok || !resolved.data) return resolved;
 
   try {
+    let duplicateQuery = supabase
+      .from('shopping_list')
+      .select('id, item_name, inventory_item_id, quantity_needed, unit, status, created_at')
+      .eq('business_id', resolved.data.business.business_id)
+      .eq('status', 'pending');
+
+    if (input.inventory_item_id) {
+      duplicateQuery = duplicateQuery.eq('inventory_item_id', input.inventory_item_id);
+    } else {
+      duplicateQuery = duplicateQuery.ilike('item_name', input.item_name.trim());
+    }
+
+    const { data: duplicateRows, error: duplicateError } = await duplicateQuery.limit(1);
+    if (duplicateError) throw new Error(duplicateError.message);
+    if (duplicateRows && duplicateRows.length > 0) {
+      return {
+        ok: true,
+        data: {
+          business: resolved.data.business,
+          shopping_item: duplicateRows[0],
+          already_pending: true,
+        },
+      };
+    }
+
     const { data, error } = await supabase.from('shopping_list').insert({
       business_id: resolved.data.business.business_id,
       inventory_item_id: input.inventory_item_id || null,
@@ -126,4 +151,25 @@ export async function createShoppingItem(input: BusinessSelectionInput & {
     });
     return { ok: false, error: error.message };
   }
+}
+
+export async function getShoppingList(input: BusinessSelectionInput & {
+  status?: 'pending' | 'purchased' | 'cancelled';
+  limit?: number;
+}): Promise<ToolResult> {
+  const resolved = await resolveBusiness(input);
+  if (!resolved.ok || !resolved.data) return resolved;
+
+  const status = input.status || 'pending';
+  const limit = Math.min(Math.max(Number(input.limit || 25), 1), 50);
+  const { data, error } = await supabase
+    .from('shopping_list')
+    .select('id, item_name, category, quantity_needed, unit, reason, priority, status, created_at')
+    .eq('business_id', resolved.data.business.business_id)
+    .eq('status', status)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, data: { business: resolved.data.business, status, items: data || [] } };
 }

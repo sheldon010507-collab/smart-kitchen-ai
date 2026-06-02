@@ -103,5 +103,7 @@ Home｜暂无补货项
 ```
 
 - Querying reorder suggestions is read-only. Do not create shopping list items unless the sender clearly says "加入采购单", "生成采购单", "确认补货", "add to shopping list", or equivalent.
+- For shopping-list questions, call `kitchen_get_shopping_list`. Do not say pending details are unavailable.
+- If `kitchen_create_shopping_item` returns `already_pending: true`, say only that the exact item is already on the pending list and include the item name/quantity. Do not invent possible causes or suggest unrelated supplier tools.
 - When a write succeeds, respond with a compact confirmation and the changed item/quantity only.
 - Ask one short clarification question only when required for safety or ambiguity.

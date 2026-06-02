@@ -1,7 +1,7 @@
 import { listAccessibleBusinesses, resolveActor, setDefaultBusiness } from './identity.js';
 import { getInventory, findInventoryItem, setStock, addStock, deductStock } from './tools/inventory.js';
 import { createPrepTasks, deletePrepTask, getPrepTasks } from './tools/prep.js';
-import { suggestReorder, createShoppingItem } from './tools/shopping.js';
+import { suggestReorder, createShoppingItem, getShoppingList } from './tools/shopping.js';
 import { recordWastage } from './tools/wastage.js';
 import { redeemTelegramLinkCode } from './linkCodes.js';
 import { supabase } from './supabase.js';
@@ -33,6 +33,7 @@ const tools = [
   { name: 'kitchen_delete_prep_task', description: 'Delete one completed or unwanted prep_task from an accessible store by task_id or exact task_text.', inputSchema: { type: 'object', properties: { ...actorFields, ...businessFields, task_id: { type: 'string' }, task_text: { type: 'string' }, task_date: { type: 'string' } }, required: ['telegram_user_id'] } },
   { name: 'kitchen_suggest_reorder', description: 'Suggest low-stock reorders using inventory_items.min_stock_level.', inputSchema: { type: 'object', properties: { ...actorFields, ...businessFields }, required: ['telegram_user_id'] } },
   { name: 'kitchen_create_shopping_item', description: 'Create a pending shopping_list item for an accessible store.', inputSchema: { type: 'object', properties: { ...actorFields, ...businessFields, item_name: { type: 'string' }, quantity_needed: { type: 'number' }, unit: { type: 'string' }, reason: { type: 'string', enum: ['low_stock', 'expiring', 'prep_required', 'manual'] }, priority: { type: 'string', enum: ['urgent', 'normal', 'low'] }, inventory_item_id: { type: 'string' }, category: { type: 'string' }, notes: { type: 'string' } }, required: ['telegram_user_id', 'item_name', 'quantity_needed'] } },
+  { name: 'kitchen_get_shopping_list', description: 'Read pending, purchased, or cancelled shopping_list items for an accessible store.', inputSchema: { type: 'object', properties: { ...actorFields, ...businessFields, status: { type: 'string', enum: ['pending', 'purchased', 'cancelled'] }, limit: { type: 'number' } }, required: ['telegram_user_id'] } },
   { name: 'kitchen_record_wastage', description: 'Record wastage_records entry and deduct matching inventory stock.', inputSchema: { type: 'object', properties: { ...actorFields, ...businessFields, item_name: { type: 'string' }, quantity: { type: 'number' }, unit: { type: 'string' }, reason: { type: 'string', enum: ['expired', 'damaged', 'spoiled', 'preparation', 'other'] }, notes: { type: 'string' } }, required: ['telegram_user_id', 'item_name', 'quantity', 'reason'] } },
   { name: 'kitchen_import_receipt_items', description: 'Apply parsed Telegram receipt/invoice lines to inventory_items and record a receipt import log.', inputSchema: { type: 'object', properties: { ...actorFields, ...businessFields, supplier: { type: 'string' }, receipt_date: { type: 'string' }, raw_text: { type: 'string' }, items: { type: 'array', items: { type: 'object', properties: { item_name: { type: 'string' }, quantity: { type: 'number' }, unit: { type: 'string' }, total_price: { type: 'number' }, category: { type: 'string' }, expiry_date: { type: 'string' } }, required: ['item_name', 'quantity'] } } }, required: ['telegram_user_id', 'items'] } },
   { name: 'kitchen_upsert_knowledge_item', description: 'Create or update a Kitchen Wiki item, aliases, default unit/location, par level, and shelf-life rules.', inputSchema: { type: 'object', properties: { ...actorFields, ...businessFields, canonical_name: { type: 'string' }, aliases: { type: 'array', items: { type: 'string' } }, category: { type: 'string' }, default_location: { type: 'string' }, default_unit: { type: 'string' }, par_level: { type: 'number' }, shelf_life_days: { type: 'number' }, notes: { type: 'string' } }, required: ['telegram_user_id', 'canonical_name'] } },
@@ -55,6 +56,7 @@ async function callTool(name: string, args: any) {
     case 'kitchen_delete_prep_task': return deletePrepTask(args);
     case 'kitchen_suggest_reorder': return suggestReorder(args);
     case 'kitchen_create_shopping_item': return createShoppingItem(args);
+    case 'kitchen_get_shopping_list': return getShoppingList(args);
     case 'kitchen_record_wastage': return recordWastage(args);
     case 'kitchen_import_receipt_items': return importTelegramReceiptItems(args);
     case 'kitchen_upsert_knowledge_item': return upsertTelegramKnowledgeItem(args);
