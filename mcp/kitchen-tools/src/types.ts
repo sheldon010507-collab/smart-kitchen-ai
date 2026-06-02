@@ -14,6 +14,7 @@ export interface ResolvedActor {
   telegram_user_id: string;
   telegram_username?: string;
   supabase_user_id?: string;
+  /** Overall convenience label only; store permissions are evaluated per business. */
   role?: 'Manager' | 'Staff';
   default_business_id?: string | null;
   accessible_businesses: AccessibleBusiness[];

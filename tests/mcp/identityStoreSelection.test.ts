@@ -36,7 +36,8 @@ vi.mock('../../mcp/kitchen-tools/src/supabase', () => {
     eq: vi.fn(() => membersBuilder),
     then: (resolve: any) => resolve({
       data: [
-        { business_id: 'biz-3', businesses: { id: 'biz-3', name: 'Bakery Kiosk' } },
+        { business_id: 'biz-3', role: 'staff', businesses: { id: 'biz-3', name: 'Bakery Kiosk' } },
+        { business_id: 'biz-4', role: 'owner', businesses: { id: 'biz-4', name: 'Pop Up' } },
       ],
       error: null,
     }),
@@ -80,9 +81,22 @@ describe('Telegram multi-store identity selection', () => {
           { business_id: 'biz-1', name: 'Cloud Cafe', access_role: 'owner', is_default: true },
           { business_id: 'biz-2', name: 'Market Bar', access_role: 'owner', is_default: false },
           { business_id: 'biz-3', name: 'Bakery Kiosk', access_role: 'staff', is_default: false },
+          { business_id: 'biz-4', name: 'Pop Up', access_role: 'owner', is_default: false },
         ],
       },
     });
+  });
+
+  it('treats business_members.owner as manager access for that store only', async () => {
+    const { resolveActor } = await import('../../mcp/kitchen-tools/src/identity');
+
+    const actor = await resolveActor({ telegram_user_id: '123456' });
+
+    expect(actor.linked).toBe(true);
+    expect(actor.accessible_businesses).toEqual(expect.arrayContaining([
+      { business_id: 'biz-3', name: 'Bakery Kiosk', access_role: 'staff' },
+      { business_id: 'biz-4', name: 'Pop Up', access_role: 'owner' },
+    ]));
   });
 
   it('sets the Telegram default store by store name after access is verified', async () => {

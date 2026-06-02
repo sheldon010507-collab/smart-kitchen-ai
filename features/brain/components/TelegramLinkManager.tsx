@@ -26,7 +26,6 @@ export function TelegramLinkManager() {
     const [copied, setCopied] = useState(false);
     const [updatingLinkId, setUpdatingLinkId] = useState<string | null>(null);
 
-    const role = user?.user_metadata?.role === 'Manager' ? 'manager' : 'staff';
     const command = linkCode ? `/link ${linkCode.code}` : '';
     const storeCount = accessibleBusinesses.length;
 
@@ -81,7 +80,7 @@ export function TelegramLinkManager() {
                     <div>
                         <h3 className="font-bold text-gray-900 dark:text-white">Telegram Access</h3>
                         <p className="text-xs text-gray-500 dark:text-gray-400">
-                            One bot uses your SmartKitchen {role} permissions across every store you can access
+                            One bot links to this SmartKitchen user; each store keeps its own role
                         </p>
                     </div>
                 </div>
@@ -159,7 +158,7 @@ export function TelegramLinkManager() {
 
             <div className="px-5 py-3 bg-gray-50 dark:bg-gray-900/40 border-b border-gray-100 dark:border-gray-700 flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
                 <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-300" />
-                Telegram commands use the linked SmartKitchen user, so staff and managers keep their normal store permissions.
+                Telegram uses your linked SmartKitchen user. Manager/staff permission is checked per store, not per Telegram account.
             </div>
 
             {links.length === 0 ? (

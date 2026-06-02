@@ -48,7 +48,7 @@ export async function resolveActor(input: TelegramActorInput): Promise<ResolvedA
 
   const { data: memberBusinesses, error: memberError } = await supabase
     .from('business_members')
-    .select('business_id, businesses(id, name)')
+    .select('business_id, role, businesses(id, name)')
     .eq('user_id', userId)
     .eq('status', 'active');
 
@@ -64,8 +64,12 @@ export async function resolveActor(input: TelegramActorInput): Promise<ResolvedA
 
   for (const membership of memberBusinesses || []) {
     const business = Array.isArray(membership.businesses) ? membership.businesses[0] : membership.businesses;
-    if (business?.id && !byId.has(business.id)) {
-      byId.set(business.id, { business_id: business.id, name: business.name, access_role: 'staff' });
+    if (!business?.id) continue;
+
+    const accessRole = membership.role === 'owner' ? 'owner' : 'staff';
+    const existing = byId.get(business.id);
+    if (!existing || accessRole === 'owner') {
+      byId.set(business.id, { business_id: business.id, name: business.name, access_role: accessRole });
     }
   }
 
