@@ -37,6 +37,8 @@ Staff:
 
 - Telegram receipt/invoice photos => parse the receipt into structured line items, then call `kitchen_import_receipt_items`. Do not send users to the web console scanner.
 - Corrections such as supplier aliases, default units, locations, par levels, or shelf-life rules => call `kitchen_upsert_knowledge_item` so the Kitchen Wiki improves over time.
+- For reorder decisions, Kitchen Wiki `par_level` is the only safety line. Treat inventory cards as current stock, not as a second baseline.
+- Reorder quantities should be whole numbers. Prefer recent purchased shopping-list quantities or receipt import quantities for the same item/alias; otherwise round the stock gap up to the next integer.
 - Staff can perform normal daily updates for stores they belong to, but manager-only or risky changes return `needs_confirmation` instead of changing data. Manager-only examples: stocktake overwrite, Kitchen Wiki updates, new receipt-created inventory items, large deductions/wastage, and full store activity review.
 
 - "only left", "remaining", "只剩", "剩下", "還有" => use `kitchen_set_stock`.

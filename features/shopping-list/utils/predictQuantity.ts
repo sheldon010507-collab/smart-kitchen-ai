@@ -51,13 +51,7 @@ const PERISHABLE_CATEGORIES = [
  * 四捨五入到合理數值
  */
 function roundToNiceNumber(quantity: number, unit: string): number {
-    if (unit === 'kg' || unit === 'L' || unit === 'lb') {
-        return Math.ceil(quantity * 2) / 2;  // 0.5 為單位
-    }
-    if (unit === 'g' || unit === 'ml') {
-        return Math.ceil(quantity / 50) * 50;  // 50 為單位
-    }
-    return Math.ceil(quantity);  // 向上取整
+    return Math.ceil(quantity);
 }
 
 /**

@@ -39,6 +39,10 @@ function getStockPriority(currentQty: number): ShoppingListPriority {
     return currentQty === 0 ? 'urgent' : 'normal';
 }
 
+function normalizeName(value: string | null | undefined): string {
+    return String(value || '').trim().toLowerCase();
+}
+
 /**
  * Generate shopping list items from inventory analysis
  * 
@@ -124,24 +128,40 @@ export async function generateShoppingList(
             }
         }
 
-        // 2. Check low stock items using min_stock_level
+        // 2. Check low stock items using Kitchen Wiki par_level
         if (options.includeLowStock) {
-            // Query items where quantity is below min_stock_level
-            const { data: lowStockItems, error: stockError } = await supabase
+            const { data: inventoryItems, error: stockError } = await supabase
                 .from('inventory_items')
-                .select('id, name, category, quantity_value, quantity_unit, min_stock_level, supplier')
+                .select('id, name, category, quantity_value, quantity_unit, supplier')
+                .eq('business_id', businessId);
+
+            const { data: wikiItems, error: wikiError } = await supabase
+                .from('kitchen_knowledge_items')
+                .select('canonical_name, category, default_unit, par_level, kitchen_knowledge_aliases(alias)')
                 .eq('business_id', businessId)
-                .gt('min_stock_level', 0);  // Only items with min_stock_level set
+                .gt('par_level', 0);
 
             if (stockError) {
                 errors.push(`Low stock check failed: ${stockError.message}`);
-            } else if (lowStockItems) {
+            } else if (wikiError) {
+                errors.push(`Kitchen Wiki check failed: ${wikiError.message}`);
+            } else if (inventoryItems) {
                 // Import prediction utilities
                 const { predictReorderQuantity, calculateReorderQuantity } = await import('./predictQuantity');
+                const wikiByName = new Map<string, any>();
+                for (const wikiItem of wikiItems || []) {
+                    wikiByName.set(normalizeName(wikiItem.canonical_name), wikiItem);
+                    for (const aliasRow of wikiItem.kitchen_knowledge_aliases || []) {
+                        wikiByName.set(normalizeName(aliasRow.alias), wikiItem);
+                    }
+                }
 
-                for (const item of lowStockItems) {
-                    // Skip if quantity is above min_stock_level
-                    if ((item.quantity_value || 0) >= (item.min_stock_level || 0)) {
+                for (const item of inventoryItems) {
+                    const wikiItem = wikiByName.get(normalizeName(item.name));
+                    const parLevel = Number(wikiItem?.par_level || 0);
+
+                    // Skip if quantity is above Kitchen Wiki par level
+                    if (parLevel <= 0 || (item.quantity_value || 0) >= parLevel) {
                         continue;
                     }
 
@@ -156,7 +176,7 @@ export async function generateShoppingList(
                     }
 
                     const unit = item.quantity_unit || 'pcs';
-                    const category = item.category || null;
+                    const category = item.category || wikiItem?.category || null;
 
                     // Use historical prediction (passes unit and category for optimization)
                     const predictedQty = await predictReorderQuantity(
@@ -167,7 +187,7 @@ export async function generateShoppingList(
                     const restockQty = calculateReorderQuantity(
                         predictedQty,
                         item.quantity_value || 0,
-                        item.min_stock_level || 0,
+                        parLevel,
                         unit,
                         category
                     );

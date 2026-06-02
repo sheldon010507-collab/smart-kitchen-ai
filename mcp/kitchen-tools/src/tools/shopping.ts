@@ -8,6 +8,69 @@ function normalizeName(value: string | null | undefined) {
   return String(value || '').trim().toLowerCase();
 }
 
+function roundOrderQuantity(value: number): number {
+  return Math.max(1, Math.ceil(Number(value) || 0));
+}
+
+function readAppliedQuantity(row: any): number {
+  const previous = Number(row?.previous_quantity ?? 0);
+  const next = Number(row?.new_quantity ?? 0);
+  const direct = Number(row?.quantity ?? 0);
+  const diff = next - previous;
+  if (Number.isFinite(diff) && diff > 0) return diff;
+  if (Number.isFinite(direct) && direct > 0) return direct;
+  return 0;
+}
+
+async function getRecentOrderQuantity(businessId: string, names: string[]): Promise<number | null> {
+  const normalizedNames = new Set(names.map(normalizeName).filter(Boolean));
+  if (normalizedNames.size === 0) return null;
+
+  const ninetyDaysAgo = new Date();
+  ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+
+  const { data: shoppingHistory } = await supabase
+    .from('shopping_list')
+    .select('item_name, quantity_needed, purchased_at, created_at')
+    .eq('business_id', businessId)
+    .eq('status', 'purchased')
+    .gte('purchased_at', ninetyDaysAgo.toISOString())
+    .order('purchased_at', { ascending: false })
+    .limit(100);
+
+  const shoppingMatch = (shoppingHistory || []).find(row => normalizedNames.has(normalizeName(row.item_name)));
+  const shoppingQuantity = Number(shoppingMatch?.quantity_needed ?? 0);
+  if (shoppingQuantity > 0) return roundOrderQuantity(shoppingQuantity);
+
+  const { data: receiptHistory } = await supabase
+    .from('receipt_import_logs')
+    .select('applied_items, parsed_items, created_at')
+    .eq('business_id', businessId)
+    .eq('status', 'applied')
+    .gte('created_at', ninetyDaysAgo.toISOString())
+    .order('created_at', { ascending: false })
+    .limit(50);
+
+  for (const log of receiptHistory || []) {
+    const appliedItems = Array.isArray(log.applied_items) ? log.applied_items : [];
+    for (const row of appliedItems) {
+      const rowNames = [row?.item_name, row?.receipt_name].map(normalizeName);
+      if (!rowNames.some(name => normalizedNames.has(name))) continue;
+      const quantity = readAppliedQuantity(row);
+      if (quantity > 0) return roundOrderQuantity(quantity);
+    }
+
+    const parsedItems = Array.isArray(log.parsed_items) ? log.parsed_items : [];
+    for (const row of parsedItems) {
+      if (!normalizedNames.has(normalizeName(row?.item_name))) continue;
+      const quantity = Number(row?.quantity ?? 0);
+      if (quantity > 0) return roundOrderQuantity(quantity);
+    }
+  }
+
+  return null;
+}
+
 export async function suggestReorder(input: BusinessSelectionInput): Promise<ToolResult> {
   const resolved = await resolveBusiness(input);
   if (!resolved.ok || !resolved.data) return resolved;
@@ -15,7 +78,7 @@ export async function suggestReorder(input: BusinessSelectionInput): Promise<Too
   const businessId = resolved.data.business.business_id;
   const { data, error } = await supabase
     .from('inventory_items')
-    .select('id, name, category, quantity_value, quantity_unit, min_stock_level, supplier')
+    .select('id, name, category, quantity_value, quantity_unit, supplier')
     .eq('business_id', businessId);
 
   if (error) return { ok: false, error: error.message };
@@ -40,22 +103,23 @@ export async function suggestReorder(input: BusinessSelectionInput): Promise<Too
   const suggestions = (data || [])
     .map(item => {
       const wikiItem = wikiByName.get(normalizeName(item.name));
-      const inventoryMin = Number(item.min_stock_level || 0);
-      const wikiMin = Number(wikiItem?.par_level || 0);
-      const minStockLevel = inventoryMin > 0 ? inventoryMin : wikiMin;
+      const minStockLevel = Number(wikiItem?.par_level || 0);
 
       return { item, wikiItem, minStockLevel };
     })
     .filter(({ item, minStockLevel }) => minStockLevel > 0 && Number(item.quantity_value || 0) < minStockLevel)
-    .map(item => {
+    .map(async item => {
       const currentQuantity = Number(item.item.quantity_value || 0);
+      const aliases = (item.wikiItem?.kitchen_knowledge_aliases || []).map((row: any) => row.alias);
+      const historyQuantity = await getRecentOrderQuantity(businessId, [item.item.name, item.wikiItem?.canonical_name, ...aliases]);
+      const stockGap = Math.max(0, item.minStockLevel - currentQuantity);
       const suggestion: any = {
         inventory_item_id: item.item.id,
         item_name: item.item.name,
         category: item.item.category || item.wikiItem?.category,
         current_quantity: currentQuantity,
-        min_stock_level: item.minStockLevel,
-        quantity_needed: Math.max(0, item.minStockLevel - currentQuantity),
+        par_level: item.minStockLevel,
+        quantity_needed: historyQuantity || roundOrderQuantity(stockGap),
         unit: item.item.quantity_unit || item.wikiItem?.default_unit || 'pcs',
         priority: currentQuantity === 0 ? 'urgent' : 'normal',
       };
@@ -63,7 +127,7 @@ export async function suggestReorder(input: BusinessSelectionInput): Promise<Too
       return suggestion;
     });
 
-  return { ok: true, data: { business: resolved.data.business, suggestions } };
+  return { ok: true, data: { business: resolved.data.business, suggestions: await Promise.all(suggestions) } };
 }
 
 export async function createShoppingItem(input: BusinessSelectionInput & {
