@@ -76,7 +76,7 @@ export async function suggestReorder(input: BusinessSelectionInput): Promise<Too
   if (!resolved.ok || !resolved.data) return resolved;
 
   const businessId = resolved.data.business.business_id;
-  const { data, error } = await supabase
+  const { data: inventory, error } = await supabase
     .from('inventory_items')
     .select('id, name, category, quantity_value, quantity_unit, supplier')
     .eq('business_id', businessId);
@@ -91,39 +91,51 @@ export async function suggestReorder(input: BusinessSelectionInput): Promise<Too
 
   if (knowledgeError) return { ok: false, error: knowledgeError.message };
 
-  const wikiByName = new Map<string, any>();
-  for (const item of knowledge || []) {
-    wikiByName.set(normalizeName(item.canonical_name), item);
-    for (const aliasRow of item.kitchen_knowledge_aliases || []) {
-      wikiByName.set(normalizeName(aliasRow.alias), item);
+  const inventoryByName = new Map<string, any>();
+  for (const item of inventory || []) {
+    inventoryByName.set(normalizeName(item.name), item);
+  }
+
+  function findInventoryForWiki(wikiItem: any) {
+    const names = [
+      wikiItem.canonical_name,
+      ...(wikiItem.kitchen_knowledge_aliases || []).map((row: any) => row.alias),
+    ];
+    for (const name of names) {
+      const match = inventoryByName.get(normalizeName(name));
+      if (match) return match;
     }
+    return null;
   }
 
   const showSensitive = canSeeSensitiveFields(resolved.data);
-  const suggestions = (data || [])
-    .map(item => {
-      const wikiItem = wikiByName.get(normalizeName(item.name));
-      const minStockLevel = Number(wikiItem?.par_level || 0);
-
-      return { item, wikiItem, minStockLevel };
-    })
-    .filter(({ item, minStockLevel }) => minStockLevel > 0 && Number(item.quantity_value || 0) < minStockLevel)
+  const suggestions = (knowledge || [])
+    .map(wikiItem => ({
+      wikiItem,
+      inventoryItem: findInventoryForWiki(wikiItem),
+      minStockLevel: Number(wikiItem?.par_level || 0),
+    }))
+    .filter(({ inventoryItem, minStockLevel }) => minStockLevel > 0 && Number(inventoryItem?.quantity_value || 0) < minStockLevel)
     .map(async item => {
-      const currentQuantity = Number(item.item.quantity_value || 0);
+      const currentQuantity = Number(item.inventoryItem?.quantity_value || 0);
       const aliases = (item.wikiItem?.kitchen_knowledge_aliases || []).map((row: any) => row.alias);
-      const historyQuantity = await getRecentOrderQuantity(businessId, [item.item.name, item.wikiItem?.canonical_name, ...aliases]);
+      const historyQuantity = await getRecentOrderQuantity(businessId, [
+        item.wikiItem.canonical_name,
+        item.inventoryItem?.name,
+        ...aliases,
+      ]);
       const stockGap = Math.max(0, item.minStockLevel - currentQuantity);
       const suggestion: any = {
-        inventory_item_id: item.item.id,
-        item_name: item.item.name,
-        category: item.item.category || item.wikiItem?.category,
+        inventory_item_id: item.inventoryItem?.id || null,
+        item_name: item.inventoryItem?.name || item.wikiItem.canonical_name,
+        category: item.inventoryItem?.category || item.wikiItem?.category,
         current_quantity: currentQuantity,
         par_level: item.minStockLevel,
         quantity_needed: historyQuantity || roundOrderQuantity(stockGap),
-        unit: item.item.quantity_unit || item.wikiItem?.default_unit || 'pcs',
+        unit: item.inventoryItem?.quantity_unit || item.wikiItem?.default_unit || 'pcs',
         priority: currentQuantity === 0 ? 'urgent' : 'normal',
       };
-      if (showSensitive) suggestion.supplier = item.item.supplier;
+      if (showSensitive && item.inventoryItem?.supplier) suggestion.supplier = item.inventoryItem.supplier;
       return suggestion;
     });
 

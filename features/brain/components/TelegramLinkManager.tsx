@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Building2, CheckCircle2, Clipboard, KeyRound, Link2, RefreshCw, ShieldCheck } from 'lucide-react';
+import { CheckCircle2, Clipboard, KeyRound, Link2, RefreshCw } from 'lucide-react';
 import { useAuthContext } from '../../../lib/AuthContext';
 import { useBusiness } from '../../../lib/BusinessContext';
 import { useTelegramUserLinks } from '../hooks/useTelegramUserLinks';
@@ -31,7 +31,7 @@ export function TelegramLinkManager() {
     const [updatingLinkId, setUpdatingLinkId] = useState<string | null>(null);
 
     const command = linkCode ? `/link ${linkCode.code}` : '';
-    const storeCount = accessibleBusinesses.length;
+    const linkedCount = links.filter(link => link.isActive).length;
 
     useEffect(() => {
         if (!defaultBusinessId && (currentBusinessId || accessibleBusinesses[0]?.id)) {
@@ -76,110 +76,89 @@ export function TelegramLinkManager() {
 
     return (
         <section className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-700">
-                <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-lg bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center">
+            <div className="flex flex-col lg:flex-row lg:items-center gap-3 px-4 py-3">
+                <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-lg bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0">
                         <Link2 className="w-4 h-4 text-blue-600 dark:text-blue-300" />
                     </div>
-                    <div>
-                        <h3 className="font-bold text-gray-900 dark:text-white">Telegram Access</h3>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                            One bot links to this SmartKitchen user; each store keeps its own role
+                    <div className="min-w-0">
+                        <h3 className="font-bold text-gray-900 dark:text-white">Telegram</h3>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                            {loading ? 'Checking link...' : linkedCount > 0 ? `${linkedCount} account${linkedCount === 1 ? '' : 's'} linked` : 'Not linked'}
                         </p>
                     </div>
                 </div>
-                <button
-                    onClick={refresh}
-                    className="p-2 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 dark:hover:bg-gray-700"
-                    title="Refresh Telegram links"
-                >
-                    <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                </button>
-            </div>
 
-            <div className="p-5 border-b border-gray-100 dark:border-gray-700 space-y-4">
-                <div className="flex items-start gap-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 p-3">
-                    <Building2 className="w-4 h-4 mt-0.5 text-gray-700 dark:text-gray-200" />
-                    <div className="text-xs text-gray-600 dark:text-gray-300 leading-5">
-                        <span className="font-semibold text-gray-900 dark:text-white">One Telegram bot, {storeCount || 0} store{storeCount === 1 ? '' : 's'}.</span>
-                        {' '}Use <code className="font-semibold">/store</code> in Telegram to list stores, <code className="font-semibold">/store Cloud cafe</code> to switch the default, or start a message with a store name for a one-off command.
-                    </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3">
-                    <label className="block">
-                        <span className="block text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">
-                            Default store for Telegram commands
-                        </span>
-                        <select
-                            value={defaultBusinessId}
-                            onChange={e => setDefaultBusinessId(e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-sm text-gray-900 dark:text-white"
-                        >
-                            <option value="">Ask me each time</option>
-                            {accessibleBusinesses.map(business => (
-                                <option key={business.id} value={business.id}>{formatBusinessRole(business)}</option>
-                            ))}
-                        </select>
-                    </label>
+                <div className="flex-1 grid grid-cols-1 sm:grid-cols-[minmax(180px,1fr)_auto_auto] gap-2 lg:ml-4">
+                    <select
+                        value={defaultBusinessId}
+                        onChange={e => setDefaultBusinessId(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-sm text-gray-900 dark:text-white"
+                        title="Default store for Telegram commands"
+                    >
+                        <option value="">Ask each time</option>
+                        {accessibleBusinesses.map(business => (
+                            <option key={business.id} value={business.id}>{formatBusinessRole(business)}</option>
+                        ))}
+                    </select>
                     <button
                         onClick={handleGenerate}
                         disabled={generating || !user}
-                        className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-gray-900 text-white text-sm font-semibold disabled:opacity-50 self-end min-h-[40px]"
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-gray-900 text-white text-sm font-semibold disabled:opacity-50 min-h-[40px]"
                     >
                         <KeyRound className="w-4 h-4" />
                         {generating ? 'Generating' : 'Generate Link Code'}
                     </button>
+                    <button
+                        onClick={refresh}
+                        className="inline-flex items-center justify-center px-3 py-2 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 dark:hover:bg-gray-700"
+                        title="Refresh Telegram links"
+                    >
+                        <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                    </button>
                 </div>
+            </div>
 
-                {linkCode && (
-                    <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 p-4">
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                            <div>
-                                <p className="text-xs font-semibold uppercase tracking-wider text-blue-700 dark:text-blue-300">
-                                    Send this in Telegram before {formatTime(linkCode.expiresAt)}
-                                </p>
-                                <code className="block mt-2 text-lg font-bold text-gray-900 dark:text-white break-all">
-                                    {command}
-                                </code>
+            {(linkCode || generateError || error) && (
+                <div className="px-4 pb-4">
+                    {linkCode && (
+                        <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 p-3">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                <div>
+                                    <p className="text-xs font-semibold uppercase tracking-wider text-blue-700 dark:text-blue-300">
+                                        Send before {formatTime(linkCode.expiresAt)}
+                                    </p>
+                                    <code className="block mt-1 text-base font-bold text-gray-900 dark:text-white break-all">
+                                        {command}
+                                    </code>
+                                </div>
+                                <button
+                                    onClick={handleCopy}
+                                    className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-white dark:bg-gray-900 border border-blue-200 dark:border-blue-700 text-sm font-semibold text-blue-700 dark:text-blue-300"
+                                >
+                                    {copied ? <CheckCircle2 className="w-4 h-4" /> : <Clipboard className="w-4 h-4" />}
+                                    {copied ? 'Copied' : 'Copy'}
+                                </button>
                             </div>
-                            <button
-                                onClick={handleCopy}
-                                className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-white dark:bg-gray-900 border border-blue-200 dark:border-blue-700 text-sm font-semibold text-blue-700 dark:text-blue-300"
-                            >
-                                {copied ? <CheckCircle2 className="w-4 h-4" /> : <Clipboard className="w-4 h-4" />}
-                                {copied ? 'Copied' : 'Copy'}
-                            </button>
                         </div>
-                    </div>
-                )}
+                    )}
 
-                {(generateError || error) && (
-                    <div className="text-sm text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
-                        {generateError || error}
-                    </div>
-                )}
-            </div>
-
-            <div className="px-5 py-3 bg-gray-50 dark:bg-gray-900/40 border-b border-gray-100 dark:border-gray-700 flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
-                <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-300" />
-                Telegram uses your linked SmartKitchen user. Manager/staff permission is checked per store, not per Telegram account.
-            </div>
-
-            {links.length === 0 ? (
-                <div className="p-8 text-center text-sm text-gray-500 dark:text-gray-400">
-                    {loading ? 'Loading Telegram links...' : 'No Telegram accounts linked yet.'}
+                    {(generateError || error) && (
+                        <div className="mt-3 text-sm text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+                            {generateError || error}
+                        </div>
+                    )}
                 </div>
-            ) : (
-                <div className="divide-y divide-gray-100 dark:divide-gray-700">
+            )}
+
+            {links.length > 0 && (
+                <div className="border-t border-gray-100 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-700">
                     {links.map(link => (
-                        <div key={link.id} className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                        <div key={link.id} className="px-4 py-3 flex flex-col md:flex-row md:items-center justify-between gap-3">
                             <div className="min-w-0">
                                 <div className="font-semibold text-sm text-gray-900 dark:text-white">
                                     {link.telegramUsername ? `@${link.telegramUsername}` : 'Telegram user'}
                                     <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">{shortId(link.telegramUserId)}</span>
-                                </div>
-                                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                    SmartKitchen user: {shortId(link.supabaseUserId)}
                                 </div>
                             </div>
                             <div className="flex flex-col sm:flex-row sm:items-center gap-2">

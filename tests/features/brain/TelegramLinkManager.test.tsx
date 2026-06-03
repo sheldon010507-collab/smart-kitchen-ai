@@ -61,7 +61,8 @@ describe('TelegramLinkManager', () => {
 
         expect(createTelegramLinkCode).toHaveBeenCalledWith({ defaultBusinessId: 'biz-1' });
         expect(screen.queryByPlaceholderText(/telegram user id/i)).not.toBeInTheDocument();
-        expect(screen.getByText(/one telegram bot, 2 stores/i)).toBeInTheDocument();
-        expect(screen.getByText(/manager\/staff permission is checked per store/i)).toBeInTheDocument();
+        expect(screen.getByText('Telegram')).toBeInTheDocument();
+        expect(screen.getByText(/not linked/i)).toBeInTheDocument();
+        expect(screen.getByTitle(/default store for telegram commands/i)).toBeInTheDocument();
     });
 });

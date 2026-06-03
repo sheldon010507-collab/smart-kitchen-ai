@@ -52,9 +52,10 @@ export async function upsertKnowledgeItem(db: any, input: KnowledgeItemInput): P
   }
 
   let syncedInventory: any[] = [];
+  let createdInventory: any = null;
   const parLevel = Number(input.par_level ?? 0);
+  const names = [...new Set([canonicalName, ...aliases])];
   if (parLevel > 0) {
-    const names = [...new Set([canonicalName, ...aliases])];
     try {
       const { data: syncedRows, error: syncError } = await db
         .from('inventory_items')
@@ -72,7 +73,39 @@ export async function upsertKnowledgeItem(db: any, input: KnowledgeItemInput): P
     }
   }
 
-  return { ok: true, data: { item, aliases, synced_inventory: syncedInventory } };
+  try {
+    const { data: existingInventory, error: lookupError } = await db
+      .from('inventory_items')
+      .select('id, name, quantity_value, quantity_unit, min_stock_level')
+      .eq('business_id', input.business_id)
+      .in('name', names);
+
+    if (!lookupError && (!existingInventory || existingInventory.length === 0)) {
+      const { data: inventoryRow, error: insertError } = await db
+        .from('inventory_items')
+        .insert({
+          business_id: input.business_id,
+          name: canonicalName,
+          canonical_name: canonicalName,
+          category: input.category || null,
+          location: input.default_location || null,
+          quantity_value: 0,
+          quantity_unit: input.default_unit || 'pcs',
+          unit_cost: 0,
+          added_date: new Date().toISOString().split('T')[0],
+          min_stock_level: parLevel > 0 ? parLevel : null,
+          notes: input.notes || null,
+        })
+        .select('id, name, quantity_value, quantity_unit, min_stock_level')
+        .single();
+
+      if (!insertError) createdInventory = inventoryRow;
+    }
+  } catch {
+    createdInventory = null;
+  }
+
+  return { ok: true, data: { item, aliases, synced_inventory: syncedInventory, created_inventory: createdInventory } };
 }
 
 export async function searchKnowledgeItems(db: any, input: { business_id: string; query?: string; limit?: number }): Promise<ToolResult> {

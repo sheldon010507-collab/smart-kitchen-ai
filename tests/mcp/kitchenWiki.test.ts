@@ -63,4 +63,59 @@ describe('Kitchen Wiki MCP tools', () => {
       { business_id: 'biz-1', knowledge_item_id: 'wiki-1', alias: 'ARLA WHOLE MILK 2L' },
     ], { onConflict: 'business_id,alias' });
   });
+
+  it('creates a zero-stock inventory row when a new wiki item is missing from inventory', async () => {
+    const knowledgeBuilder = builder({
+      data: {
+        id: 'wiki-2',
+        business_id: 'biz-1',
+        canonical_name: 'Cream',
+      },
+      error: null,
+    });
+    const inventoryBuilder = builder({
+      data: {
+        id: 'item-2',
+        name: 'Cream',
+        quantity_value: 0,
+        quantity_unit: 'bottle',
+        min_stock_level: 2,
+      },
+      error: null,
+    });
+
+    const db = {
+      from: vi.fn((table: string) => {
+        if (table === 'kitchen_knowledge_items') return knowledgeBuilder;
+        if (table === 'inventory_items') return inventoryBuilder;
+        throw new Error(`unexpected table ${table}`);
+      }),
+    };
+
+    const result = await upsertKnowledgeItem(db as any, {
+      business_id: 'biz-1',
+      actor_user_id: 'user-1',
+      canonical_name: 'Cream',
+      category: 'Dairy',
+      default_location: 'Fridge',
+      default_unit: 'bottle',
+      par_level: 2,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(inventoryBuilder.insert).toHaveBeenCalledWith(expect.objectContaining({
+      business_id: 'biz-1',
+      name: 'Cream',
+      canonical_name: 'Cream',
+      category: 'Dairy',
+      location: 'Fridge',
+      quantity_value: 0,
+      quantity_unit: 'bottle',
+      min_stock_level: 2,
+    }));
+    expect((result.data as any).created_inventory).toEqual(expect.objectContaining({
+      id: 'item-2',
+      name: 'Cream',
+    }));
+  });
 });

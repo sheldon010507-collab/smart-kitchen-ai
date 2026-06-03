@@ -14,7 +14,7 @@ vi.mock('../../lib/AuthContext', () => ({
 
 vi.mock('../../lib/BusinessContext', () => ({
     useBusiness: vi.fn(() => ({
-        activeBusiness: { id: 'biz_1', name: 'Test Biz' },
+        activeBusiness: { id: 'biz_1', name: 'Test Biz', accessRole: 'Manager' },
         currentBusinessId: 'biz_1',
         isMasterView: false,
         businesses: [],
